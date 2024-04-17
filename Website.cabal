@@ -1,0 +1,85 @@
+cabal-version:      3.0
+name:               Website
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Owen Harvey
+maintainer:         owenlharvey@gmail.com
+-- copyright:
+category:           Web
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+    build-depends:  base
+                  , lens
+                  , servant
+                  , servant-server
+                  , containers
+                  , unordered-containers
+                  , mtl
+                  , transformers
+                  , warp
+                  , aeson
+                  , blaze
+                  , blaze-html
+                  , blaze-markup
+                  , servant-blaze
+                  , text
+                  , directory
+                  , http-api-data
+                  , transformers
+                  , mtl
+                  , time
+                  , sqlite-simple
+    default-extensions: DataKinds
+                      , OverloadedRecordDot
+                      , OverloadedStrings
+                      , DuplicateRecordFields
+                      , GeneralisedNewtypeDeriving
+                      , ScopedTypeVariables
+                      , ConstraintKinds
+
+library
+    import:           warnings
+    exposed-modules:  Website.Network.API
+                    , Website.Network.API.Types
+                    , Website.Network.API.CRUD
+                    , Website.Network.Server
+                    , Website.Content.Common
+                    , Website.Content.Entry
+                    , Website.Content.HTMX
+                    , Website.Types
+                    , Website.Data.Entry
+                    , Website.Data.Schema
+                    , Website.Data.Common
+                    , Free
+    -- other-modules:
+    -- other-extensions:
+    hs-source-dirs:   src
+    default-language: GHC2021
+
+executable Website
+    import:           warnings
+    main-is:          Main.hs
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    Website
+    hs-source-dirs:   app
+    default-language: GHC2021
+
+test-suite Website-test
+    import:           warnings
+    default-language: GHC2021
+    -- other-modules:
+    -- other-extensions:
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        base,
+        Website

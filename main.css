@@ -1,0 +1,56 @@
+body {
+  background-color: #D3D3D3;
+}
+
+a {
+  color: blue;
+}
+
+h1 {
+  text-align: center;
+}
+
+#main-content {
+  display: flex;
+  align-items: flex-start;
+}
+
+nav {
+  display: inline-block;
+  margin: 10px;
+}
+
+main {
+  display: inline-block;
+  margin: 10px;
+}
+
+nav ul {
+  padding: 0px;
+}
+
+nav ul li {
+  list-style: none;
+}
+
+label {
+  padding-right: 5px;
+}
+
+.contentform {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 4px;
+}
+
+.formlabel {
+  grid-column: 1;
+}
+
+.formvalue {
+  grid-column: 2;
+}
+
+.formbutton {
+  grid-column: 1 / -1;
+}
