@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Website.Network.API where
 
 import Text.Blaze.Html qualified as H
@@ -5,6 +7,10 @@ import Website.Content.Common
 import Website.Content.Entry
 import Website.Data.Entry
 import Website.Types
+import Servant
+import Website.Network.API.CRUD
+import Data.Text (Text)
+import Website.Network.API.Types
 
 getIndex :: (CanAppM c e m) => m H.Html
 getIndex = pure index
@@ -18,8 +24,11 @@ getEntryInitial :: (CanAppM Env Err m) => m H.Html
 getEntryInitial = pure entryCreationForm
 
 -- Create an Entry and get its value back as Html
-postEntry :: (CanAppM Env Err m) => EntryCreate -> m H.Html
-postEntry create = entryDisplayFullPage <$> createEntry create
+postEntry :: (CanAppM Env Err m) => EntryCreate -> m (Headers '[Header "HX-Location" Text] H.Html)
+postEntry create = do
+  entry <- createEntry create
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key
+  pure $ addHeader link mempty
 
 -- Get a given Entry
 getEntry :: (CanAppM Env Err m) => EntryKey -> m H.Html

@@ -3,12 +3,13 @@ module Website.Network.API.CRUD where
 import Servant
 import Servant.HTML.Blaze (HTML)
 import Text.Blaze.Html
+import Data.Text
 
 -- This should always be paired with CRUDCreate so that we can get the initial form
 -- for the CRUD creation, before posting to the CRUDCreate route, and getting the
 -- response back
 type CRUDCreateForm create = Get '[HTML] Html
-type CRUDCreate create = ReqBody '[FormUrlEncoded] create :> Post '[HTML] Html
+type CRUDCreate create = ReqBody '[FormUrlEncoded] create :> Post '[HTML] (Headers '[Header "HX-Location" Text] Html)
 
 -- Read a specific resource
 type CRUDRead key = Capture "key" key :> Get '[HTML] Html
