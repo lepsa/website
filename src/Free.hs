@@ -2,6 +2,8 @@
 
 module Free where
 
+-- Experiments with Free monads, and using them to make a DSL
+
 data Free f a
   = Free (f (Free f a))
   | Pure a

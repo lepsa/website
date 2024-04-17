@@ -2,6 +2,7 @@ module Website.Data.Common where
 
 import Data.Proxy
 
+-- |Values for a given form field
 data FieldData = FieldData
   { label :: String,
     name :: String,
@@ -9,6 +10,7 @@ data FieldData = FieldData
     value :: Maybe String
   }
 
+-- |Overall data for creation and update forms.
 data FormData = FormData
   { title :: String,
     createUrl :: Maybe String,

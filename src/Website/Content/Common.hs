@@ -15,6 +15,7 @@ import Website.Content.HTMX (htmxAttribute)
 siteTitle :: String
 siteTitle = "Owen's Site"
 
+-- |Helper function for generating typesafe internal API links for use in HTML attributes
 htmlLink ::
   ( IsElem endpoint TopAPI,
     HasLink endpoint,
@@ -26,6 +27,7 @@ htmlLink ::
 -- This also lets the API root routes work, otherwise the safeLink would be ""
 htmlLink = HA.href . H.textValue . linkText
 
+-- |Helper function when generating typesafe internal API links.
 linkText ::
   ( IsElem endpoint TopAPI,
     HasLink endpoint,
@@ -35,6 +37,7 @@ linkText ::
   Text
 linkText api = pack "/" <> toUrlPiece (safeLink topAPI api)
 
+-- |A common location for common header elements
 pageHeader :: Html
 pageHeader =
   H.header $
@@ -42,10 +45,12 @@ pageHeader =
       H.h1 $
         toHtml siteTitle
 
+-- |A common location for common footer elements
 pageFooter :: Html
 pageFooter =
   H.footer mempty
 
+-- |A common location for including resources needed by all pages. Invoked by 'basicPage'
 commonHead :: Html
 commonHead =
   H.head $
@@ -55,6 +60,7 @@ commonHead =
         H.title $ toHtml siteTitle
       ]
 
+-- |Builds the list of links on the side. Invoked by 'basicPage'
 sideNav :: Html
 sideNav =
   H.nav $
@@ -66,6 +72,10 @@ sideNav =
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
 
+-- |'basicPage' should be used as a wrapper on any route that could be loaded directly by a
+-- user. This could be due to a page refresh, bookmark, history, etc.
+-- 'basicPage' includes all content and overall page structure that is required for styling and
+-- HTMX interactivity.
 basicPage :: Html -> Html
 basicPage content =
   mconcat
@@ -84,37 +94,31 @@ basicPage content =
           ]
     ]
 
+-- |Initial landing page.
 index :: Html
 index =
   basicPage $
     H.p "Hello, Index!"
 
-foo :: Html
-foo =
-  basicPage $
-    mconcat
-      [ H.p "Hello, World!"
-      ]
-
-dynamic :: String -> Html
-dynamic s = H.p $ H.toHtml s
-
+-- |Helper function for building forms. Will apply styling, labels, and values.
 formField :: String -> String -> String -> Maybe String -> Html
 formField fieldName fieldLabel type_ value = mconcat
   [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel
   , H.input ! HA.class_ "formvalue" ! HA.name (toValue fieldName) ! HA.type_ (toValue type_) ! maybe mempty (HA.value . stringValue) value
   ]
 
+-- |Helper function for building textarea inputs
 formFieldTextArea :: String -> String -> Maybe String -> Html
 formFieldTextArea fieldName fieldLabel value = mconcat
   [ H.label ! HA.for (toValue fieldName) $ toHtml fieldLabel
   , H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
   ]
 
+-- |Generate an empty form for a given type. This form can be used to create a new value for the type.
 generateNewForm :: GenerateForm a => Proxy a -> Html
 generateNewForm p = H.form
   ! HA.class_ "contentform"
-  ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
+  ! maybe mempty (htmxAttribute "hx-post" . stringValue) fd.createUrl
   $ mconcat
   [ mconcat $ intersperse H.br $ generateField <$> fd.fields
   , H.br
@@ -123,6 +127,7 @@ generateNewForm p = H.form
   where
     fd = newForm p
 
+-- |Generate a form for editing a given value. Fields will be pre-populated with existing values.
 generateUpdateForm :: GenerateForm a => a -> Html
 generateUpdateForm a = H.form
   ! HA.class_ "contentform"
@@ -138,5 +143,6 @@ generateUpdateForm a = H.form
   where
     fd = updateForm a
 
+-- |Helper function for generating forms
 generateField :: FieldData -> Html
 generateField fd = formField fd.name fd.label fd.type_ fd.value

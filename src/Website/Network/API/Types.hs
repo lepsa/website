@@ -6,6 +6,10 @@ import Text.Blaze.Html
 import {-# SOURCE #-} Website.Data.Entry
 import Website.Network.API.CRUD
 
+--
+-- Top level API. The type is used when writing servers, and the value is used to generate API type safe links.
+--
+
 topAPI :: Proxy TopAPI
 topAPI = Proxy
 

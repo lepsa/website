@@ -8,11 +8,18 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField (toField)
 import Website.Types
 
+-- Create the Entry table
 createEntry :: Query
 createEntry = "create table if not exists entry (key integer primary key, created datetime not null, title text not null, value text not null)"
 
+-- Create a table for tracking the schema version
 createVersion :: Query
 createVersion = "create table if not exists schema_version (version integer not null)"
+
+-- Set an initial value for schema versions, as otherwise the table will be empty and break
+-- the other schema version bumping
+initialVersion :: Query
+initialVersion = "insert into schema_version (version) values (0)"
 
 getSchemaVersion :: Query
 getSchemaVersion = "select version from schema_version"
@@ -20,15 +27,11 @@ getSchemaVersion = "select version from schema_version"
 setSchema :: Query
 setSchema = "update schema_version set version = ?"
 
+-- This is run on application start to ensure that the schema_version table exists
 createSchema :: (CanAppM Env e m) => m ()
 createSchema = do
   c <- asks conn
-  liftIO $
-    traverse_
-      (execute_ c)
-      [ createVersion,
-        createEntry
-      ]
+  liftIO $ execute_ c createVersion
 
 newtype Version = Version Int
   deriving (Eq, Ord, Show, Read, Num)
@@ -44,7 +47,7 @@ runMigrations = do
   c <- asks conn
   versions <- liftIO $ withTransaction c $ query_ c getSchemaVersion
   currentVersion <- case versions of
-    [] -> pure 0
+    [] -> pure 0 -- When there is no result from the schema_version table set a minimum value to start the process
     [version] -> pure version
     _ -> throwError TooManyResults
   liftIO $ putStrLn $ "Schema: " <> show currentVersion
@@ -58,20 +61,35 @@ runMigrations = do
       -- if anything fails, the transaction aborts and
       -- the error propagates up, stopping the rest of
       -- the changes and the server starting.
-      (withExclusiveTransaction c . runMigration c currentVersion . snd)
+      (withExclusiveTransaction c . runMigration c)
       migrationsToRun
   where
     comp (a, _) (b, _) = compare a b
 
-runMigration :: Connection -> Version -> [Query] -> IO ()
-runMigration c currentVersion queries = do
+runMigration :: Connection -> (Version, [Query]) -> IO ()
+runMigration c (version, queries) = do
+  -- Run the migration queries
   traverse_ (execute_ c) queries
-  execute c setSchema $ currentVersion + 1
+  -- Bump the schema version for the current migration.
+  execute c setSchema $ version + 1
+  putStrLn $ "Ran migration for schema: " <> show version
 
+-- Set the initial version of the schema to "0" so that other
+-- schema bumps have something to work against. When this migration
+-- is run, it will be immediately followed by a schema version bump
+-- so the rest of the migration code can run properly.
 migrateSchemaV0 :: [Query]
-migrateSchemaV0 = []
+migrateSchemaV0 =
+  [ initialVersion
+  ]
+
+migrateSchemaV1 :: [Query]
+migrateSchemaV1 =
+  [ createEntry
+  ]
 
 migrations :: [(Version, [Query])]
 migrations =
-  [ (0, migrateSchemaV0)
+  [ (0, migrateSchemaV0),
+    (1, migrateSchemaV1)
   ]

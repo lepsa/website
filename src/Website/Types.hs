@@ -5,10 +5,16 @@ import Control.Monad.Reader
 import Database.SQLite.Simple
 import Servant
 
+--
+-- Server configration values
+--
 newtype Env = Env
   { conn :: Connection
   }
 
+--
+-- Mapping application errors to servant errors
+--
 data Err
   = NotFound
   | TooManyResults
@@ -18,6 +24,10 @@ errToServerError :: Err -> ServerError
 errToServerError NotFound = err404
 errToServerError TooManyResults = err404
 
+--
+-- Application monad stack and type constraints.
+-- Helper functions when working with Servant.
+--
 type AppM c e m a = ReaderT c (ExceptT e m) a
 
 type CanAppM c e m = (MonadReader c m, MonadError e m, MonadIO m)
@@ -27,5 +37,5 @@ runAppM c m = runExceptT $ runReaderT m c
 
 runAppMToHandler :: c -> AppM c Err IO a -> Handler a
 runAppMToHandler c m = do
-  e <- liftIO $ runExceptT $ runReaderT m c
+  e <- liftIO $ runAppM c m
   either (throwError . errToServerError) pure e

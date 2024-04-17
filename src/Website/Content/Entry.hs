@@ -16,14 +16,16 @@ import Website.Network.API.Types
 entryUpdateForm :: Entry -> Html
 entryUpdateForm = generateUpdateForm
 
+-- Page to create a new Entry
 entryCreationForm :: Html
 entryCreationForm =
   basicPage $
     generateNewForm $
       Proxy @Entry
 
-entryDisplaySimple :: Entry -> Html
-entryDisplaySimple entry =
+-- |Display an entry, with edit and delete buttons
+entryDisplay :: Entry -> Html
+entryDisplay entry =
   H.div
     ! HA.id "entry"
     $ mconcat
@@ -54,9 +56,11 @@ entryDisplaySimple entry =
         ! htmxAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDDelete EntryKey)) entry.key)
         $ "Delete"
 
-entryDisplay :: Entry -> Html
-entryDisplay = basicPage . entryDisplaySimple
+-- |As 'entryDisplay' with 'basicPage' wrapping
+entryDisplayFullPage :: Entry -> Html
+entryDisplayFullPage = basicPage . entryDisplay
 
+-- |List all entries as a page
 entryList :: [Entry] -> Html
 entryList entries =
   basicPage $

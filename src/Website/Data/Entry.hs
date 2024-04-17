@@ -15,6 +15,11 @@ import GHC.Generics
 import Servant
 import Web.FormUrlEncoded
 
+--
+-- What an Entry is, and the various derived types that
+-- are needed to help run the API and DB in typesafe ways
+--
+
 newtype EntryKey = EntryKey
   { key :: Int
   }
@@ -46,6 +51,9 @@ data Entry = Entry
   }
   deriving (Eq, Ord, Show)
 
+--
+-- What an Entry should look like in HTML
+--
 instance GenerateForm Entry where
   newForm _ =
     FormData
@@ -87,6 +95,10 @@ instance GenerateForm Entry where
               }
           ]
       }
+
+--
+-- SQL for managing entries in the DB
+--
 
 instance FromRow Entry where
   fromRow =
