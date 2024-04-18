@@ -7,13 +7,13 @@ import Data.Time
 import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.ToField
+import GHC.Generics
+import Servant
+import Web.FormUrlEncoded
 import Website.Data.Common
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
-import GHC.Generics
-import Servant
-import Web.FormUrlEncoded
 
 --
 -- What an Entry is, and the various derived types that
@@ -51,50 +51,61 @@ data Entry = Entry
   }
   deriving (Eq, Ord, Show)
 
+entryTimeFormat :: TimeZone -> UTCTime -> String
+entryTimeFormat tz = formatTime defaultTimeLocale "%e %B ,%Y" . utcToZonedTime tz
+
 --
 -- What an Entry should look like in HTML
 --
 instance GenerateForm Entry where
   newForm _ =
-    FormData
-      { title = "Create Entry",
-        createUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDCreate EntryCreate))),
-        updateUrl = Nothing,
-        fields =
-          [ FieldData
-              { label = "Title",
-                name = "title",
-                type_ = "text",
-                value = Nothing
-              },
-            FieldData
-              { label = "Value",
-                name = "value",
-                type_ = "text",
-                value = Nothing
-              }
-          ]
-      }
-  updateForm entry =
-    FormData
-      { title = "Update Entry",
-        createUrl = Nothing,
-        updateUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDUpdate EntryUpdate EntryKey)) entry.key),
-        fields =
-          [ FieldData
-              { label = "Title",
-                name = "title",
-                type_ = "text",
-                value = pure entry.title
-              },
-            FieldData
-              { label = "Value",
-                name = "value",
-                type_ = "text",
-                value = pure entry.value
-              }
-          ]
-      }
+    pure $
+      FormData
+        { title = "Create Entry",
+          createUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDCreate EntryCreate))),
+          updateUrl = Nothing,
+          fields =
+            [ FieldData
+                { label = "Title",
+                  name = "title",
+                  type_ = "text",
+                  value = Nothing
+                },
+              FieldData
+                { label = "Value",
+                  name = "value",
+                  type_ = "textarea",
+                  value = Nothing
+                }
+            ]
+        }
+  updateForm entry = do
+    tz <- asks timeZone
+    pure $
+      FormData
+        { title = "Update Entry",
+          createUrl = Nothing,
+          updateUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDUpdate EntryUpdate EntryKey)) entry.key),
+          fields =
+            [ FieldData
+                { label = "Title",
+                  name = "title",
+                  type_ = "text",
+                  value = pure entry.title
+                },
+              StaticData
+                { label = "Created",
+                  name = "created",
+                  value = pure $ entryTimeFormat tz entry.created
+                },
+              FieldData
+                { label = "Value",
+                  name = "value",
+                  type_ = "textarea",
+                  value = pure entry.value
+                }
+            ]
+        }
 
 --
 -- SQL for managing entries in the DB

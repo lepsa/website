@@ -4,12 +4,14 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Database.SQLite.Simple
 import Servant
+import Data.Time.LocalTime
 
 --
 -- Server configration values
 --
-newtype Env = Env
+data Env = Env
   { conn :: Connection
+  , timeZone :: TimeZone
   }
 
 --

@@ -1,14 +1,15 @@
 module Main where
 
 import Control.Monad
+import Data.Time
 import Database.SQLite.Simple
+import Network.Wai.Handler.Warp
+import Servant.Server
+import System.Directory
 import Website.Data.Schema
 import Website.Network.API.Types
 import Website.Network.Server
 import Website.Types
-import Network.Wai.Handler.Warp
-import Servant.Server
-import System.Directory
 
 main :: IO ()
 main = do
@@ -17,6 +18,7 @@ main = do
   env <-
     Env
       <$> open "db.sqlite"
+      <*> getCurrentTimeZone
   either (error . show) pure <=< runAppM env $ do
     createSchema
     runMigrations
