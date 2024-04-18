@@ -24,7 +24,7 @@ getEntryInitial :: (CanAppM Env Err m) => m H.Html
 getEntryInitial = pure entryCreationForm
 
 -- Create an Entry and get its value back as Html
-postEntry :: (CanAppM Env Err m) => EntryCreate -> m (Headers '[Header "HX-Location" Text] H.Html)
+postEntry :: (CanAppM Env Err m) => EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
 postEntry create = do
   entry <- createEntry create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key

@@ -9,7 +9,7 @@ import Data.Text
 -- for the CRUD creation, before posting to the CRUDCreate route, and getting the
 -- response back
 type CRUDCreateForm create = Get '[HTML] Html
-type CRUDCreate create = ReqBody '[FormUrlEncoded] create :> Post '[HTML] (Headers '[Header "HX-Location" Text] Html)
+type CRUDCreate create = ReqBody '[FormUrlEncoded] create :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
 
 -- Read a specific resource
 type CRUDRead key = Capture "key" key :> Get '[HTML] Html
@@ -30,5 +30,6 @@ type CRUD create update key =
     :<|> CRUDCreateForm create
     :<|> CRUDRead key
     :<|> CRUDUpdate update key
-    :<|> CRUDUpdateForm key
+    :<|> CRUDUpdateForm
+     key
     :<|> CRUDDelete key

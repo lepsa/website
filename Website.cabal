@@ -52,7 +52,6 @@ library
                     , Website.Network.Server
                     , Website.Content.Common
                     , Website.Content.Entry
-                    , Website.Content.HTMX
                     , Website.Types
                     , Website.Data.Entry
                     , Website.Data.Schema

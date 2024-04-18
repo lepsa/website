@@ -10,7 +10,6 @@ import Text.Blaze.Html qualified as H
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as HA
 import Website.Data.Common
-import Website.Content.HTMX (htmxAttribute)
 
 siteTitle :: String
 siteTitle = "Owen's Site"
@@ -96,9 +95,13 @@ basicPage content =
 
 -- |Initial landing page.
 index :: Html
-index =
-  basicPage $
-    H.p "Hello, Index!"
+index = basicPage $
+  mconcat
+    [ H.p "Welcome to my website."
+    , H.p "I use this as a test bed for various ways of deploying code and working with server-driven client interactions."
+    , H.p "The current version of the site uses a REST architecture where the server sends pre-rendered HTML with expected state interactions."
+    , H.p "HTMX is used to help with server interactions, mainly extending HTTP verb support in forms and allowing a small amount of client side updating for user interactions."
+    ]
 
 -- |Helper function for building forms. Will apply styling, labels, and values.
 formField :: String -> String -> String -> Maybe String -> Html
@@ -118,7 +121,7 @@ formFieldTextArea fieldName fieldLabel value = mconcat
 generateNewForm :: GenerateForm a => Proxy a -> Html
 generateNewForm p = H.form
   ! HA.class_ "contentform"
-  ! maybe mempty (htmxAttribute "hx-post" . stringValue) fd.createUrl
+  ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
   $ mconcat
   [ mconcat $ intersperse H.br $ generateField <$> fd.fields
   , H.br
@@ -131,7 +134,7 @@ generateNewForm p = H.form
 generateUpdateForm :: GenerateForm a => a -> Html
 generateUpdateForm a = H.form
   ! HA.class_ "contentform"
-  ! maybe mempty (htmxAttribute "hx-put" . stringValue) fd.updateUrl
+  ! maybe mempty (dataAttribute "hx-put" . stringValue) fd.updateUrl
   $ mconcat
   [ mconcat $ intersperse H.br $ generateField <$> fd.fields
   , H.br

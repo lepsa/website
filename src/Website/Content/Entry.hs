@@ -2,16 +2,20 @@ module Website.Content.Entry where
 
 import Data.List (sortBy)
 import Data.Text
+import Data.Time
+import Data.Time.Format.ISO8601
 import Servant
 import Text.Blaze.Html
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as HA
 import Text.Blaze.Internal as H
 import Website.Content.Common
-import Website.Content.HTMX
 import Website.Data.Entry
 import Website.Network.API.CRUD
 import Website.Network.API.Types
+
+entryTimeFormat :: UTCTime -> String
+entryTimeFormat = formatShow iso8601Format
 
 entryUpdateForm :: Entry -> Html
 entryUpdateForm = generateUpdateForm
@@ -23,13 +27,14 @@ entryCreationForm =
     generateNewForm $
       Proxy @Entry
 
--- |Display an entry, with edit and delete buttons
+-- | Display an entry, with edit and delete buttons
 entryDisplay :: Entry -> Html
 entryDisplay entry =
   H.div
     ! HA.id "entry"
     $ mconcat
       [ H.h3 $ toHtml entry.title,
+        H.p $ toHtml $ "Created " <> entryTimeFormat entry.created,
         H.p $ toHtml entry.value,
         H.div
           ! HA.id "edit-delete-buttons"
@@ -42,25 +47,26 @@ entryDisplay entry =
     edit :: Html
     edit =
       H.button
-        ! htmxAttribute "hx-trigger" "click"
-        ! htmxAttribute "hx-swap" "outerHTML"
-        ! htmxAttribute "hx-target" "#entry"
-        ! htmxAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDUpdateForm EntryKey)) entry.key)
+        ! dataAttribute "hx-trigger" "click"
+        ! dataAttribute "hx-swap" "outerHTML"
+        ! dataAttribute "hx-target" "#entry"
+        ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDUpdateForm EntryKey)) entry.key)
         $ "Edit"
     delete :: Html
     delete =
       H.button
-        ! htmxAttribute "hx-trigger" "click"
-        ! htmxAttribute "hx-swap" "outerHTML"
-        ! htmxAttribute "hx-target" "#edit-delete-buttons"
-        ! htmxAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDDelete EntryKey)) entry.key)
+        ! dataAttribute "hx-trigger" "click"
+        ! dataAttribute "hx-swap" "outerHTML"
+        ! dataAttribute "hx-target" "#edit-delete-buttons"
+        ! dataAttribute "hx-confirm" "Confirm deletion"
+        ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDDelete EntryKey)) entry.key)
         $ "Delete"
 
--- |As 'entryDisplay' with 'basicPage' wrapping
+-- | As 'entryDisplay' with 'basicPage' wrapping
 entryDisplayFullPage :: Entry -> Html
 entryDisplayFullPage = basicPage . entryDisplay
 
--- |List all entries as a page
+-- | List all entries as a page
 entryList :: [Entry] -> Html
 entryList entries =
   basicPage $
@@ -74,7 +80,13 @@ entryList entries =
   where
     entryLink :: Entry -> Html
     entryLink entry =
-      H.li $ H.a ! (HA.href $ H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key)) $ toHtml entry.title
+      H.li
+        $ mconcat
+        [ H.a
+          ! (HA.href $ H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key))
+          $ toHtml entry.title,
+          toHtml $ " (" <> entryTimeFormat entry.created <> ")"
+        ]
     newEntry :: Html
     newEntry =
       H.a ! htmlLink (Proxy @("entry" :> CRUDCreate EntryCreate)) $ "Create Entry"
