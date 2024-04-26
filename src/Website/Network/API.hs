@@ -8,6 +8,13 @@ import Website.Content.Entry
 import Website.Data.Entry
 import Website.Types
 import Servant
+    ( addHeader,
+      safeLink,
+      Proxy(Proxy),
+      ToHttpApiData(toUrlPiece),
+      Header,
+      Headers
+    )
 import Website.Network.API.CRUD
 import Data.Text (Text)
 import Website.Network.API.Types
@@ -27,7 +34,7 @@ getEntryInitial = entryCreationForm
 postEntry :: (CanAppM Env Err m) => EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
 postEntry create = do
   entry <- createEntry create
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key
   pure $ addHeader link mempty
 
 -- Get a given Entry

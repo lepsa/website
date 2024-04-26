@@ -36,6 +36,12 @@ common warnings
                   , mtl
                   , time
                   , sqlite-simple
+                  , uuid
+                  , bytestring
+                  , servant-auth
+                  , servant-auth-server
+                  , jose
+
     default-extensions: DataKinds
                       , OverloadedRecordDot
                       , OverloadedStrings
@@ -56,6 +62,9 @@ library
                     , Website.Data.Entry
                     , Website.Data.Schema
                     , Website.Data.Common
+                    , Website.Data.User
+                    , Website.Auth.Authentication
+                    , Website.Auth.Authorisation
                     , Free
     -- other-modules:
     -- other-extensions:

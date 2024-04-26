@@ -30,14 +30,14 @@ errToServerError TooManyResults = err404
 -- Application monad stack and type constraints.
 -- Helper functions when working with Servant.
 --
-type AppM c e m a = ReaderT c (ExceptT e m) a
+type AppM c e m = ReaderT c (ExceptT e m)
 
 type CanAppM c e m = (MonadReader c m, MonadError e m, MonadIO m)
 
 runAppM :: c -> AppM c e m a -> m (Either e a)
 runAppM c m = runExceptT $ runReaderT m c
 
-runAppMToHandler :: c -> AppM c Err IO a -> Handler a
+runAppMToHandler :: c -> AppM c ServerError IO a -> Handler a
 runAppMToHandler c m = do
   e <- liftIO $ runAppM c m
-  either (throwError . errToServerError) pure e
+  either throwError pure e

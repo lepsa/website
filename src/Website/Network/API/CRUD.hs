@@ -30,6 +30,5 @@ type CRUD create update key =
     :<|> CRUDCreateForm create
     :<|> CRUDRead key
     :<|> CRUDUpdate update key
-    :<|> CRUDUpdateForm
-     key
+    :<|> CRUDUpdateForm key
     :<|> CRUDDelete key

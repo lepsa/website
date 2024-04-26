@@ -7,6 +7,7 @@ import Data.List (sortBy)
 import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField (toField)
 import Website.Types
+import Servant (ServerError, err404)
 
 -- Create the Entry table
 createEntry :: Query
@@ -27,6 +28,12 @@ getSchemaVersion = "select version from schema_version"
 setSchema :: Query
 setSchema = "update schema_version set version = ?"
 
+getJWK :: Query
+getJWK = "select value from jwk"
+
+insertJWK :: Query
+insertJWK = "insert into jwk (value) values (?)"
+
 -- This is run on application start to ensure that the schema_version table exists
 createSchema :: (CanAppM Env e m) => m ()
 createSchema = do
@@ -42,14 +49,14 @@ instance FromRow Version where
 instance ToRow Version where
   toRow (Version v) = pure $ toField v
 
-runMigrations :: (CanAppM Env Err m) => m ()
+runMigrations :: (CanAppM Env ServerError m) => m ()
 runMigrations = do
   c <- asks conn
   versions <- liftIO $ withTransaction c $ query_ c getSchemaVersion
   currentVersion <- case versions of
     [] -> pure 0 -- When there is no result from the schema_version table set a minimum value to start the process
     [version] -> pure version
-    _ -> throwError TooManyResults
+    _ -> throwError err404
   liftIO $ putStrLn $ "Schema: " <> show currentVersion
   let migrationsToRun =
         filter (\(v, _) -> v >= currentVersion) $
@@ -88,8 +95,14 @@ migrateSchemaV1 =
   [ createEntry
   ]
 
+migrateSchemaV2 :: [Query]
+migrateSchemaV2 =
+  [ "create table if not exists jwk (value text not null)"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
-    (1, migrateSchemaV1)
+    (1, migrateSchemaV1),
+    (2, migrateSchemaV2)
   ]

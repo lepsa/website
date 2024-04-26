@@ -3,7 +3,7 @@ module Website.Content.Common where
 import Control.Monad.Reader
 import Data.List
 import Data.Text (Text, pack)
-import Servant
+import Servant hiding (BasicAuth)
 import Servant.HTML.Blaze
 import Text.Blaze.Html
 import Text.Blaze.Html qualified as H
@@ -12,6 +12,8 @@ import Text.Blaze.Html5.Attributes qualified as HA
 import Website.Data.Common
 import Website.Network.API.Types
 import Website.Types
+import Website.Data.User
+import Servant.Auth
 
 siteTitle :: String
 siteTitle = "Owen's Site"
@@ -68,7 +70,7 @@ sideNav =
     H.ul $
       mconcat
         [ H.li $ H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a ! htmlLink (Proxy @("entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a ! htmlLink (Proxy @(Auth Auths User :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]

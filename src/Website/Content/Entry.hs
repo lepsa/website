@@ -4,7 +4,7 @@ import Control.Monad.Reader
 import Data.List (sortBy)
 import Data.Text
 import Data.Time
-import Servant
+import Servant hiding (BasicAuth)
 import Text.Blaze.Html
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as HA
@@ -48,7 +48,7 @@ entryDisplay entry = do
         ! dataAttribute "hx-trigger" "click"
         ! dataAttribute "hx-swap" "outerHTML"
         ! dataAttribute "hx-target" "#entry"
-        ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDUpdateForm EntryKey)) entry.key)
+        ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
         $ "Edit"
     delete :: Html
     delete =
@@ -57,7 +57,7 @@ entryDisplay entry = do
         ! dataAttribute "hx-swap" "outerHTML"
         ! dataAttribute "hx-target" "#edit-delete-buttons"
         ! dataAttribute "hx-confirm" "Confirm deletion"
-        ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @("entry" :> CRUDDelete EntryKey)) entry.key)
+        ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
@@ -84,12 +84,12 @@ entryList entries = do
       H.li $
         mconcat
           [ H.a
-              ! (HA.href $ H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDRead EntryKey)) entry.key))
+              ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
               $ toHtml entry.title,
             toHtml $ " " <> entryTimeFormat tz entry.created
           ]
     newEntry :: Html
     newEntry =
-      H.a ! htmlLink (Proxy @("entry" :> CRUDCreate EntryCreate)) $ "Create Entry"
+      H.a ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
     sortEntries = sortBy $ \a b ->
       compare a.created b.created

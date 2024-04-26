@@ -8,12 +8,14 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.ToField
 import GHC.Generics
-import Servant
+import Servant hiding (BasicAuth)
 import Web.FormUrlEncoded
 import Website.Data.Common
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
+import Servant.Auth
+import Website.Data.User (User)
 
 --
 -- What an Entry is, and the various derived types that
@@ -54,6 +56,8 @@ data Entry = Entry
 entryTimeFormat :: TimeZone -> UTCTime -> String
 entryTimeFormat tz = formatTime defaultTimeLocale "%e %B ,%Y" . utcToZonedTime tz
 
+type AuthEntry a = Auth Auths User :> "entry" :> a
+
 --
 -- What an Entry should look like in HTML
 --
@@ -62,7 +66,7 @@ instance GenerateForm Entry where
     pure $
       FormData
         { title = "Create Entry",
-          createUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDCreate EntryCreate))),
+          createUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDCreate EntryCreate)))),
           updateUrl = Nothing,
           fields =
             [ FieldData
@@ -85,7 +89,7 @@ instance GenerateForm Entry where
       FormData
         { title = "Update Entry",
           createUrl = Nothing,
-          updateUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @("entry" :> CRUDUpdate EntryUpdate EntryKey)) entry.key),
+          updateUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
           fields =
             [ FieldData
                 { label = "Title",
@@ -154,4 +158,4 @@ deleteEntry key = do
 getEntries :: (CanAppM Env e m) => m [Entry]
 getEntries = do
   c <- asks conn
-  liftIO $ withTransaction c $ query c "select * from entry" ()
+  liftIO $ withTransaction c $ query_ c "select * from entry"
