@@ -31,7 +31,7 @@ main = do
   either (error . show) pure <=< runAppM env $ do
     createSchema
     runMigrations
-  jwtKey <- generateKey
+  jwtKey <- getJwtKey env
   let jwtSettings = defaultJWTSettings jwtKey
       cfg = BasicAuthCfg' () :. defaultCookieSettings :. jwtSettings :. EmptyContext
   run 8080 $
@@ -45,10 +45,12 @@ getJwtKey env = do
     jsons <- query_ c getJWK
     case jsons of
       [] -> do
+        putStrLn "No JWK found, making a new one."
         jwk <- generateKey
         execute c insertJWK (Only $ BSL8.unpack $ encode jwk)
         pure jwk
-      [Only json] ->
+      [Only json] -> do
+        putStrLn "Found a JWK entry, decoding"
         case eitherDecode $ BSL8.pack json of
           Right jwk -> pure jwk
           Left s -> error s
