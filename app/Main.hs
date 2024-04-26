@@ -17,7 +17,7 @@ import Data.Proxy
 import Data.Aeson (encode, eitherDecode)
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 
-newtype BasicAuthCfg' = BasicAuthCfg' ()
+data BasicAuthCfg' = BasicAuthCfg'
 type instance BasicAuthCfg = BasicAuthCfg'
 
 main :: IO ()
@@ -33,7 +33,7 @@ main = do
     runMigrations
   jwtKey <- getJwtKey env
   let jwtSettings = defaultJWTSettings jwtKey
-      cfg = BasicAuthCfg' () :. defaultCookieSettings :. jwtSettings :. EmptyContext
+      cfg = BasicAuthCfg' :. defaultCookieSettings :. jwtSettings :. EmptyContext
   run 8080 $
     serveWithContext topAPI cfg $
       hoistServerWithContext topAPI (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings]) (runAppMToHandler env) $

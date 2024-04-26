@@ -8,13 +8,6 @@ import Website.Content.Entry
 import Website.Data.Entry
 import Website.Types
 import Servant
-    ( addHeader,
-      safeLink,
-      Proxy(Proxy),
-      ToHttpApiData(toUrlPiece),
-      Header,
-      Headers
-    )
 import Website.Network.API.CRUD
 import Data.Text (Text)
 import Website.Network.API.Types

@@ -4,7 +4,7 @@ import Control.Monad.Reader
 import Data.List (sortBy)
 import Data.Text
 import Data.Time
-import Servant hiding (BasicAuth)
+import Servant
 import Text.Blaze.Html
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as HA

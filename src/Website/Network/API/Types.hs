@@ -1,13 +1,13 @@
 module Website.Network.API.Types where
 
 import Servant (Proxy (..))
-import Servant.HTML.Blaze (HTML)
+import Servant.HTML.Blaze
 import Text.Blaze.Html
 import {-# SOURCE #-} Website.Data.Entry
 import Website.Network.API.CRUD
 import Servant.Auth
-import Website.Data.User (User)
-import Website.Auth.Authentication (Login)
+import Website.Data.User
+import Website.Auth.Authentication
 import Servant.Auth.Server
 import Servant.API hiding (BasicAuth)
 

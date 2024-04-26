@@ -8,14 +8,14 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.ToField
 import GHC.Generics
-import Servant hiding (BasicAuth)
+import Servant
 import Web.FormUrlEncoded
 import Website.Data.Common
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
 import Servant.Auth
-import Website.Data.User (User)
+import Website.Data.User
 
 --
 -- What an Entry is, and the various derived types that

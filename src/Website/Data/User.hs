@@ -1,14 +1,14 @@
 module Website.Data.User where
 
 import Data.UUID
-import Website.Auth.Authorisation ( Group(Admin) )
+import Website.Auth.Authorisation (Group(Admin))
 import Data.Text
 import GHC.Generics
 import Data.Aeson
 import Servant.Auth.JWT
 import Servant.Auth.Server
-import Data.UUID.V4 (nextRandom)
-import Website.Auth.Authentication (checkUserPass)
+import Data.UUID.V4
+import Website.Auth.Authentication
 
 data User = User
   { userId :: UUID

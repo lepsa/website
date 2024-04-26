@@ -1,7 +1,7 @@
 module Website.Auth.Authentication where
 import Data.ByteString
-import GHC.Generics (Generic)
-import Web.FormUrlEncoded (FromForm)
+import GHC.Generics
+import Web.FormUrlEncoded
 
 data Login = Login
   { user :: String

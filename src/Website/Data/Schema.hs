@@ -3,11 +3,11 @@ module Website.Data.Schema where
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Foldable
-import Data.List (sortBy)
+import Data.List
 import Database.SQLite.Simple
-import Database.SQLite.Simple.ToField (toField)
+import Database.SQLite.Simple.ToField
 import Website.Types
-import Servant (ServerError, err404)
+import Servant
 
 -- Create the Entry table
 createEntry :: Query

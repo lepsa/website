@@ -1,7 +1,7 @@
 module Website.Network.API.CRUD where
 
 import Servant
-import Servant.HTML.Blaze (HTML)
+import Servant.HTML.Blaze
 import Text.Blaze.Html
 import Data.Text
 
@@ -26,7 +26,7 @@ type CRUDDelete key = Capture "key" key :> "delete" :> Delete '[HTML] Html
 -- A template for creating CRUD servers for specific types.
 -- It will ensure that pages are provided so that users can perform the required actions
 type CRUD create update key =
-  CRUDCreate create
+         CRUDCreate create
     :<|> CRUDCreateForm create
     :<|> CRUDRead key
     :<|> CRUDUpdate update key
