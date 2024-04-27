@@ -53,7 +53,8 @@ common warnings
 
 library
     import:           warnings
-    exposed-modules:  Website.Network.API
+    exposed-modules:  Website
+                    , Website.Network.API
                     , Website.Network.API.Types
                     , Website.Network.API.CRUD
                     , Website.Network.Server
@@ -92,6 +93,8 @@ test-suite Website-test
     other-modules:    Test.StateMachine
                     , Test.Api
                     , Test.Db
+                    , Test.Db.Entry
+                    , Test.Db.User
     build-depends:
         base,
         Website,

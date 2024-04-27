@@ -51,7 +51,7 @@ data Entry = Entry
     title :: String,
     value :: String
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 entryTimeFormat :: TimeZone -> UTCTime -> String
 entryTimeFormat tz = formatTime defaultTimeLocale "%e %B ,%Y" . utcToZonedTime tz
@@ -135,7 +135,7 @@ createEntry (EntryCreate title value) = do
 getEntry :: (CanAppM Env Err m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "select * from entry where key = ?" (Only key)
+  entries <- liftIO $ withTransaction c $ query c "select key, created, title, value from entry where key = ?" (Only key)
   case entries of
     [] -> throwError $ DbError NotFound
     [entry] -> pure entry
@@ -158,4 +158,4 @@ deleteEntry key = do
 getEntries :: (CanAppM Env e m) => m [Entry]
 getEntries = do
   c <- asks conn
-  liftIO $ withTransaction c $ query_ c "select * from entry"
+  liftIO $ withTransaction c $ query_ c "select key, created, title, value from entry"

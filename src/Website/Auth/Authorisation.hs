@@ -1,4 +1,5 @@
 module Website.Auth.Authorisation where
+
 import Data.Aeson
 import GHC.Generics
 import Database.SQLite.Simple.FromField
