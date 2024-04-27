@@ -9,13 +9,11 @@ import Data.UUID
 import Website.Auth.Authorisation (Group)
 import Data.Text hiding (group)
 import GHC.Generics
-import Data.Aeson
 import Servant.Auth.JWT
 import Servant.Auth.Server
 import Data.UUID.V4
 import Database.SQLite.Simple
 import Website.Types
-import Data.ByteString hiding (group)
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Password.Argon2 (hashPassword, mkPassword, unPasswordHash, checkPassword, PasswordCheck (..), Argon2, PasswordHash (..))
@@ -27,6 +25,7 @@ import Database.SQLite.Simple.ToField
 import Website.Data.Common (ensureSingleResult, ensureSingleInsert)
 import Data.Bifunctor
 import Database.SQLite.Simple.FromRow
+import Web.FormUrlEncoded
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
@@ -37,15 +36,6 @@ instance ToField UUID where
   toField = toField . toString
 instance FromRow UUID where
   fromRow = fieldWith fromField
-
-data UserLogin = UserLogin
-  { userLoginId :: UUID
-  , userLoginHash :: ByteString
-  }
-instance FromRow UserLogin where
-  fromRow = UserLogin
-    <$> field
-    <*> field
 
 type UserId = UUID
 instance ToJWT UserId
@@ -62,7 +52,11 @@ data CreateUser = CreateUser
   , createUserEmail :: Text
   , createUserPassword :: Text
   } deriving Generic
-instance FromJSON CreateUser
+instance FromForm CreateUser where
+  fromForm f = CreateUser
+    <$> parseUnique "group" f
+    <*> parseUnique "email" f
+    <*> parseUnique "password" f
 
 newtype BasicAuthCfg' = BasicAuthCfg' Connection
 type instance BasicAuthCfg = BasicAuthCfg'
@@ -102,10 +96,9 @@ createUser :: (CanAppM Env Err m) => CreateUser -> m User
 createUser (CreateUser group email password) = do
   c <- asks conn
   userId <- liftIO nextRandom
-  user <- liftIO (query c "insert into user(id, email, group_name) values (?, ?, ?) returning (id, email, group)" (userId, email, group))
+  user <- liftIO (query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group))
     >>= ensureSingleInsert
     >>= liftEither
-  liftIO $ execute c "insert into user(id, email, group_name) values (?, ?, ?)" (userId, email, email)
   hash <- hashPassword $ mkPassword password
   liftIO $ execute c "insert into user_login(id, hash) values (?, ?)" (userId, encodeUtf8 $ unPasswordHash hash)
   pure user

@@ -6,6 +6,7 @@ import Network.HTTP.Client qualified as H
 import Network.HTTP.Types qualified as H
 import Test.Api (testTopAPI, testTopServer)
 import Test.StateMachine
+import Test.StateMachine.Types
 import Website
 
 main :: IO Bool

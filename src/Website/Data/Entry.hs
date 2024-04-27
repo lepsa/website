@@ -34,8 +34,10 @@ data EntryCreate = EntryCreate
     value :: String
   }
   deriving (Eq, Ord, Show, Generic)
-
-instance FromForm EntryCreate
+instance FromForm EntryCreate where
+  fromForm f = EntryCreate
+    <$> parseUnique "title" f
+    <*> parseUnique "value" f
 
 data EntryUpdate = EntryUpdate
   { title :: String,
@@ -43,7 +45,10 @@ data EntryUpdate = EntryUpdate
   }
   deriving (Eq, Ord, Show, Generic)
 
-instance FromForm EntryUpdate
+instance FromForm EntryUpdate where
+  fromForm f = EntryUpdate
+    <$> parseUnique "title" f
+    <*> parseUnique "value" f
 
 data Entry = Entry
   { key :: EntryKey,

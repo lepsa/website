@@ -11,8 +11,6 @@ import Test.Db.User (getAllUsers)
 import Website.Data.User (User)
 import Website.Data.Entry (Entry)
 import Control.Monad.Reader
-import qualified Data.Text.IO as T
-import Servant (PostNoContent, NoContent (NoContent))
 
 -- Top level API for testing. This is the main api with a set of test specific routes bolted onto the side.
 -- These test APIs only exist in the test suite.

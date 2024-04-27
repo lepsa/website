@@ -29,14 +29,24 @@ server cookieSettings jwtSettings currentDirectory =
     unprotected =
       getIndex
         :<|> login
+        :<|> register
         :<|> serveDirectoryWebApp currentDirectory
 
+    login :: Login -> AppM Env ServerError IO (SetCookies NoContent)
     login (Login user pass) = do
       c <- asks conn
       userId <- lift $ withExceptT (const err401) $ checkUserPassword c (T.pack user) (T.pack pass)
       mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings userId
       case mApplyCookies of
         Nothing -> throwError err401
+        Just cookies -> pure $ cookies NoContent
+    
+    register :: CreateUser -> AppM Env ServerError IO (SetCookies NoContent)
+    register cUser = do
+      user <- mapServerErrors $ createUser cUser
+      mApplyCookies <- mapServerErrors $ liftIO $ acceptLogin cookieSettings jwtSettings user.userId
+      case mApplyCookies of
+        Nothing -> throwError err500
         Just cookies -> pure $ cookies NoContent
 
     crudEntry =

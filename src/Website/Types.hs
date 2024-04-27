@@ -34,6 +34,7 @@ errToServerError (DbError e) = dbErrToServerError e
 errToServerError Unauthenticated = err401
 errToServerError Unauthorised = err403
 errToServerError (Other _) = err500
+
 dbErrToServerError :: DbErr -> ServerError
 dbErrToServerError NotFound = err404
 dbErrToServerError TooManyResults = err404
