@@ -1,13 +1,14 @@
 module Website.Data.Schema where
 
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Foldable
 import Data.List
 import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
-import Website.Types
 import Servant
+import Website.Types
 
 -- Create the Entry table
 createEntry :: Query
@@ -48,6 +49,18 @@ instance FromRow Version where
 
 instance ToRow Version where
   toRow (Version v) = pure $ toField v
+
+setupDatabase :: (CanAppM Env ServerError m) => m ()
+setupDatabase = do
+  c <- asks conn
+  -- Explicitly enable foreign keys, as SQLite doesn't turn
+  -- them on by default. If the database doesn't support the
+  -- features we are expecting, exit the server reporting the
+  -- error so that we can try again later with changes made.
+  liftIO $ do
+    execute_ c "PRAGMA foreign_keys = ON"
+    [Only (enabled :: Bool)] <- query_ c "PRAGMA foreign_keys"
+    unless enabled $ error "Foreign keys aren't supported in this version of SQLite. Please use a version with foreign key support."
 
 runMigrations :: (CanAppM Env ServerError m) => m ()
 runMigrations = do
@@ -100,9 +113,16 @@ migrateSchemaV2 =
   [ "create table if not exists jwk (value text not null)"
   ]
 
+migrateSchemaV3 :: [Query]
+migrateSchemaV3 =
+  [ "create table if not exists user(id text not null, email text not null, group_name text not null)",
+    "create table if not exists user_login(id text not null, hash blob not null)"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
     (1, migrateSchemaV1),
-    (2, migrateSchemaV2)
+    (2, migrateSchemaV2),
+    (3, migrateSchemaV3)
   ]

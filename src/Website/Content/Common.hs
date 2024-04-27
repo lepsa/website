@@ -70,7 +70,7 @@ sideNav =
     H.ul $
       mconcat
         [ H.li $ H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a ! htmlLink (Proxy @(Auth Auths User :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a ! htmlLink (Proxy @(Auth Auths UserId :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]

@@ -18,13 +18,26 @@ data Env = Env
 -- Mapping application errors to servant errors
 --
 data Err
+  = DbError DbErr
+  | Unauthenticated
+  | Unauthorised
+  | Other String
+  deriving (Eq, Ord, Show)
+data DbErr
   = NotFound
   | TooManyResults
+  | FailedToInsertRecord
   deriving (Eq, Ord, Show)
 
 errToServerError :: Err -> ServerError
-errToServerError NotFound = err404
-errToServerError TooManyResults = err404
+errToServerError (DbError e) = dbErrToServerError e
+errToServerError Unauthenticated = err401
+errToServerError Unauthorised = err403
+errToServerError (Other _) = err500
+dbErrToServerError :: DbErr -> ServerError
+dbErrToServerError NotFound = err404
+dbErrToServerError TooManyResults = err404
+dbErrToServerError FailedToInsertRecord = err500
 
 --
 -- Application monad stack and type constraints.

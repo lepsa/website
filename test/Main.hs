@@ -1,4 +1,12 @@
 module Main (main) where
+import Hedgehog
+import Test.StateMachine
 
-main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main :: IO Bool
+main = checkSequential $
+  Group "API Tests"
+  [ ("API State Machine", propApiTests env reset)
+  ]
+  where
+    env = undefined
+    reset = undefined

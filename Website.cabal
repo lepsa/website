@@ -41,6 +41,7 @@ common warnings
                   , servant-auth
                   , servant-auth-server
                   , jose
+                  , password
 
     default-extensions: DataKinds
                       , OverloadedRecordDot
@@ -88,6 +89,14 @@ test-suite Website-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
+    other-modules:    Test.StateMachine
+                    , Test.Api
+                    , Test.Db
     build-depends:
         base,
-        Website
+        Website,
+        hedgehog,
+        http-client,
+        http-types,
+        case-insensitive,
+        exceptions

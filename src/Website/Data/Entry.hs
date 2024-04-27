@@ -56,7 +56,7 @@ data Entry = Entry
 entryTimeFormat :: TimeZone -> UTCTime -> String
 entryTimeFormat tz = formatTime defaultTimeLocale "%e %B ,%Y" . utcToZonedTime tz
 
-type AuthEntry a = Auth Auths User :> "entry" :> a
+type AuthEntry a = Auth Auths UserId :> "entry" :> a
 
 --
 -- What an Entry should look like in HTML
@@ -128,27 +128,27 @@ createEntry (EntryCreate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning *" (title, value)
   case entries of
-    [] -> throwError NotFound
+    [] -> throwError $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError TooManyResults
+    _ -> throwError $ DbError TooManyResults
 
 getEntry :: (CanAppM Env Err m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select * from entry where key = ?" (Only key)
   case entries of
-    [] -> throwError NotFound
+    [] -> throwError $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError TooManyResults
+    _ -> throwError $ DbError TooManyResults
 
 updateEntry :: (CanAppM Env Err m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning *" (title, value, key)
   case entries of
-    [] -> throwError NotFound
+    [] -> throwError $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError TooManyResults
+    _ -> throwError $ DbError TooManyResults
 
 deleteEntry :: (CanAppM Env e m) => EntryKey -> m ()
 deleteEntry key = do
