@@ -21,4 +21,6 @@ Things I want to add over time:
 - User management. Much like the blog section, I think that this would be a good fit for the HTMX frontend as it doesn't need to do anything too fancy, so long as I have some way to do user management without full-page reloads everytime I click something.
 - File uploads. Today computers are very good at talking to everyone and everything, just not in the ways we want. Sending files to friends and family without using email or a third party of poor-at-best reputation is a long standing issue. As such, a way of uploading and sharing files to/from well-known users is an interesting project in streaming arbitrarily large blobs of data.
 
-![xkcd 949](https://xkcd.com/949/)
+  As always, XKCD always has something for any situation.
+
+  ![xkcd 949](https://imgs.xkcd.com/comics/file_transfer.png)
