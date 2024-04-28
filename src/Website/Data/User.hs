@@ -18,7 +18,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Password.Argon2 (hashPassword, mkPassword, unPasswordHash, checkPassword, PasswordCheck (..), Argon2, PasswordHash (..))
 import Control.Monad.Except (MonadError(throwError), runExceptT, liftEither, ExceptT)
-import Data.Text.Encoding (encodeUtf8, decodeUtf8')
+import Data.Text.Encoding (decodeUtf8')
 import Database.SQLite.Simple.FromField
 import Control.Monad
 import Database.SQLite.Simple.ToField
@@ -31,9 +31,9 @@ import Web.FormUrlEncoded
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
 instance FromField UUID where
   fromField :: FieldParser UUID
-  fromField = fromField >=> maybe (fail "Could not parse UUID") pure . fromString
+  fromField = fromField @String >=> maybe (fail "Could not parse UUID") pure . fromString
 instance ToField UUID where
-  toField = toField . toString
+  toField = toField @String . toString
 instance FromRow UUID where
   fromRow = fieldWith fromField
 
@@ -100,14 +100,18 @@ createUser (CreateUser group email password) = do
     >>= ensureSingleInsert
     >>= liftEither
   hash <- hashPassword $ mkPassword password
-  liftIO $ execute c "insert into user_login(id, hash) values (?, ?)" (userId, encodeUtf8 $ unPasswordHash hash)
+  liftIO $ execute c "insert into user_login(id, hash) values (?, ?)" (userId, hash)
   pure user
 
 instance FromField (PasswordHash Argon2) where
-  fromField f = PasswordHash <$> fromField f
+  fromField f = PasswordHash <$> fromField @Text f
 
 instance FromRow (PasswordHash Argon2) where
-  fromRow = PasswordHash <$> field
+  fromRow = PasswordHash <$> field @Text
+
+instance ToField (PasswordHash Argon2) where
+  toField = toField . unPasswordHash
+
 
 getUserHash :: Connection -> UUID -> IO (Either Err (PasswordHash Argon2))
 getUserHash c uid = query c "select hash from user_login where id = ?" (Only uid) >>=

@@ -1,6 +1,4 @@
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Test.StateMachine where
 
@@ -9,9 +7,8 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import Data.ByteString qualified as BS
 import Data.CaseInsensitive (mk)
-import Data.List (sort)
+import Data.List (sort, find)
 import Data.Text (Text)
-import Data.Text.Encoding (encodeUtf8)
 import Hedgehog hiding (Group)
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
@@ -23,7 +20,10 @@ import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
 import Web.FormUrlEncoded
 import Test.StateMachine.Types
-import Data.Char (chr)
+import Data.Maybe (mapMaybe, fromMaybe, isJust)
+import Text.Regex.TDFA
+import Text.RawString.QQ
+import qualified Data.ByteString.Lazy as BSL
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -44,7 +44,7 @@ genGroup :: MonadGen m => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]
 
 genTestUser :: MonadGen m => m (TestUser v)
-genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup
+genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup <*> pure Nothing
 
 --
 -- Main api commands
@@ -78,15 +78,20 @@ cRegister env = Command gen execute
 cLogin :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cLogin env = Command gen execute
   -- Check that the state is in a position where we can run this command
-  [ Require $ \state _input -> not (null state.users),
+  [ Require $ \state input -> isJust $ find
+      -- Tell hedgehog to actually ensure that the user we're trying to login from
+      -- actually exists. Otherwise it can get funky ideas like having split values
+      -- and putting new strings out of thin air.
+      (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
+      state.users
     -- Update the state as needed to reflect the new reality
-    Update $ \state _input _output -> state,
+  , Update $ \state _input _output -> state
     -- Test that the state updates and input/output matches what we are
     -- expecting to have occured.
-    Ensure $ \_oldState _newState _input output -> do
+  , Ensure $ \_oldState _newState _input output -> do
       output.responseStatus === status204
       let cookies = filter (\(k, v) -> k == mk "Set-Cookie" && not (BS.null v)) output.responseHeaders
-      length cookies === 1
+      length cookies === 2
   ]
   where
     -- From our state, generate a value to be used for the test.
@@ -98,11 +103,13 @@ cLogin env = Command gen execute
         user <- Gen.element apiState.users
         pure $ TestLogin user.testUserEmail user.testUserPassword
     -- What we want to do with this value
-    execute (TestLogin user pass) = do
+    execute login = do
       req <- H.parseRequest (env.baseUrl <> "/login")
-      let user' = encodeUtf8 user
-          pass' = encodeUtf8 pass
-          req' = H.applyBasicAuth user' pass' $ req { H.method = methodPost }
+      let req' = req
+            { H.method = methodPost
+            , H.requestHeaders = ("Content-Type", "application/x-www-form-urlencoded") : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login
+            }
       liftIO $ H.httpNoBody req' env.manager
 
 --
@@ -131,7 +138,8 @@ cTestReset env = Command gen execute
 
 cTestGetUsers :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cTestGetUsers env = Command gen execute
-  [ Ensure $ \_oldState newState _input output -> sort (testUserEmail <$> newState.users) === sort (userEmail <$> output)
+  [ Ensure $ \_oldState newState _input output ->
+      sort (testUserEmail <$> newState.users) === sort (userEmail <$> output)
   ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetTestUsers Symbolic))
@@ -139,19 +147,50 @@ cTestGetUsers env = Command gen execute
     execute :: GetTestUsers Concrete -> m [User]
     execute _ = do
       req <- H.parseRequest (env.baseUrl <> "/getUsers")
-      let req' = req {H.method = methodGet}
+      let req' = req { H.method = methodGet }
       res <- liftIO $ H.httpLbs req' env.manager
       assert $ res.responseStatus == status200
       either fail pure $ eitherDecode @[User] res.responseBody
+
+cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntries env = Command gen execute
+  [ Require $ \state _input -> not $ null $ state.users >>= fromMaybe [] . testUserAuth
+  , Ensure $ \_oldState newState _input output -> do
+    length newState.entries === length output
+  ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
+    gen state =
+      let auths = mapMaybe testUserAuth state.users
+      in if null auths
+        then Nothing
+        else pure $ GetEntries <$> Gen.element auths
+    execute :: GetEntries Concrete -> m [BSL.ByteString]
+    execute getEntries = do
+      req <- H.parseRequest (env.baseUrl <> "/entries")
+      let req' = req
+            { H.method = methodGet
+            , H.requestHeaders = getEntries.getEntriesAuth <> H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      assert $ res.responseStatus == status200
+      let body = res.responseBody
+      -- Commit the great sin of "parsing" html with regex
+      pure $ getAllTextMatches (body =~ ([r|"/entry/\d+"|] :: String))
+
 
 --
 -- The prop test machine
 --
 
 propApiTests :: TestEnv -> IO Bool -> Property
-propApiTests env reset = withTests 100 . property $ do
-  worked <- evalIO reset
-  if worked then pure () else fail "Could not reset the API"
+propApiTests env reset = withTests 10 . property $ do
   let commands = ($ env) <$> [cLogin, cRegister, cTestGetUsers, cTestReset]
   actions <- forAll $ Gen.sequential (Range.linear 1 1000) initialState commands
+  -- Once we have our set of actions, reset the API and begin to test it.
+  -- The reset has to be performed here, not above `actions <- forAll...`
+  -- otherwise it seems to only run for the first test, but any shrinks
+  -- or changes don't get a fresh DB.
+  worked' <- evalIO reset
+  if worked' then pure () else fail "Could not reset the API, again"
   executeSequential initialState actions

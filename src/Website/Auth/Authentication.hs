@@ -6,6 +6,7 @@ data Login = Login
   { email :: String
   , password :: String
   } deriving Generic
+
 instance FromForm Login where
   fromForm f = Login
     <$> parseUnique "login" f

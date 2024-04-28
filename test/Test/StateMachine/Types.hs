@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Test.StateMachine.Types where
 
 import Data.Text (Text)
@@ -13,6 +10,10 @@ import Test.Db.User ()
 import Website.Data.Entry (Entry (..), EntryKey(..))
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
+import Network.HTTP.Types
+import Web.FormUrlEncoded
+import Servant (ToHttpApiData(..))
+import GHC.Exts (IsList(fromList))
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -70,6 +71,7 @@ data TestUser v = TestUser
   { testUserEmail    :: Text
   , testUserPassword :: Text
   , testUserGroup    :: Auth.Group
+  , testUserAuth     :: Maybe [Header]
   }
   deriving (Generic, Show)
 instance FunctorB TestUser
@@ -83,12 +85,19 @@ data TestLogin v = TestLogin
 instance FunctorB TestLogin
 instance TraversableB TestLogin
 
+instance ToForm (TestLogin v) where
+  toForm (TestLogin user pass) = fromList
+    [ ("login", toQueryParam user)
+    , ("password", toQueryParam pass)
+    ]
+
 toCreateUser :: TestUser v -> CreateUser
 toCreateUser r = CreateUser r.testUserGroup r.testUserEmail r.testUserPassword
 
 -- Get the entries from the API
-data GetEntries v = GetEntries
-  deriving (Eq, Show, Generic)
+newtype GetEntries v = GetEntries
+  { getEntriesAuth :: [Header]
+  } deriving (Eq, Show, Generic)
 instance FunctorB GetEntries
 instance TraversableB GetEntries
 

@@ -116,7 +116,7 @@ migrateSchemaV2 =
 migrateSchemaV3 :: [Query]
 migrateSchemaV3 =
   [ "create table if not exists user(id text not null, email text not null, group_name text not null)",
-    "create table if not exists user_login(id text not null, hash blob not null)"
+    "create table if not exists user_login(id text not null, hash text not null)"
   ]
 
 migrations :: [(Version, [Query])]

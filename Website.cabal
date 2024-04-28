@@ -86,7 +86,9 @@ test-suite Website-test
     import:           warnings
     default-language: GHC2021
     -- other-modules:
-    -- other-extensions:
+    default-extensions: OverloadedRecordDot
+                      , ScopedTypeVariables
+                      , OverloadedStrings
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
@@ -103,4 +105,6 @@ test-suite Website-test
         http-client,
         http-types,
         case-insensitive,
-        exceptions
+        exceptions,
+        regex-tdfa,
+        raw-strings-qq
