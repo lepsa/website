@@ -70,6 +70,24 @@ instance FunctorB TestUser
 instance TraversableB TestUser
 
 -- Log into the API with the given email and password
+data BadLoginType = Random | BadUser | BadPassword
+  deriving (Eq, Ord, Show)
+
+data TestLoginBad v = TestLoginBad
+  { testType :: BadLoginType
+  , testUser :: Text
+  , testPass :: Text
+  } deriving (Eq, Show, Generic)
+instance FunctorB TestLoginBad
+instance TraversableB TestLoginBad
+
+instance ToForm (TestLoginBad v) where
+  toForm (TestLoginBad _ user pass) = fromList
+    [ ("login", toQueryParam user)
+    , ("password", toQueryParam pass)
+    ]
+
+
 data TestLogin v = TestLogin
   { testUser :: Text
   , testPass :: Text

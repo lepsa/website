@@ -17,14 +17,14 @@ import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Network.HTTP.Client qualified as H
 import Network.HTTP.Types
-    ( Header, status204, methodPost, methodGet, status200, status303, methodDelete, methodPut )
+    ( Header, status204, methodPost, methodGet, status200, status303, methodDelete, methodPut, status401 )
 import Test.Db.Entry ()
 import Test.Db.User ()
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
 import Web.FormUrlEncoded
 import Test.StateMachine.Types
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing)
 import Text.Regex.TDFA
 import Text.RawString.QQ
 import qualified Data.ByteString.Lazy as BSL
@@ -125,7 +125,7 @@ cLogin env = Command gen execute
       -- and putting new strings out of thin air.
       (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
       state.users
-  , Update $ \state input output -> 
+  , Update $ \state input output ->
     let updateUser u = if u.testUserEmail == input.testUser && u.testUserPassword == input.testPass
           then u { testUserJwt = pure output }
           else u
@@ -163,6 +163,57 @@ cLogin env = Command gen execute
       -- Drop the cookie name and settings
       let jwt' = BS8.takeWhile (/= ';') $ BS8.drop 1 $ BS8.dropWhile (/= '=') jwt
       pure jwt'
+
+cLoginFail :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cLoginFail env = Command gen execute
+  [ Require $ \state input -> isNothing $ find
+      -- Tell hedgehog to actually ensure that the user we're trying to login from
+      -- actually exists. Otherwise it can get funky ideas like having split values
+      -- and putting new strings out of thin air.
+      (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
+      state.users
+  ]
+  where
+    -- From our state, generate a value to be used for the test.
+    -- In this case, pick a user to log in from the list of users.
+    gen :: ApiState Symbolic -> Maybe (gen (TestLoginBad Symbolic))
+    gen apiState = Just $
+      -- We have 3 things we want to test.
+      -- 1) unknown user-password pairs. This can be done if there are no users.
+      -- 2) known user with a bad password
+      -- 3) unknown user with a known password
+      let genRandom = TestLoginBad Random <$> genEmail <*> genPassword
+      in if null apiState.users
+        then genRandom
+        else do
+          Gen.choice
+            [ Gen.filterT
+              ( \u -> u.testUser `notElem` fmap testUserEmail apiState.users
+                   && u.testPass `notElem` fmap testUserPassword apiState.users
+              )
+              genRandom
+            , do
+              user <- Gen.element apiState.users
+              TestLoginBad BadPassword user.testUserEmail
+                <$> Gen.filterT (\p -> p /= user.testUserPassword) genPassword
+            , do
+              user <- Gen.element apiState.users
+              TestLoginBad BadUser
+                <$> Gen.filterT (\e -> e /= user.testUserEmail) genEmail
+                <*> pure user.testUserPassword
+            ]
+
+    -- What we want to do with this value
+    execute login = do
+      req <- H.parseRequest (env.baseUrl <> "/login")
+      let req' = req
+            { H.method = methodPost
+            , H.requestHeaders = formHeader : acceptHtml : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login
+            }
+      res <- liftIO $ H.httpNoBody req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
 
 cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cGetEntries env = Command gen execute
@@ -297,8 +348,8 @@ cUpdateEntry env = Command gen execute
   [ Require $ \state input ->
     input.updateEntryAuth `elem` state.users &&
     input.updateEntryId `elem` fmap testKey state.entries
-  , Update $ \state input _output -> 
-    let updateEntry u = 
+  , Update $ \state input _output ->
+    let updateEntry u =
           if u.testKey == input.updateEntryId
           then u
             { testTitle = input.updateEntryTitle
@@ -390,6 +441,7 @@ propApiTests env reset = withTests 100 . property $ do
     commands = ($ env) <$>
       [ cRegister
       , cLogin
+      , cLoginFail
       , cTestGetUsers
       , cGetEntry
       , cGetEntries
