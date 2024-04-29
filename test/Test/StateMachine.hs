@@ -17,7 +17,7 @@ import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Network.HTTP.Client qualified as H
 import Network.HTTP.Types
-    ( Header, status204, methodPost, methodGet, status200, status303 )
+    ( Header, status204, methodPost, methodGet, status200, status303, methodDelete, methodPut )
 import Test.Db.Entry ()
 import Test.Db.User ()
 import Website.Auth.Authorisation qualified as Auth
@@ -57,16 +57,27 @@ genGroup :: MonadGen m => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]
 
 genTestUser :: MonadGen m => m (TestUser v)
-genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup
+genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup <*> pure Nothing
 
 --
 -- Helper functions
 --
 
-mkAuthHeaders :: TestUser v -> Header
-mkAuthHeaders user =
+mkAuthHeader :: TestUser Concrete -> Header
+mkAuthHeader user = case user.testUserJwt of
+  Nothing -> mkBasicAuthHeader user
+  Just jwt -> mkJwtAuthHeader jwt
+
+mkBasicAuthHeader :: TestUser v -> Header
+mkBasicAuthHeader user =
   ( "Authorization"
   , "Basic " <> encodeUtf8 (extractBase64 @_ @T.Text $ B64.encodeBase64 (user.testUserEmail <> ":" <> user.testUserPassword))
+  )
+
+mkJwtAuthHeader :: Var BS8.ByteString Concrete -> Header
+mkJwtAuthHeader jwt =
+  ( "Authorization"
+  , "Bearer " <> concrete jwt
   )
 
 formHeader :: Header
@@ -114,8 +125,11 @@ cLogin env = Command gen execute
       -- and putting new strings out of thin air.
       (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
       state.users
-  , Ensure $ \_old _new _in out -> do
-    length out === 2
+  , Update $ \state input output -> 
+    let updateUser u = if u.testUserEmail == input.testUser && u.testUserPassword == input.testPass
+          then u { testUserJwt = pure output }
+          else u
+    in state { users = updateUser <$> state.users }
   ]
   where
     -- From our state, generate a value to be used for the test.
@@ -137,8 +151,18 @@ cLogin env = Command gen execute
       res <- liftIO $ H.httpNoBody req' env.manager
       annotate $ show res
       res.responseStatus === status204
+      -- Find cookies
       let cookies = filter (\(k, v) -> k == mk "Set-Cookie" && not (BS.null v)) res.responseHeaders
-      pure cookies
+      jwt <- maybe
+        (fail "Could not extract JWT value")
+        (pure . snd)
+        $ find
+        -- Find the JWT cookie
+        (\(_, v) -> BS8.isPrefixOf "JWT" v)
+        cookies
+      -- Drop the cookie name and settings
+      let jwt' = BS8.takeWhile (/= ';') $ BS8.drop 1 $ BS8.dropWhile (/= '=') jwt
+      pure jwt'
 
 cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cGetEntries env = Command gen execute
@@ -158,7 +182,7 @@ cGetEntries env = Command gen execute
             { H.method = methodGet
             , H.requestHeaders
               = acceptHtml
-              : mkAuthHeaders getEntries.getEntriesUser
+              : mkAuthHeader getEntries.getEntriesUser
               : H.requestHeaders req
             }
       res <- liftIO $ H.httpLbs req' env.manager
@@ -181,20 +205,14 @@ cGetEntry env = Command gen execute
       in if null state.users || null entries
         then Nothing
         else pure $ GetEntry <$> Gen.element state.users <*> Gen.element entries
-    execute :: GetEntry Concrete -> m BSL.ByteString
+    execute :: GetEntry Concrete -> m BSL8.ByteString
     execute getEntry = do
-      loc <- maybe
-        (fail "Could not get Location for entry")
-        (pure . BS8.unpack . snd)
-        $ find (\(h, _) -> h == "Location")
-        $ H.responseHeaders
-        $ concrete getEntry.getEntryId
-      req <- H.parseRequest (env.baseUrl <> loc)
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete getEntry.getEntryId)
       let req' = req
             { H.method = methodGet
             , H.requestHeaders
               = acceptHtml
-              : mkAuthHeaders getEntry.getEntryAuth
+              : mkAuthHeader getEntry.getEntryAuth
               : H.requestHeaders req
             }
       res <- liftIO $ H.httpLbs req' env.manager
@@ -208,6 +226,10 @@ cCreateEntry env = Command gen execute
   , Update $ \state input output -> state
     { entries = TestEntry output input.createEntryTitle input.createEntryValue : state.entries
     }
+  , Ensure $ \_old _new _input output -> do
+    annotate $ show output
+    assert $ BS8.isPrefixOf "/entry/" output
+    assert $ BS8.length output > BS8.length "/entry/"
   ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (CreateEntry Symbolic))
@@ -217,7 +239,7 @@ cCreateEntry env = Command gen execute
         <$> Gen.element state.users
         <*> Gen.string (Range.linear 1 10) chars
         <*> Gen.string (Range.linear 1 10) chars
-    execute :: CreateEntry Concrete -> m (H.Response BSL8.ByteString)
+    execute :: CreateEntry Concrete -> m BS8.ByteString
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
       let req' = req
@@ -226,7 +248,7 @@ cCreateEntry env = Command gen execute
             , H.requestHeaders
               = formHeader
               : acceptHtml
-              : mkAuthHeaders createEntry.createEntryAuth
+              : mkAuthHeader createEntry.createEntryAuth
               : H.requestHeaders req
             , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
             }
@@ -235,10 +257,81 @@ cCreateEntry env = Command gen execute
       res.responseStatus === status303
       maybe
         (fail "No Location header returned")
-        (const $ pure ())
+        (pure . snd)
         $ find (\(h, _) -> h == "Location")
         $ H.responseHeaders res
-      pure res
+
+cDeleteEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cDeleteEntry env = Command gen execute
+  [ Require $ \state input ->
+    input.deleteEntryAuth `elem` state.users &&
+    input.deleteEntryId `elem` fmap testKey state.entries
+  , Update $ \state input _output -> state
+    { entries = filter (\e -> e.testKey /= input.deleteEntryId) state.entries
+    }
+  ]
+  where
+    gen :: ApiState v -> Maybe (gen (DeleteEntry v))
+    gen state = if not (null state.users) && not (null state.entries)
+      then Just $ DeleteEntry
+        <$> Gen.element state.users
+        <*> Gen.element (fmap testKey state.entries)
+      else Nothing
+    execute :: DeleteEntry Concrete -> m ()
+    execute deleteEntry = do
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete deleteEntry.deleteEntryId) <> "/delete"
+      let req' = req
+            { H.method = methodDelete
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = acceptHtml
+              : mkAuthHeader deleteEntry.deleteEntryAuth
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status200
+
+cUpdateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cUpdateEntry env = Command gen execute
+  [ Require $ \state input ->
+    input.updateEntryAuth `elem` state.users &&
+    input.updateEntryId `elem` fmap testKey state.entries
+  , Update $ \state input _output -> 
+    let updateEntry u = 
+          if u.testKey == input.updateEntryId
+          then u
+            { testTitle = input.updateEntryTitle
+            , testValue = input.updateEntryValue
+            }
+          else u
+    in state { entries = fmap updateEntry state.entries }
+  ]
+  where
+    gen :: ApiState v -> Maybe (gen (UpdateEntry v))
+    gen state = if not (null state.users) && not (null state.entries)
+      then Just $ UpdateEntry
+        <$> Gen.element state.users
+        <*> Gen.element (fmap testKey state.entries)
+        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string (Range.linear 1 10) chars
+      else Nothing
+    execute :: UpdateEntry Concrete -> m ()
+    execute updateEntry = do
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete updateEntry.updateEntryId) <> "/update"
+      let req' = req
+            { H.method = methodPut
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = acceptHtml
+              : formHeader
+              : mkAuthHeader updateEntry.updateEntryAuth
+              : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm updateEntry
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status200
 
 --
 -- Side channel commands.
@@ -301,4 +394,6 @@ propApiTests env reset = withTests 100 . property $ do
       , cGetEntry
       , cGetEntries
       , cCreateEntry
+      , cDeleteEntry
+      , cUpdateEntry
       ]

@@ -11,7 +11,8 @@ import Website.Data.User
 import Web.FormUrlEncoded
 import Servant (ToHttpApiData(..))
 import GHC.Exts (IsList(fromList))
-import qualified Data.ByteString.Lazy.Char8 as BSL8
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -49,7 +50,7 @@ instance FunctorB TestEntryKey
 instance TraversableB TestEntryKey
 
 data TestEntry v = TestEntry
-  { testKey     :: Var (H.Response BSL8.ByteString) v,
+  { testKey     :: Var BS8.ByteString v,
     -- testCreated :: UTCTime,
     testTitle   :: String,
     testValue   :: String
@@ -62,6 +63,7 @@ data TestUser v = TestUser
   { testUserEmail    :: Text
   , testUserPassword :: Text
   , testUserGroup    :: Auth.Group
+  , testUserJwt      :: Maybe (Var ByteString v)
   }
   deriving (Eq, Generic, Show)
 instance FunctorB TestUser
@@ -93,7 +95,7 @@ instance TraversableB GetEntries
 
 data GetEntry v = GetEntry
   { getEntryAuth :: TestUser v
-  , getEntryId :: Var (H.Response BSL8.ByteString) v
+  , getEntryId :: Var BS8.ByteString v
   } deriving (Show, Generic)
 instance FunctorB GetEntry
 instance TraversableB GetEntry
@@ -108,6 +110,28 @@ instance TraversableB CreateEntry
 
 instance ToForm (CreateEntry v) where
   toForm (CreateEntry _ title value) = fromList
+    [ ("title", toQueryParam title)
+    , ("value", toQueryParam value)
+    ]
+
+data DeleteEntry v = DeleteEntry
+  { deleteEntryAuth :: TestUser v
+  , deleteEntryId :: Var BS8.ByteString v
+  } deriving (Show, Generic)
+instance FunctorB DeleteEntry
+instance TraversableB DeleteEntry
+
+data UpdateEntry v = UpdateEntry
+  { updateEntryAuth :: TestUser v
+  , updateEntryId :: Var BS8.ByteString v
+  , updateEntryTitle :: String
+  , updateEntryValue :: String
+  } deriving (Show, Generic)
+instance FunctorB UpdateEntry
+instance TraversableB UpdateEntry
+
+instance ToForm (UpdateEntry v) where
+  toForm (UpdateEntry _ _ title value) = fromList
     [ ("title", toQueryParam title)
     , ("value", toQueryParam value)
     ]
