@@ -1,19 +1,17 @@
 module Test.StateMachine.Types where
 
 import Data.Text (Text)
-import Data.Time
 import GHC.Generics
 import Hedgehog hiding (Group)
 import Network.HTTP.Client qualified as H
 import Test.Db.Entry ()
 import Test.Db.User ()
-import Website.Data.Entry (Entry (..), EntryKey(..))
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
-import Network.HTTP.Types
 import Web.FormUrlEncoded
 import Servant (ToHttpApiData(..))
 import GHC.Exts (IsList(fromList))
+import qualified Data.ByteString.Lazy.Char8 as BSL8
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -44,15 +42,15 @@ data TestEnv = TestEnv
 --
 
 newtype TestEntryKey v = TestEntryKey
-  { testKey :: Int
+  { testEntryKey :: String
   }
-  deriving (Generic)
+  deriving (Eq, Show, Generic)
 instance FunctorB TestEntryKey
 instance TraversableB TestEntryKey
 
 data TestEntry v = TestEntry
-  { testKey     :: TestEntryKey v,
-    testCreated :: UTCTime,
+  { testKey     :: Var (H.Response BSL8.ByteString) v,
+    -- testCreated :: UTCTime,
     testTitle   :: String,
     testValue   :: String
   }
@@ -60,20 +58,12 @@ data TestEntry v = TestEntry
 instance FunctorB TestEntry
 instance TraversableB TestEntry
 
-toEntry :: TestEntry Concrete -> Entry
-toEntry e = Entry
-  (EntryKey e.testKey.testKey)
-  e.testCreated
-  e.testTitle
-  e.testValue
-
 data TestUser v = TestUser
   { testUserEmail    :: Text
   , testUserPassword :: Text
   , testUserGroup    :: Auth.Group
-  , testUserAuth     :: Maybe [Header]
   }
-  deriving (Generic, Show)
+  deriving (Eq, Generic, Show)
 instance FunctorB TestUser
 instance TraversableB TestUser
 
@@ -96,10 +86,31 @@ toCreateUser r = CreateUser r.testUserGroup r.testUserEmail r.testUserPassword
 
 -- Get the entries from the API
 newtype GetEntries v = GetEntries
-  { getEntriesAuth :: [Header]
-  } deriving (Eq, Show, Generic)
+  { getEntriesUser :: TestUser v
+  } deriving (Show, Generic)
 instance FunctorB GetEntries
 instance TraversableB GetEntries
+
+data GetEntry v = GetEntry
+  { getEntryAuth :: TestUser v
+  , getEntryId :: Var (H.Response BSL8.ByteString) v
+  } deriving (Show, Generic)
+instance FunctorB GetEntry
+instance TraversableB GetEntry
+
+data CreateEntry v = CreateEntry
+  { createEntryAuth :: TestUser v
+  , createEntryTitle :: String
+  , createEntryValue :: String
+  } deriving (Eq, Show, Generic)
+instance FunctorB CreateEntry
+instance TraversableB CreateEntry
+
+instance ToForm (CreateEntry v) where
+  toForm (CreateEntry _ title value) = fromList
+    [ ("title", toQueryParam title)
+    , ("value", toQueryParam value)
+    ]
 
 --
 -- Side channel commands

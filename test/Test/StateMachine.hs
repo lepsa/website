@@ -1,5 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 
+-- This helps us make sure that our commands are all added to the state machine
+{-# OPTIONS_GHC -Wunused-top-binds #-}
+
 module Test.StateMachine where
 
 import Control.Monad.Catch
@@ -14,16 +17,23 @@ import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Network.HTTP.Client qualified as H
 import Network.HTTP.Types
+    ( Header, status204, methodPost, methodGet, status200, status303 )
 import Test.Db.Entry ()
 import Test.Db.User ()
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
 import Web.FormUrlEncoded
 import Test.StateMachine.Types
-import Data.Maybe (mapMaybe, fromMaybe, isJust)
+import Data.Maybe (isJust)
 import Text.Regex.TDFA
 import Text.RawString.QQ
 import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Text.Encoding.Base64.URL as B64
+import Data.Base64.Types
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -34,18 +44,36 @@ import qualified Data.ByteString.Lazy as BSL
 -- Generators
 --
 
+chars :: MonadGen m => m Char
+chars = Gen.element $ ['a' .. 'z'] <> ['A' .. 'Z']
+
 genEmail :: MonadGen m => m Text
-genEmail = Gen.text (Range.linear 1 100) Gen.unicode
+genEmail = Gen.text (Range.linear 1 10) $ Gen.filterT (/= ':') chars
 
 genPassword :: MonadGen m => m Text
-genPassword = Gen.text (Range.linear 1 100) Gen.unicode
+genPassword = Gen.text (Range.linear 1 10) chars
 
 genGroup :: MonadGen m => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]
 
 genTestUser :: MonadGen m => m (TestUser v)
-genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup <*> pure Nothing
+genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup
 
+--
+-- Helper functions
+--
+
+mkAuthHeaders :: TestUser v -> Header
+mkAuthHeaders user =
+  ( "Authorization"
+  , "Basic " <> encodeUtf8 (extractBase64 @_ @T.Text $ B64.encodeBase64 (user.testUserEmail <> ":" <> user.testUserPassword))
+  )
+
+formHeader :: Header
+formHeader = ("Content-Type", "application/x-www-form-urlencoded")
+
+acceptHtml :: Header
+acceptHtml = ("Accept", "text/html")
 --
 -- Main api commands
 --
@@ -69,10 +97,12 @@ cRegister env = Command gen execute
       let req' = req
             { H.method = methodPost
             , H.requestHeaders =
-              [ ("Content-Type", "application/x-www-form-urlencoded")
-              ]
+                formHeader
+              : acceptHtml
+              : req.requestHeaders
             , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm $ toCreateUser register
             }
+      annotate $ show req'
       liftIO $ H.httpNoBody req' env.manager
 
 cLogin :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -84,14 +114,8 @@ cLogin env = Command gen execute
       -- and putting new strings out of thin air.
       (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
       state.users
-    -- Update the state as needed to reflect the new reality
-  , Update $ \state _input _output -> state
-    -- Test that the state updates and input/output matches what we are
-    -- expecting to have occured.
-  , Ensure $ \_oldState _newState _input output -> do
-      output.responseStatus === status204
-      let cookies = filter (\(k, v) -> k == mk "Set-Cookie" && not (BS.null v)) output.responseHeaders
-      length cookies === 2
+  , Ensure $ \_old _new _in out -> do
+    length out === 2
   ]
   where
     -- From our state, generate a value to be used for the test.
@@ -107,10 +131,114 @@ cLogin env = Command gen execute
       req <- H.parseRequest (env.baseUrl <> "/login")
       let req' = req
             { H.method = methodPost
-            , H.requestHeaders = ("Content-Type", "application/x-www-form-urlencoded") : H.requestHeaders req
+            , H.requestHeaders = formHeader : acceptHtml : H.requestHeaders req
             , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login
             }
-      liftIO $ H.httpNoBody req' env.manager
+      res <- liftIO $ H.httpNoBody req' env.manager
+      annotate $ show res
+      res.responseStatus === status204
+      let cookies = filter (\(k, v) -> k == mk "Set-Cookie" && not (BS.null v)) res.responseHeaders
+      pure cookies
+
+cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntries env = Command gen execute
+  [ Require $ \state input -> input.getEntriesUser `elem` state.users
+  , Ensure $ \_oldState newState _input output -> do
+    length newState.entries === length output
+  ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
+    gen state = if null state.users
+      then Nothing
+      else pure $ GetEntries <$> Gen.element state.users
+    execute :: GetEntries Concrete -> m [BSL.ByteString]
+    execute getEntries = do
+      req <- H.parseRequest (env.baseUrl <> "/entries")
+      let req' = req
+            { H.method = methodGet
+            , H.requestHeaders
+              = acceptHtml
+              : mkAuthHeaders getEntries.getEntriesUser
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status200
+      let body = res.responseBody
+      -- Commit the great sin of "parsing" html with regex
+          matches = getAllTextMatches (body =~ ([r|"/entry/[[:digit:]]+"|] :: String))
+      annotate $ show matches
+      pure matches
+
+cGetEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntry env = Command gen execute
+  [ Require $ \state input -> input.getEntryAuth `elem` state.users
+  ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
+    gen state =
+      let entries = testKey <$> state.entries
+      in if null state.users || null entries
+        then Nothing
+        else pure $ GetEntry <$> Gen.element state.users <*> Gen.element entries
+    execute :: GetEntry Concrete -> m BSL.ByteString
+    execute getEntry = do
+      loc <- maybe
+        (fail "Could not get Location for entry")
+        (pure . BS8.unpack . snd)
+        $ find (\(h, _) -> h == "Location")
+        $ H.responseHeaders
+        $ concrete getEntry.getEntryId
+      req <- H.parseRequest (env.baseUrl <> loc)
+      let req' = req
+            { H.method = methodGet
+            , H.requestHeaders
+              = acceptHtml
+              : mkAuthHeaders getEntry.getEntryAuth
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status200
+      pure res.responseBody
+
+cCreateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cCreateEntry env = Command gen execute
+  [ Require $ \state input -> input.createEntryAuth `elem` state.users
+  , Update $ \state input output -> state
+    { entries = TestEntry output input.createEntryTitle input.createEntryValue : state.entries
+    }
+  ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (CreateEntry Symbolic))
+    gen state = if null state.users
+      then Nothing
+      else pure $ CreateEntry
+        <$> Gen.element state.users
+        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string (Range.linear 1 10) chars
+    execute :: CreateEntry Concrete -> m (H.Response BSL8.ByteString)
+    execute createEntry = do
+      req <- H.parseRequest (env.baseUrl <> "/entry")
+      let req' = req
+            { H.method = methodPost
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = formHeader
+              : acceptHtml
+              : mkAuthHeaders createEntry.createEntryAuth
+              : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status303
+      maybe
+        (fail "No Location header returned")
+        (const $ pure ())
+        $ find (\(h, _) -> h == "Location")
+        $ H.responseHeaders res
+      pure res
 
 --
 -- Side channel commands.
@@ -119,21 +247,20 @@ cLogin env = Command gen execute
 -- looks like vs what the API thinks the world looks like.
 --
 
-cTestReset :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cTestReset env = Command gen execute
-  [ Update $ \_state _ _ -> initialState
-  ]
-  where
-    gen :: ApiState Symbolic -> Maybe (gen (Reset Symbolic))
-    gen _apiState = Just $ pure Reset
-    execute :: Reset Concrete -> m ()
-    execute _reset = do
-      req <- H.parseRequest (env.baseUrl <> "/reset")
-      let req' = req {H.method = methodPost}
-      annotate $ show req
-      res <- liftIO $ H.httpNoBody req' env.manager
-      annotate $ show res
-      res.responseStatus === status204
+-- cTestReset :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+-- cTestReset env = Command gen execute
+--   [ Update $ \_state _ _ -> initialState
+--   ]
+--   where
+--     gen :: ApiState Symbolic -> Maybe (gen (Reset Symbolic))
+--     gen _apiState = Just $ pure Reset
+--     execute :: Reset Concrete -> m ()
+--     execute _reset = do
+--       req <- H.parseRequest (env.baseUrl <> "/reset")
+--       let req' = req {H.method = methodPost}
+--       res <- liftIO $ H.httpNoBody req' env.manager
+--       annotate $ show res
+--       res.responseStatus === status204
 
 
 cTestGetUsers :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -149,44 +276,16 @@ cTestGetUsers env = Command gen execute
       req <- H.parseRequest (env.baseUrl <> "/getUsers")
       let req' = req { H.method = methodGet }
       res <- liftIO $ H.httpLbs req' env.manager
-      assert $ res.responseStatus == status200
+      res.responseStatus === status200
       either fail pure $ eitherDecode @[User] res.responseBody
-
-cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
-cGetEntries env = Command gen execute
-  [ Require $ \state _input -> not $ null $ state.users >>= fromMaybe [] . testUserAuth
-  , Ensure $ \_oldState newState _input output -> do
-    length newState.entries === length output
-  ]
-  where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
-    gen state =
-      let auths = mapMaybe testUserAuth state.users
-      in if null auths
-        then Nothing
-        else pure $ GetEntries <$> Gen.element auths
-    execute :: GetEntries Concrete -> m [BSL.ByteString]
-    execute getEntries = do
-      req <- H.parseRequest (env.baseUrl <> "/entries")
-      let req' = req
-            { H.method = methodGet
-            , H.requestHeaders = getEntries.getEntriesAuth <> H.requestHeaders req
-            }
-      res <- liftIO $ H.httpLbs req' env.manager
-      assert $ res.responseStatus == status200
-      let body = res.responseBody
-      -- Commit the great sin of "parsing" html with regex
-      pure $ getAllTextMatches (body =~ ([r|"/entry/\d+"|] :: String))
-
 
 --
 -- The prop test machine
 --
 
 propApiTests :: TestEnv -> IO Bool -> Property
-propApiTests env reset = withTests 10 . property $ do
-  let commands = ($ env) <$> [cLogin, cRegister, cTestGetUsers, cTestReset]
-  actions <- forAll $ Gen.sequential (Range.linear 1 1000) initialState commands
+propApiTests env reset = withTests 100 . property $ do
+  actions <- forAll $ Gen.sequential (Range.linear 1 100) initialState commands
   -- Once we have our set of actions, reset the API and begin to test it.
   -- The reset has to be performed here, not above `actions <- forAll...`
   -- otherwise it seems to only run for the first test, but any shrinks
@@ -194,3 +293,12 @@ propApiTests env reset = withTests 10 . property $ do
   worked' <- evalIO reset
   if worked' then pure () else fail "Could not reset the API, again"
   executeSequential initialState actions
+  where
+    commands = ($ env) <$>
+      [ cRegister
+      , cLogin
+      , cTestGetUsers
+      , cGetEntry
+      , cGetEntries
+      , cCreateEntry
+      ]

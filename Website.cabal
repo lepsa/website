@@ -13,6 +13,11 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
+common threads
+    ghc-options: -threaded
+                 -rtsopts
+                 -with-rtsopts=-N
+
 common warnings
     ghc-options: -Wall
     build-depends:  base
@@ -53,6 +58,7 @@ common warnings
 
 library
     import:           warnings
+    import:           threads
     exposed-modules:  Website
                     , Website.Network.API
                     , Website.Network.API.Types
@@ -75,6 +81,7 @@ library
 
 executable Website
     import:           warnings
+    import:           threads
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
@@ -84,11 +91,9 @@ executable Website
 
 test-suite Website-test
     import:           warnings
+    import:           threads
     default-language: GHC2021
     -- other-modules:
-    default-extensions: OverloadedRecordDot
-                      , ScopedTypeVariables
-                      , OverloadedStrings
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
@@ -107,4 +112,5 @@ test-suite Website-test
         case-insensitive,
         exceptions,
         regex-tdfa,
-        raw-strings-qq
+        raw-strings-qq,
+        base64
