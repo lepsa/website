@@ -245,9 +245,29 @@ cGetEntries env = Command gen execute
       annotate $ show matches
       pure matches
 
+cGetEntriesNoAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntriesNoAuth env = Command gen execute
+  []
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntriesNoAuth Symbolic))
+    gen _state = pure $ pure GetEntriesNoAuth
+    execute :: GetEntriesNoAuth Concrete -> m ()
+    execute _ = do
+      req <- H.parseRequest (env.baseUrl <> "/entries")
+      let req' = req
+            { H.method = methodGet
+            , H.requestHeaders
+              = acceptHtml
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
+
 cGetEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cGetEntry env = Command gen execute
   [ Require $ \state input -> input.getEntryAuth `elem` state.users
+                           && input.getEntryId `elem` fmap testKey state.entries
   ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
@@ -270,6 +290,30 @@ cGetEntry env = Command gen execute
       annotate $ show res
       res.responseStatus === status200
       pure res.responseBody
+
+cGetEntryNoAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntryNoAuth env = Command gen execute
+  [ Require $ \state input -> input.getEntryId `elem` fmap testKey state.entries
+  ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntryNoAuth Symbolic))
+    gen state =
+      let entries = testKey <$> state.entries
+      in if null entries
+        then Nothing
+        else pure $ GetEntryNoAuth <$> Gen.element entries
+    execute :: GetEntryNoAuth Concrete -> m ()
+    execute getEntry = do
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete getEntry.getEntryId)
+      let req' = req
+            { H.method = methodGet
+            , H.requestHeaders
+              = acceptHtml
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
 
 cCreateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cCreateEntry env = Command gen execute
@@ -312,6 +356,32 @@ cCreateEntry env = Command gen execute
         $ find (\(h, _) -> h == "Location")
         $ H.responseHeaders res
 
+cCreateEntryNoAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cCreateEntryNoAuth env = Command gen execute
+  []
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (CreateEntryNoAuth Symbolic))
+    gen state = if null state.users
+      then Nothing
+      else pure $ CreateEntryNoAuth
+        <$> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string (Range.linear 1 10) chars
+    execute :: CreateEntryNoAuth Concrete -> m ()
+    execute createEntry = do
+      req <- H.parseRequest (env.baseUrl <> "/entry")
+      let req' = req
+            { H.method = methodPost
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = formHeader
+              : acceptHtml
+              : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
+
 cDeleteEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cDeleteEntry env = Command gen execute
   [ Require $ \state input ->
@@ -342,6 +412,30 @@ cDeleteEntry env = Command gen execute
       res <- liftIO $ H.httpLbs req' env.manager
       annotate $ show res
       res.responseStatus === status200
+
+cDeleteEntryNoAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cDeleteEntryNoAuth env = Command gen execute
+  [ Require $ \state input -> input.deleteEntryId `elem` fmap testKey state.entries
+  ]
+  where
+    gen :: ApiState v -> Maybe (gen (DeleteEntryNoAuth v))
+    gen state = if not (null state.users) && not (null state.entries)
+      then Just $ DeleteEntryNoAuth
+        <$> Gen.element (fmap testKey state.entries)
+      else Nothing
+    execute :: DeleteEntryNoAuth Concrete -> m ()
+    execute deleteEntry = do
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete deleteEntry.deleteEntryId) <> "/delete"
+      let req' = req
+            { H.method = methodDelete
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = acceptHtml
+              : H.requestHeaders req
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
 
 cUpdateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cUpdateEntry env = Command gen execute
@@ -383,6 +477,35 @@ cUpdateEntry env = Command gen execute
       res <- liftIO $ H.httpLbs req' env.manager
       annotate $ show res
       res.responseStatus === status200
+
+cUpdateEntryNoAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cUpdateEntryNoAuth env = Command gen execute
+  [ Require $ \state input ->
+    input.updateEntryId `elem` fmap testKey state.entries
+  ]
+  where
+    gen :: ApiState v -> Maybe (gen (UpdateEntryNoAuth v))
+    gen state = if not (null state.users) && not (null state.entries)
+      then Just $ UpdateEntryNoAuth
+        <$> Gen.element (fmap testKey state.entries)
+        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string (Range.linear 1 10) chars
+      else Nothing
+    execute :: UpdateEntryNoAuth Concrete -> m ()
+    execute updateEntry = do
+      req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete updateEntry.updateEntryId) <> "/update"
+      let req' = req
+            { H.method = methodPut
+            , H.redirectCount = 0
+            , H.requestHeaders
+              = acceptHtml
+              : formHeader
+              : H.requestHeaders req
+            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm updateEntry
+            }
+      res <- liftIO $ H.httpLbs req' env.manager
+      annotate $ show res
+      res.responseStatus === status401
 
 --
 -- Side channel commands.
@@ -444,8 +567,13 @@ propApiTests env reset = withTests 100 . property $ do
       , cLoginFail
       , cTestGetUsers
       , cGetEntry
+      , cGetEntriesNoAuth
       , cGetEntries
+      , cGetEntriesNoAuth
       , cCreateEntry
+      , cCreateEntryNoAuth
       , cDeleteEntry
+      , cDeleteEntryNoAuth
       , cUpdateEntry
+      , cUpdateEntryNoAuth
       ]
