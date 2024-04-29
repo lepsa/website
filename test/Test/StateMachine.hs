@@ -30,10 +30,11 @@ import Text.RawString.QQ
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text.Encoding.Base64.URL as B64
+import qualified Data.Text.Encoding.Base64 as B64
 import Data.Base64.Types
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
+import Data.Char
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -45,13 +46,25 @@ import Data.Text.Encoding (encodeUtf8)
 --
 
 chars :: MonadGen m => m Char
-chars = Gen.element $ ['a' .. 'z'] <> ['A' .. 'Z']
+chars = Gen.filterT predicate Gen.ascii
+  where
+    predicate c = isPrint c && c /= '\n' -- isAlpha c || isNumber c
+
+minTextLength, maxTextLength :: Num a => a
+minTextLength = 1
+maxTextLength = 50
+
+textLength :: Integral a => Range a
+textLength = Range.linear minTextLength maxTextLength
+
+genText :: MonadGen m => m Text
+genText = Gen.text textLength chars
 
 genEmail :: MonadGen m => m Text
-genEmail = Gen.text (Range.linear 1 10) $ Gen.filterT (/= ':') chars
+genEmail = Gen.text textLength $ Gen.filterT (/= ':') $ Gen.filterT isAlpha chars
 
 genPassword :: MonadGen m => m Text
-genPassword = Gen.text (Range.linear 1 10) chars
+genPassword =  Gen.text textLength $ Gen.filterT (/= ':') chars
 
 genGroup :: MonadGen m => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]
@@ -63,10 +76,13 @@ genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup <*> pure Nothin
 -- Helper functions
 --
 
-mkAuthHeader :: TestUser Concrete -> Header
-mkAuthHeader user = case user.testUserJwt of
-  Nothing -> mkBasicAuthHeader user
-  Just jwt -> mkJwtAuthHeader jwt
+mkAuthHeader :: MonadTest m => TestUser Concrete -> m Header
+mkAuthHeader user = do
+  let auth = case user.testUserJwt of
+        Nothing -> mkBasicAuthHeader user
+        Just jwt -> mkJwtAuthHeader jwt
+  annotate $ show auth
+  pure auth
 
 mkBasicAuthHeader :: TestUser v -> Header
 mkBasicAuthHeader user =
@@ -122,7 +138,7 @@ cLogin env = Command gen execute
   [ Require $ \state input -> isJust $ find
       -- Tell hedgehog to actually ensure that the user we're trying to login from
       -- actually exists. Otherwise it can get funky ideas like having split values
-      -- and putting new strings out of thin air.
+      -- and pulling new strings out of thin air.
       (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
       state.users
   , Update $ \state input output ->
@@ -169,7 +185,7 @@ cLoginFail env = Command gen execute
   [ Require $ \state input -> isNothing $ find
       -- Tell hedgehog to actually ensure that the user we're trying to login from
       -- actually exists. Otherwise it can get funky ideas like having split values
-      -- and putting new strings out of thin air.
+      -- and pulling new strings out of thin air.
       (\u -> u.testUserEmail == input.testUser && u.testUserPassword == input.testPass)
       state.users
   ]
@@ -229,13 +245,15 @@ cGetEntries env = Command gen execute
     execute :: GetEntries Concrete -> m [BSL.ByteString]
     execute getEntries = do
       req <- H.parseRequest (env.baseUrl <> "/entries")
+      auth <- mkAuthHeader getEntries.getEntriesUser
       let req' = req
             { H.method = methodGet
             , H.requestHeaders
               = acceptHtml
-              : mkAuthHeader getEntries.getEntriesUser
+              : auth
               : H.requestHeaders req
             }
+      annotate $ show auth
       res <- liftIO $ H.httpLbs req' env.manager
       annotate $ show res
       res.responseStatus === status200
@@ -279,11 +297,12 @@ cGetEntry env = Command gen execute
     execute :: GetEntry Concrete -> m BSL8.ByteString
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete getEntry.getEntryId)
+      auth <- mkAuthHeader getEntry.getEntryAuth
       let req' = req
             { H.method = methodGet
             , H.requestHeaders
               = acceptHtml
-              : mkAuthHeader getEntry.getEntryAuth
+              : auth
               : H.requestHeaders req
             }
       res <- liftIO $ H.httpLbs req' env.manager
@@ -332,18 +351,19 @@ cCreateEntry env = Command gen execute
       then Nothing
       else pure $ CreateEntry
         <$> Gen.element state.users
-        <*> Gen.string (Range.linear 1 10) chars
-        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string textLength chars
+        <*> Gen.string textLength chars
     execute :: CreateEntry Concrete -> m BS8.ByteString
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
+      auth <- mkAuthHeader createEntry.createEntryAuth
       let req' = req
             { H.method = methodPost
             , H.redirectCount = 0
             , H.requestHeaders
               = formHeader
               : acceptHtml
-              : mkAuthHeader createEntry.createEntryAuth
+              : auth
               : H.requestHeaders req
             , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
             }
@@ -364,8 +384,8 @@ cCreateEntryNoAuth env = Command gen execute
     gen state = if null state.users
       then Nothing
       else pure $ CreateEntryNoAuth
-        <$> Gen.string (Range.linear 1 10) chars
-        <*> Gen.string (Range.linear 1 10) chars
+        <$> Gen.string textLength chars
+        <*> Gen.string textLength chars
     execute :: CreateEntryNoAuth Concrete -> m ()
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
@@ -401,12 +421,13 @@ cDeleteEntry env = Command gen execute
     execute :: DeleteEntry Concrete -> m ()
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete deleteEntry.deleteEntryId) <> "/delete"
+      auth <- mkAuthHeader deleteEntry.deleteEntryAuth
       let req' = req
             { H.method = methodDelete
             , H.redirectCount = 0
             , H.requestHeaders
               = acceptHtml
-              : mkAuthHeader deleteEntry.deleteEntryAuth
+              : auth
               : H.requestHeaders req
             }
       res <- liftIO $ H.httpLbs req' env.manager
@@ -458,19 +479,20 @@ cUpdateEntry env = Command gen execute
       then Just $ UpdateEntry
         <$> Gen.element state.users
         <*> Gen.element (fmap testKey state.entries)
-        <*> Gen.string (Range.linear 1 10) chars
-        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string textLength chars
+        <*> Gen.string textLength chars
       else Nothing
     execute :: UpdateEntry Concrete -> m ()
     execute updateEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete updateEntry.updateEntryId) <> "/update"
+      auth <- mkAuthHeader updateEntry.updateEntryAuth
       let req' = req
             { H.method = methodPut
             , H.redirectCount = 0
             , H.requestHeaders
               = acceptHtml
               : formHeader
-              : mkAuthHeader updateEntry.updateEntryAuth
+              : auth
               : H.requestHeaders req
             , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm updateEntry
             }
@@ -488,8 +510,8 @@ cUpdateEntryNoAuth env = Command gen execute
     gen state = if not (null state.users) && not (null state.entries)
       then Just $ UpdateEntryNoAuth
         <$> Gen.element (fmap testKey state.entries)
-        <*> Gen.string (Range.linear 1 10) chars
-        <*> Gen.string (Range.linear 1 10) chars
+        <*> Gen.string textLength chars
+        <*> Gen.string textLength chars
       else Nothing
     execute :: UpdateEntryNoAuth Concrete -> m ()
     execute updateEntry = do

@@ -75,7 +75,6 @@ instance FromBasicAuthData UserId where
       -- Convert the type for the hash
       password <- either (const $ throwError BadPassword) pure (decodeUtf8' pass)
       checkUserPassword conn email password
-      
 
 checkUserPassword :: MonadIO m => Connection -> Text -> Text -> ExceptT (AuthResult UserId) m UserId
 checkUserPassword conn email pass = do
