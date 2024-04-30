@@ -29,9 +29,10 @@ type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Co
 type Unprotected =
   Get '[HTML] Html
     :<|> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 204 '[HTML] (SetCookies NoContent)
-    :<|> "register" :> ReqBody '[FormUrlEncoded] CreateUser :> Verb 'POST 204 '[HTML] (SetCookies NoContent)
+    :<|> "register" :> ReqBody '[FormUrlEncoded] UserCreate :> Verb 'POST 204 '[HTML] (SetCookies NoContent)
     :<|> Raw
 
 type Protected =
   "entry" :> CRUD EntryCreate EntryUpdate EntryKey
     :<|> "entries" :> Get '[HTML] Html
+    :<|> "user" :> CRUD UserCreate UserUpdate UserId

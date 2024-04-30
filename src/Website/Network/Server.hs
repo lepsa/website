@@ -24,6 +24,7 @@ server cookieSettings jwtSettings currentDirectory =
     protected (Authenticated _user) =
       crudEntry
         :<|> mapServerErrors getEntries
+        :<|> crudUser
     protected _ = throwAll err401
 
     unprotected =
@@ -41,13 +42,21 @@ server cookieSettings jwtSettings currentDirectory =
         Nothing -> throwError err401
         Just cookies -> pure $ cookies NoContent
     
-    register :: CreateUser -> AppM Env ServerError IO (SetCookies NoContent)
+    register :: UserCreate -> AppM Env ServerError IO (SetCookies NoContent)
     register cUser = do
       user <- mapServerErrors $ createUser cUser
-      mApplyCookies <- mapServerErrors $ liftIO $ acceptLogin cookieSettings jwtSettings user.userId
+      mApplyCookies <- mapServerErrors $ liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
       case mApplyCookies of
         Nothing -> throwError err500
         Just cookies -> pure $ cookies NoContent
+
+    postUser = undefined
+    getUserInitial = undefined
+    getUser' = undefined
+    putUser = undefined
+    getUserForUpdate = undefined
+    deleteUser = undefined
+
 
     crudEntry =
       (mapServerErrors . postEntry)
@@ -56,3 +65,11 @@ server cookieSettings jwtSettings currentDirectory =
         :<|> (\k -> mapServerErrors . putEntry k)
         :<|> (mapServerErrors . getEntryForUpdate)
         :<|> (mapServerErrors . deleteEntry)
+
+    crudUser =
+      (mapServerErrors . postUser)
+        :<|> mapServerErrors getUserInitial
+        :<|> (mapServerErrors . getUser')
+        :<|> (\k -> mapServerErrors . putUser k)
+        :<|> (mapServerErrors . getUserForUpdate)
+        :<|> (mapServerErrors . deleteUser)

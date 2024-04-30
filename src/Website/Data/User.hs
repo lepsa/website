@@ -42,18 +42,27 @@ instance ToJWT UserId
 instance FromJWT UserId
 
 data User = User
-  { userId :: UUID
-  , userEmail :: Text
-  , userGroup :: Group
+  { uuid :: UUID
+  , email :: Text
+  , group :: Group
   } deriving (Eq, Show, Generic)
 
-data CreateUser = CreateUser
-  { createUserGroup :: Group
-  , createUserEmail :: Text
-  , createUserPassword :: Text
+data UserUpdate = UserUpdate
+  { password :: Maybe Text
+  , group :: Maybe Group
   } deriving Generic
-instance FromForm CreateUser where
-  fromForm f = CreateUser
+instance FromForm UserUpdate where
+  fromForm f = UserUpdate
+    <$> parseUnique "password" f
+    <*> parseUnique "group" f
+
+data UserCreate = UserCreate
+  { group :: Group
+  , email :: Text
+  , password :: Text
+  } deriving Generic
+instance FromForm UserCreate where
+  fromForm f = UserCreate
     <$> parseUnique "group" f
     <*> parseUnique "email" f
     <*> parseUnique "password" f
@@ -91,8 +100,8 @@ checkUserPassword conn email pass = do
 instance FromRow User where
   fromRow = User <$> field <*> field <*> field
 
-createUser :: (CanAppM Env Err m) => CreateUser -> m User
-createUser (CreateUser group email password) = do
+createUser :: (CanAppM Env Err m) => UserCreate -> m User
+createUser (UserCreate group email password) = do
   c <- asks conn
   userId <- liftIO nextRandom
   user <- liftIO (query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group))

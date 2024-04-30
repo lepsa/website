@@ -43,20 +43,20 @@ data TestEnv = TestEnv
 --
 
 data TestEntry v = TestEntry
-  { testKey     :: Var BS8.ByteString v,
-    -- testCreated :: UTCTime,
-    testTitle   :: String,
-    testValue   :: String
+  { key     :: Var BS8.ByteString v,
+    -- created :: UTCTime,
+    title   :: String,
+    value   :: String
   }
   deriving (Generic)
 instance FunctorB TestEntry
 instance TraversableB TestEntry
 
 data TestUser v = TestUser
-  { testUserEmail    :: Text
-  , testUserPassword :: Text
-  , testUserGroup    :: Auth.Group
-  , testUserJwt      :: Maybe (Var ByteString v)
+  { email    :: Text
+  , password :: Text
+  , group    :: Auth.Group
+  , jwt      :: Maybe (Var ByteString v)
   }
   deriving (Eq, Generic, Show)
 instance FunctorB TestUser
@@ -67,9 +67,9 @@ data BadLoginType = Random | BadUser | BadPassword
   deriving (Eq, Ord, Show)
 
 data TestLoginBad v = TestLoginBad
-  { testType :: BadLoginType
-  , testUser :: Text
-  , testPass :: Text
+  { type_ :: BadLoginType
+  , user  :: Text
+  , pass  :: Text
   } deriving (Eq, Show, Generic)
 instance FunctorB TestLoginBad
 instance TraversableB TestLoginBad
@@ -81,8 +81,8 @@ instance ToForm (TestLoginBad v) where
     ]
 
 data TestLogin v = TestLogin
-  { testUser :: Text
-  , testPass :: Text
+  { user :: Text
+  , pass :: Text
   } deriving (Eq, Show, Generic)
 instance FunctorB TestLogin
 instance TraversableB TestLogin
@@ -93,41 +93,41 @@ instance ToForm (TestLogin v) where
     , ("password", toQueryParam pass)
     ]
 
-toCreateUser :: TestUser v -> CreateUser
-toCreateUser r = CreateUser r.testUserGroup r.testUserEmail r.testUserPassword
+toUserCreate :: TestUser v -> UserCreate
+toUserCreate r = UserCreate r.group r.email r.password
 
 -- Get the entries from the API
 newtype GetEntries v = GetEntries
-  { getEntriesUser :: TestUser v
+  { user :: TestUser v
   } deriving (Show, Generic)
 instance FunctorB GetEntries
 instance TraversableB GetEntries
 
 newtype GetEntriesBadAuth v = GetEntriesBadAuth
-  { getEntriesUser :: Maybe (TestUser v)
+  { user :: Maybe (TestUser v)
   }
   deriving (Show, Generic)
 instance FunctorB GetEntriesBadAuth
 instance TraversableB GetEntriesBadAuth
 
 data GetEntry v = GetEntry
-  { getEntryAuth :: TestUser v
-  , getEntryId :: Var BS8.ByteString v
+  { user :: TestUser v
+  , key :: Var BS8.ByteString v
   } deriving (Show, Generic)
 instance FunctorB GetEntry
 instance TraversableB GetEntry
 
 data GetEntryBadAuth v = GetEntryBadAuth
-  { getEntryId :: Var BS8.ByteString v
-  , getEntryAuth :: Maybe (TestUser v)
+  { key :: Var BS8.ByteString v
+  , user :: Maybe (TestUser v)
   } deriving (Show, Generic)
 instance FunctorB GetEntryBadAuth
 instance TraversableB GetEntryBadAuth
 
 data CreateEntry v = CreateEntry
-  { createEntryAuth :: TestUser v
-  , createEntryTitle :: String
-  , createEntryValue :: String
+  { user :: TestUser v
+  , title :: String
+  , value :: String
   } deriving (Eq, Show, Generic)
 instance FunctorB CreateEntry
 instance TraversableB CreateEntry
@@ -139,9 +139,9 @@ instance ToForm (CreateEntry v) where
     ]
 
 data CreateEntryBadAuth v = CreateEntryBadAuth
-  { createEntryTitle :: String
-  , createEntryValue :: String
-  , createEntryUser  :: Maybe (TestUser v)
+  { title :: String
+  , value :: String
+  , user  :: Maybe (TestUser v)
   } deriving (Eq, Show, Generic)
 instance FunctorB CreateEntryBadAuth
 instance TraversableB CreateEntryBadAuth
@@ -153,24 +153,24 @@ instance ToForm (CreateEntryBadAuth v) where
     ]
 
 data DeleteEntry v = DeleteEntry
-  { deleteEntryAuth :: TestUser v
-  , deleteEntryId :: Var BS8.ByteString v
+  { user :: TestUser v
+  , key :: Var BS8.ByteString v
   } deriving (Show, Generic)
 instance FunctorB DeleteEntry
 instance TraversableB DeleteEntry
 
 data DeleteEntryBadAuth v = DeleteEntryBadAuth
-  { deleteEntryId :: Var BS8.ByteString v
-  , deleteEntryUser :: Maybe (TestUser v)
+  { key :: Var BS8.ByteString v
+  , user :: Maybe (TestUser v)
   } deriving (Show, Generic)
 instance FunctorB DeleteEntryBadAuth
 instance TraversableB DeleteEntryBadAuth
 
 data UpdateEntry v = UpdateEntry
-  { updateEntryAuth :: TestUser v
-  , updateEntryId :: Var BS8.ByteString v
-  , updateEntryTitle :: String
-  , updateEntryValue :: String
+  { user :: TestUser v
+  , key :: Var BS8.ByteString v
+  , title :: String
+  , value :: String
   } deriving (Show, Generic)
 instance FunctorB UpdateEntry
 instance TraversableB UpdateEntry
@@ -182,10 +182,10 @@ instance ToForm (UpdateEntry v) where
     ]
 
 data UpdateEntryBadAuth v = UpdateEntryBadAuth
-  { updateEntryId :: Var BS8.ByteString v
-  , updateEntryTitle :: String
-  , updateEntryValue :: String
-  , updateEntryUser :: Maybe (TestUser v)
+  { key :: Var BS8.ByteString v
+  , title :: String
+  , value :: String
+  , user :: Maybe (TestUser v)
   } deriving (Show, Generic)
 instance FunctorB UpdateEntryBadAuth
 instance TraversableB UpdateEntryBadAuth

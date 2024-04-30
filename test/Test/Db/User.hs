@@ -16,8 +16,8 @@ instance FromJSON Group
 instance ToHttpApiData Group where
   toQueryParam = toQueryParam . show
 
-instance ToForm CreateUser where
-  toForm (CreateUser group email password) = fromList
+instance ToForm UserCreate where
+  toForm (UserCreate group email password) = fromList
     [ ("group", toQueryParam group)
     , ("email", toQueryParam email)
     , ("password", toQueryParam password)
