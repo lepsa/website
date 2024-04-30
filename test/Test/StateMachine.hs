@@ -17,14 +17,14 @@ import Hedgehog hiding (Group)
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Network.HTTP.Client qualified as H
-import Network.HTTP.Types
-    ( Header, status204, methodPost, methodGet, status200, status303, methodDelete, methodPut, status401, Status )
+import Network.HTTP.Types ( Header, status204, methodPost, methodGet, status200, status303, methodDelete, methodPut, status401, Status, Method )
 import Test.Db.Entry ()
 import Test.Db.User ()
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User
 import Web.FormUrlEncoded
 import Test.StateMachine.Types
+import Test.StateMachine.Types qualified as ST
 import Data.Maybe (isJust, isNothing)
 import Text.Regex.TDFA
 import Text.RawString.QQ
@@ -78,11 +78,20 @@ genTestUser = TestUser <$> genEmail <*> genPassword <*> genGroup <*> pure Nothin
 -- Helper functions
 --
 
+mkReq :: Method -> [Header] -> H.Request -> H.Request
+mkReq method headers req = req
+  { H.method = method
+  , H.redirectCount = 0
+  , H.requestHeaders = acceptHtml : headers <> H.requestHeaders req
+  }
+
 emailExists :: (HasField "email" r Text) => ApiState v -> r -> Bool
 emailExists state command = command.email `elem` fmap (.email) state.users
 
-userExists :: (HasField "user" r (TestUser v), Eq1 v) => ApiState v -> r -> Bool
-userExists state command = command.user `elem` state.users
+userExists :: (HasField "auth" r (Auth v), Eq1 v) => ApiState v -> r -> Bool
+userExists state command = case command.auth of
+  Normal user -> user `elem` state.users
+  Bad _ -> True
 
 entryExists :: (HasField "key" r (Var BS8.ByteString v), Eq1 v) => ApiState v -> r -> Bool
 entryExists state command = command.key `elem` fmap (.key) state.entries
@@ -90,46 +99,49 @@ entryExists state command = command.key `elem` fmap (.key) state.entries
 response204 :: (HasField "responseStatus" r Status, MonadTest m) => ApiState v -> ApiState v -> a -> r -> m ()
 response204 _old _new _input output = output.responseStatus === status204
 
-mkAuthHeader :: MonadTest m => TestUser Concrete -> m Header
-mkAuthHeader user = do
-  let auth = case user.jwt of
+mkAuthHeader :: (HasField "auth" command (Auth Concrete)) => command -> [Header]
+mkAuthHeader command = case command.auth of
+  Normal user -> pure $ normalHeader user
+  Bad user -> badHeader user
+  where
+    normalHeader :: TestUser Concrete -> Header
+    normalHeader user = do
+      case user.jwt of
         Nothing -> mkBasicAuthHeader user
         Just jwt -> mkJwtAuthHeader jwt
-  annotate $ show auth
-  pure auth
+    badHeader :: Maybe (TestUser Concrete) -> [Header]
+    badHeader = maybe [] (pure . normalHeader)
+    mkBasicAuthHeader :: TestUser v -> Header
+    mkBasicAuthHeader user =
+      ( "Authorization"
+      , "Basic " <> encodeUtf8 (extractBase64 @_ @T.Text $ B64.encodeBase64 (user.email <> ":" <> user.password))
+      )
+    mkJwtAuthHeader :: Var BS8.ByteString Concrete -> Header
+    mkJwtAuthHeader jwt =
+      ( "Authorization"
+      , "Bearer " <> concrete jwt
+      )
 
-mkBasicAuthHeader :: TestUser v -> Header
-mkBasicAuthHeader user =
-  ( "Authorization"
-  , "Basic " <> encodeUtf8 (extractBase64 @_ @T.Text $ B64.encodeBase64 (user.email <> ":" <> user.password))
-  )
+mkAuth :: MonadGen m => ApiState v -> m (Auth v)
+mkAuth state = Normal <$> Gen.element state.users
 
-mkJwtAuthHeader :: Var BS8.ByteString Concrete -> Header
-mkJwtAuthHeader jwt =
-  ( "Authorization"
-  , "Bearer " <> concrete jwt
-  )
-
-mkBadAuth :: MonadGen m => ApiState v -> m (Maybe (TestUser v))
+mkBadAuth :: MonadGen m => ApiState v -> m (Auth v)
 mkBadAuth state = Gen.choice
-  [ pure Nothing
+  [ pure $ Bad Nothing
   , if null state.users
-    then pure Nothing
+    then pure $ Bad Nothing
     else do
       u <- Gen.element state.users
       let u' = u { jwt = Nothing }
-      pure <$> Gen.choice
+      Bad . pure <$> Gen.choice
         [ do
           newPass <- Gen.filterT (/= u'.password) genPassword
-          pure $ u' { password = newPass}
+          pure $ u' { ST.password = newPass}
         , do
           newEmail <- Gen.filterT (/= u'.email) genEmail
-          pure $ u' { email = newEmail}
+          pure $ u' { ST.email = newEmail}
         ]
   ]
-
-mkBadAuthHeader :: (HasField "user" command (Maybe (TestUser Concrete)), MonadTest m) => command -> m ([Header] -> [Header])
-mkBadAuthHeader command = maybe (pure id) (fmap (:) . mkAuthHeader) command.user
 
 formHeader :: Header
 formHeader = ("Content-Type", "application/x-www-form-urlencoded")
@@ -157,15 +169,7 @@ cRegister env = Command gen execute
     gen _apiState = pure genTestUser
     execute register = do
       req <- H.parseRequest $ env.baseUrl <> "/register"
-      let req' = req
-            { H.method = methodPost
-            , H.requestHeaders =
-                formHeader
-              : acceptHtml
-              : req.requestHeaders
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm $ toUserCreate register
-            }
-      annotate $ show req'
+      let req' = mkReq methodPost [formHeader] req { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm $ toUserCreate register }
       liftIO $ H.httpNoBody req' env.manager
 
 cLogin :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -188,17 +192,12 @@ cLogin env = Command gen execute
       then Nothing
       else Just $ do
         user <- Gen.element apiState.users
-        pure $ TestLogin user.email user.password
+        pure $ TestLogin Good user.email user.password
     -- What we want to do with this value
     execute login = do
       req <- H.parseRequest (env.baseUrl <> "/login")
-      let req' = req
-            { H.method = methodPost
-            , H.requestHeaders = formHeader : acceptHtml : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login
-            }
+      let req' = mkReq methodPost [formHeader] req { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login }
       res <- liftIO $ H.httpNoBody req' env.manager
-      annotate $ show res
       res.responseStatus === status204
       -- Find cookies
       let cookies = filter (\(k, v) -> k == mk "Set-Cookie" && not (BS.null v)) res.responseHeaders
@@ -209,29 +208,25 @@ cLogin env = Command gen execute
         -- Find the JWT cookie
         (\(_, v) -> BS8.isPrefixOf "JWT" v)
         cookies
-      -- Drop the cookie name and settings
+      -- Drop the cookie name and settings. We don't care about them and
+      -- only want to get the bearer token
       let jwt' = BS8.takeWhile (/= ';') $ BS8.drop 1 $ BS8.dropWhile (/= '=') jwt
       pure jwt'
 
 cLoginFail :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cLoginFail env = Command gen execute
   [ Require $ \state input -> isNothing $ find
-      -- Tell hedgehog to actually ensure that the user we're trying to login from
-      -- actually exists. Otherwise it can get funky ideas like having split values
-      -- and pulling new strings out of thin air.
       (\u -> u.email == input.user && u.password == input.pass)
       state.users
   ]
   where
-    -- From our state, generate a value to be used for the test.
-    -- In this case, pick a user to log in from the list of users.
-    gen :: ApiState Symbolic -> Maybe (gen (TestLoginBad Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (TestLogin Symbolic))
     gen apiState = Just $
       -- We have 3 things we want to test.
       -- 1) unknown user-password pairs. This can be done if there are no users.
       -- 2) known user with a bad password
       -- 3) unknown user with a known password
-      let genRandom = TestLoginBad Random <$> genEmail <*> genPassword
+      let genRandom = TestLogin Random <$> genEmail <*> genPassword
       in if null apiState.users
         then genRandom
         else do
@@ -243,25 +238,18 @@ cLoginFail env = Command gen execute
               genRandom
             , do
               user <- Gen.element apiState.users
-              TestLoginBad BadPassword user.email
+              TestLogin BadPassword user.email
                 <$> Gen.filterT (\p -> p /= user.password) genPassword
             , do
               user <- Gen.element apiState.users
-              TestLoginBad BadUser
+              TestLogin BadUser
                 <$> Gen.filterT (\e -> e /= user.email) genEmail
                 <*> pure user.password
             ]
-
-    -- What we want to do with this value
     execute login = do
       req <- H.parseRequest (env.baseUrl <> "/login")
-      let req' = req
-            { H.method = methodPost
-            , H.requestHeaders = formHeader : acceptHtml : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login
-            }
+      let req' = mkReq methodPost [formHeader] req { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login }
       res <- liftIO $ H.httpNoBody req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cGetEntries :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -274,45 +262,28 @@ cGetEntries env = Command gen execute
     gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
     gen state = if null state.users
       then Nothing
-      else pure $ GetEntries <$> Gen.element state.users
+      else pure $ GetEntries . Normal <$> Gen.element state.users
     execute :: GetEntries Concrete -> m [BSL.ByteString]
     execute getEntries = do
       req <- H.parseRequest (env.baseUrl <> "/entries")
-      auth <- mkAuthHeader getEntries.user
-      let req' = req
-            { H.method = methodGet
-            , H.requestHeaders
-              = acceptHtml
-              : auth
-              : H.requestHeaders req
-            }
-      annotate $ show auth
+      let req' = mkReq methodGet (mkAuthHeader getEntries) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status200
-      let body = res.responseBody
       -- Commit the great sin of "parsing" html with regex
-          matches = getAllTextMatches (body =~ ([r|"/entry/[[:digit:]]+"|] :: String))
-      annotate $ show matches
+      let matches = getAllTextMatches (res.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
       pure matches
 
 cGetEntriesBadAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cGetEntriesBadAuth env = Command gen execute
   []
   where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntriesBadAuth Symbolic))
-    gen state = pure $ GetEntriesBadAuth <$> mkBadAuth state
-    execute :: GetEntriesBadAuth Concrete -> m ()
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
+    gen state = pure $ GetEntries <$> mkBadAuth state
+    execute :: GetEntries Concrete -> m ()
     execute getEntries = do
       req <- H.parseRequest (env.baseUrl <> "/entries")
-      auth <- mkBadAuthHeader getEntries
-      let req' = req
-            { H.method = methodGet
-            , H.requestHeaders
-              = auth $ acceptHtml : H.requestHeaders req
-            }
+      let req' = mkReq methodGet (mkAuthHeader getEntries) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cGetEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -321,25 +292,17 @@ cGetEntry env = Command gen execute
   , Require entryExists
   ]
   where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (EntryAccess Symbolic))
     gen state =
       let entries = (.key) <$> state.entries
       in if null state.users || null entries
         then Nothing
-        else pure $ GetEntry <$> Gen.element state.users <*> Gen.element entries
-    execute :: GetEntry Concrete -> m BSL8.ByteString
+        else pure $ EntryAccess <$> mkAuth state <*> Gen.element entries
+    execute :: EntryAccess Concrete -> m BSL8.ByteString
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete getEntry.key)
-      auth <- mkAuthHeader getEntry.user
-      let req' = req
-            { H.method = methodGet
-            , H.requestHeaders
-              = acceptHtml
-              : auth
-              : H.requestHeaders req
-            }
+      let req' = mkReq methodGet (mkAuthHeader getEntry) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status200
       pure res.responseBody
 
@@ -348,25 +311,17 @@ cGetEntryBadAuth env = Command gen execute
   [ Require entryExists
   ]
   where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntryBadAuth Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (EntryAccess Symbolic))
     gen state =
       let entries = (.key) <$> state.entries
       in if null entries
         then Nothing
-        else pure $ GetEntryBadAuth
-          <$> Gen.element entries
-          <*> mkBadAuth state
-    execute :: GetEntryBadAuth Concrete -> m ()
+        else pure $ EntryAccess <$> mkBadAuth state <*> Gen.element entries
+    execute :: EntryAccess Concrete -> m ()
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete getEntry.key)
-      auth <- mkBadAuthHeader getEntry
-      let req' = req
-            { H.method = methodGet
-            , H.requestHeaders
-              = auth $ acceptHtml : H.requestHeaders req
-            }
+      let req' = mkReq methodGet (mkAuthHeader getEntry) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cCreateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -376,7 +331,6 @@ cCreateEntry env = Command gen execute
     { entries = TestEntry output input.title input.title : state.entries
     }
   , Ensure $ \_old _new _input output -> do
-    annotate $ show output
     assert $ BS8.isPrefixOf "/entry/" output
     assert $ BS8.length output > BS8.length "/entry/"
   ]
@@ -384,26 +338,13 @@ cCreateEntry env = Command gen execute
     gen :: ApiState Symbolic -> Maybe (gen (CreateEntry Symbolic))
     gen state = if null state.users
       then Nothing
-      else pure $ CreateEntry
-        <$> Gen.element state.users
-        <*> Gen.string textLength chars
-        <*> Gen.string textLength chars
+      else pure $ CreateEntry <$> mkAuth state <*> genText <*> genText
     execute :: CreateEntry Concrete -> m BS8.ByteString
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
-      auth <- mkAuthHeader createEntry.user
-      let req' = req
-            { H.method = methodPost
-            , H.redirectCount = 0
-            , H.requestHeaders
-              = formHeader
-              : acceptHtml
-              : auth
-              : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
-            }
+      let req' = mkReq methodPost (formHeader : mkAuthHeader createEntry) req
+            { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status303
       maybe
         (fail "No Location header returned")
@@ -415,26 +356,16 @@ cCreateEntryBadAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m
 cCreateEntryBadAuth env = Command gen execute
   []
   where
-    gen :: ApiState Symbolic -> Maybe (gen (CreateEntryBadAuth Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (CreateEntry Symbolic))
     gen state = if null state.users
       then Nothing
-      else pure $ CreateEntryBadAuth
-        <$> Gen.string textLength chars
-        <*> Gen.string textLength chars
-        <*> mkBadAuth state
-    execute :: CreateEntryBadAuth Concrete -> m ()
+      else pure $ CreateEntry <$> mkBadAuth state <*> genText <*> genText
+    execute :: CreateEntry Concrete -> m ()
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
-      auth <- mkBadAuthHeader createEntry
-      let req' = req
-            { H.method = methodPost
-            , H.redirectCount = 0
-            , H.requestHeaders
-              = auth $ formHeader : acceptHtml : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
-            }
+      let req' = mkReq methodPost (formHeader:mkAuthHeader createEntry) req
+            { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cDeleteEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -446,26 +377,17 @@ cDeleteEntry env = Command gen execute
     }
   ]
   where
-    gen :: ApiState v -> Maybe (gen (DeleteEntry v))
+    gen :: ApiState v -> Maybe (gen (EntryAccess v))
     gen state = if not (null state.users) && not (null state.entries)
-      then Just $ DeleteEntry
-        <$> Gen.element state.users
+      then Just $ EntryAccess
+        <$> mkAuth state
         <*> Gen.element ((.key) <$> state.entries)
       else Nothing
-    execute :: DeleteEntry Concrete -> m ()
+    execute :: EntryAccess Concrete -> m ()
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete deleteEntry.key) <> "/delete"
-      auth <- mkAuthHeader deleteEntry.user
-      let req' = req
-            { H.method = methodDelete
-            , H.redirectCount = 0
-            , H.requestHeaders
-              = acceptHtml
-              : auth
-              : H.requestHeaders req
-            }
+      let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status200
 
 cDeleteEntryBadAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -473,23 +395,17 @@ cDeleteEntryBadAuth env = Command gen execute
   [ Require entryExists
   ]
   where
-    gen :: ApiState v -> Maybe (gen (DeleteEntryBadAuth v))
+    gen :: ApiState v -> Maybe (gen (EntryAccess v))
     gen state = if not (null state.users) && not (null state.entries)
-      then Just $ DeleteEntryBadAuth
-        <$> Gen.element ((.key) <$> state.entries)
-        <*> mkBadAuth state
+      then Just $ EntryAccess
+        <$> mkBadAuth state
+        <*> Gen.element ((.key) <$> state.entries)
       else Nothing
-    execute :: DeleteEntryBadAuth Concrete -> m ()
+    execute :: EntryAccess Concrete -> m ()
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete deleteEntry.key) <> "/delete"
-      auth <- mkBadAuthHeader deleteEntry
-      let req' = req
-            { H.method = methodDelete
-            , H.redirectCount = 0
-            , H.requestHeaders = auth $ acceptHtml : H.requestHeaders req
-            }
+      let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cUpdateEntry :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -510,27 +426,17 @@ cUpdateEntry env = Command gen execute
     gen :: ApiState v -> Maybe (gen (UpdateEntry v))
     gen state = if not (null state.users) && not (null state.entries)
       then Just $ UpdateEntry
-        <$> Gen.element state.users
+        <$> mkAuth state
         <*> Gen.element ((.key) <$> state.entries)
-        <*> Gen.string textLength chars
-        <*> Gen.string textLength chars
+        <*> genText
+        <*> genText
       else Nothing
     execute :: UpdateEntry Concrete -> m ()
     execute input = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete input.key) <> "/update"
-      auth <- mkAuthHeader input.user
-      let req' = req
-            { H.method = methodPut
-            , H.redirectCount = 0
-            , H.requestHeaders
-              = acceptHtml
-              : formHeader
-              : auth
-              : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm input
-            }
+      let req' = mkReq methodPut (formHeader : mkAuthHeader input) req
+            { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm input }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status200
 
 cUpdateEntryBadAuth :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
@@ -538,27 +444,20 @@ cUpdateEntryBadAuth env = Command gen execute
   [ Require entryExists
   ]
   where
-    gen :: ApiState v -> Maybe (gen (UpdateEntryBadAuth v))
+    gen :: ApiState v -> Maybe (gen (UpdateEntry v))
     gen state = if not (null state.users) && not (null state.entries)
-      then Just $ UpdateEntryBadAuth
-        <$> Gen.element ((.key) <$> state.entries)
-        <*> Gen.string textLength chars
-        <*> Gen.string textLength chars
-        <*> mkBadAuth state
+      then Just $ UpdateEntry
+        <$> mkBadAuth state
+        <*> Gen.element ((.key) <$> state.entries)
+        <*> genText
+        <*> genText
       else Nothing
-    execute :: UpdateEntryBadAuth Concrete -> m ()
+    execute :: UpdateEntry Concrete -> m ()
     execute updateEntry = do
       req <- H.parseRequest $ env.baseUrl <> BS8.unpack (concrete updateEntry.key) <> "/update"
-      auth <- mkBadAuthHeader updateEntry
-      let req' = req
-            { H.method = methodPut
-            , H.redirectCount = 0
-            , H.requestHeaders
-              = auth $ acceptHtml : formHeader : H.requestHeaders req
-            , H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm updateEntry
-            }
+      let req' = mkReq methodPut (formHeader : mkAuthHeader updateEntry) req
+            { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm updateEntry }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 --
@@ -580,9 +479,7 @@ cUpdateEntryBadAuth env = Command gen execute
 --       req <- H.parseRequest (env.baseUrl <> "/reset")
 --       let req' = req {H.method = methodPost}
 --       res <- liftIO $ H.httpNoBody req' env.manager
---       annotate $ show res
 --       res.responseStatus === status204
-
 
 cTestGetUsers :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cTestGetUsers env = Command gen execute

@@ -21,16 +21,10 @@ common threads
 common warnings
     ghc-options: -Wall
     build-depends:  base
-                  , lens
                   , servant
                   , servant-server
-                  , containers
-                  , unordered-containers
-                  , mtl
-                  , transformers
                   , warp
                   , aeson
-                  , blaze
                   , blaze-html
                   , blaze-markup
                   , servant-blaze

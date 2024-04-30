@@ -45,8 +45,8 @@ data TestEnv = TestEnv
 data TestEntry v = TestEntry
   { key     :: Var BS8.ByteString v,
     -- created :: UTCTime,
-    title   :: String,
-    value   :: String
+    title   :: Text,
+    value   :: Text
   }
   deriving (Generic)
 instance FunctorB TestEntry
@@ -62,33 +62,27 @@ data TestUser v = TestUser
 instance FunctorB TestUser
 instance TraversableB TestUser
 
+data Auth v
+  = Normal (TestUser v)
+  | Bad (Maybe (TestUser v))
+  deriving (Eq, Generic, Show)
+instance FunctorB Auth
+instance TraversableB Auth
+
 -- Log into the API with the given email and password
-data BadLoginType = Random | BadUser | BadPassword
+data LoginType = Good | Random | BadUser | BadPassword
   deriving (Eq, Ord, Show)
 
-data TestLoginBad v = TestLoginBad
-  { type_ :: BadLoginType
+data TestLogin v = TestLogin
+  { type_ :: LoginType
   , user  :: Text
   , pass  :: Text
-  } deriving (Eq, Show, Generic)
-instance FunctorB TestLoginBad
-instance TraversableB TestLoginBad
-
-instance ToForm (TestLoginBad v) where
-  toForm (TestLoginBad _ user pass) = fromList
-    [ ("login", toQueryParam user)
-    , ("password", toQueryParam pass)
-    ]
-
-data TestLogin v = TestLogin
-  { user :: Text
-  , pass :: Text
   } deriving (Eq, Show, Generic)
 instance FunctorB TestLogin
 instance TraversableB TestLogin
 
 instance ToForm (TestLogin v) where
-  toForm (TestLogin user pass) = fromList
+  toForm (TestLogin _ user pass) = fromList
     [ ("login", toQueryParam user)
     , ("password", toQueryParam pass)
     ]
@@ -98,36 +92,22 @@ toUserCreate r = UserCreate r.group r.email r.password
 
 -- Get the entries from the API
 newtype GetEntries v = GetEntries
-  { user :: TestUser v
+  { auth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB GetEntries
 instance TraversableB GetEntries
 
-newtype GetEntriesBadAuth v = GetEntriesBadAuth
-  { user :: Maybe (TestUser v)
-  }
-  deriving (Show, Generic)
-instance FunctorB GetEntriesBadAuth
-instance TraversableB GetEntriesBadAuth
-
-data GetEntry v = GetEntry
-  { user :: TestUser v
+data EntryAccess v = EntryAccess
+  { auth :: Auth v
   , key :: Var BS8.ByteString v
   } deriving (Show, Generic)
-instance FunctorB GetEntry
-instance TraversableB GetEntry
-
-data GetEntryBadAuth v = GetEntryBadAuth
-  { key :: Var BS8.ByteString v
-  , user :: Maybe (TestUser v)
-  } deriving (Show, Generic)
-instance FunctorB GetEntryBadAuth
-instance TraversableB GetEntryBadAuth
+instance FunctorB EntryAccess
+instance TraversableB EntryAccess
 
 data CreateEntry v = CreateEntry
-  { user :: TestUser v
-  , title :: String
-  , value :: String
+  { auth :: Auth v
+  , title :: Text
+  , value :: Text
   } deriving (Eq, Show, Generic)
 instance FunctorB CreateEntry
 instance TraversableB CreateEntry
@@ -138,60 +118,17 @@ instance ToForm (CreateEntry v) where
     , ("value", toQueryParam value)
     ]
 
-data CreateEntryBadAuth v = CreateEntryBadAuth
-  { title :: String
-  , value :: String
-  , user  :: Maybe (TestUser v)
-  } deriving (Eq, Show, Generic)
-instance FunctorB CreateEntryBadAuth
-instance TraversableB CreateEntryBadAuth
-
-instance ToForm (CreateEntryBadAuth v) where
-  toForm (CreateEntryBadAuth title value _) = fromList
-    [ ("title", toQueryParam title)
-    , ("value", toQueryParam value)
-    ]
-
-data DeleteEntry v = DeleteEntry
-  { user :: TestUser v
-  , key :: Var BS8.ByteString v
-  } deriving (Show, Generic)
-instance FunctorB DeleteEntry
-instance TraversableB DeleteEntry
-
-data DeleteEntryBadAuth v = DeleteEntryBadAuth
-  { key :: Var BS8.ByteString v
-  , user :: Maybe (TestUser v)
-  } deriving (Show, Generic)
-instance FunctorB DeleteEntryBadAuth
-instance TraversableB DeleteEntryBadAuth
-
 data UpdateEntry v = UpdateEntry
-  { user :: TestUser v
+  { auth :: Auth v
   , key :: Var BS8.ByteString v
-  , title :: String
-  , value :: String
+  , title :: Text
+  , value :: Text
   } deriving (Show, Generic)
 instance FunctorB UpdateEntry
 instance TraversableB UpdateEntry
 
 instance ToForm (UpdateEntry v) where
   toForm (UpdateEntry _ _ title value) = fromList
-    [ ("title", toQueryParam title)
-    , ("value", toQueryParam value)
-    ]
-
-data UpdateEntryBadAuth v = UpdateEntryBadAuth
-  { key :: Var BS8.ByteString v
-  , title :: String
-  , value :: String
-  , user :: Maybe (TestUser v)
-  } deriving (Show, Generic)
-instance FunctorB UpdateEntryBadAuth
-instance TraversableB UpdateEntryBadAuth
-
-instance ToForm (UpdateEntryBadAuth v) where
-  toForm (UpdateEntryBadAuth _ title value _) = fromList
     [ ("title", toQueryParam title)
     , ("value", toQueryParam value)
     ]
