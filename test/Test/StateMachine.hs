@@ -210,8 +210,7 @@ cLogin env = Command gen execute
         cookies
       -- Drop the cookie name and settings. We don't care about them and
       -- only want to get the bearer token
-      let jwt' = BS8.takeWhile (/= ';') $ BS8.drop 1 $ BS8.dropWhile (/= '=') jwt
-      pure jwt'
+      pure $ BS8.takeWhile (/= ';') $ BS8.drop 1 $ BS8.dropWhile (/= '=') jwt
 
 cLoginFail :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cLoginFail env = Command gen execute

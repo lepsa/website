@@ -1,7 +1,5 @@
 module Website.Content.Common where
 
-import Control.Monad.Reader
-import Data.List
 import Data.Text (Text, pack)
 import Servant hiding (BasicAuth)
 import Servant.HTML.Blaze
@@ -9,11 +7,12 @@ import Text.Blaze.Html
 import Text.Blaze.Html qualified as H
 import Text.Blaze.Html5 qualified as H
 import Text.Blaze.Html5.Attributes qualified as HA
-import Website.Data.Common
 import Website.Network.API.Types
-import Website.Types
 import Website.Data.User
 import Servant.Auth
+
+type AuthEntry a = Auth Auths UserKey :> "entry" :> a
+type AuthUser a = Auth Auths UserKey :> "user" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
@@ -70,7 +69,7 @@ sideNav =
     H.ul $
       mconcat
         [ H.li $ H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a ! htmlLink (Proxy @(Auth Auths UserId :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a ! htmlLink (Proxy @(Auth Auths UserKey :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
@@ -132,41 +131,3 @@ formFieldTextArea fieldName fieldLabel value =
     [ H.label ! HA.for (toValue fieldName) $ toHtml fieldLabel,
       H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
     ]
-
--- | Generate an empty form for a given type. This form can be used to create a new value for the type.
-generateNewForm :: (MonadReader Env m, GenerateForm a) => Proxy a -> m Html
-generateNewForm p = do
-  fd <- newForm p
-  pure
-    $ H.form
-      ! HA.class_ "contentform"
-      ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
-    $ mconcat
-      [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
-        H.br,
-        H.input ! HA.class_ "formbutton" ! HA.type_ "submit" ! HA.value "Create"
-      ]
-
--- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
-generateUpdateForm :: (MonadReader Env m, GenerateForm a) => a -> m Html
-generateUpdateForm a = do
-  fd <- updateForm a
-  pure
-    $ H.form
-      ! HA.class_ "contentform"
-      ! dataAttribute "hx-swap" "outerHTML"
-      ! maybe mempty (dataAttribute "hx-put" . stringValue) fd.updateUrl
-    $ mconcat
-      [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
-        H.br,
-        H.input
-          ! HA.type_ "submit"
-          ! HA.class_ "formbutton"
-          ! HA.value "Update"
-      ]
-
--- | Helper function for generating forms
-generateField :: FieldData -> Html
-generateField fd = case fd of
-  FieldData {} -> formField fd.name fd.label fd.type_ fd.value
-  StaticData {} -> staticField fd.name fd.label fd.value

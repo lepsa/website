@@ -9,6 +9,7 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
 import Servant
 import Website.Types
+import Website.Data.Env
 
 -- Create the Entry table
 createEntry :: Query

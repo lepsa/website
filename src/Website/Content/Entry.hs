@@ -13,15 +13,8 @@ import Website.Content.Common
 import Website.Data.Entry
 import Website.Network.API.CRUD
 import Website.Network.API.Types
-import Website.Types
+import Website.Data.Env
 
-entryUpdateForm :: (MonadReader Env m) => Entry -> m Html
-entryUpdateForm = generateUpdateForm
-
--- Page to create a new Entry
-entryCreationForm :: (MonadReader Env m) => m Html
-entryCreationForm =
-  basicPage <$> generateNewForm (Proxy @Entry)
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (MonadReader Env m) => Entry -> m Html

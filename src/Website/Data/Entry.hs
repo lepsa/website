@@ -2,7 +2,6 @@ module Website.Data.Entry where
 
 import Control.Monad.Except
 import Control.Monad.Reader
-import Data.Text
 import Data.Time
 import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
@@ -10,12 +9,9 @@ import Database.SQLite.Simple.ToField
 import GHC.Generics
 import Servant
 import Web.FormUrlEncoded
-import Website.Data.Common
-import Website.Network.API.CRUD
-import Website.Network.API.Types
 import Website.Types
-import Servant.Auth
-import Website.Data.User
+import Website.Data.Env
+import Website.Data.Error
 
 --
 -- What an Entry is, and the various derived types that
@@ -60,61 +56,6 @@ data Entry = Entry
 
 entryTimeFormat :: TimeZone -> UTCTime -> String
 entryTimeFormat tz = formatTime defaultTimeLocale "%e %B ,%Y" . utcToZonedTime tz
-
-type AuthEntry a = Auth Auths UserId :> "entry" :> a
-
---
--- What an Entry should look like in HTML
---
-instance GenerateForm Entry where
-  newForm _ =
-    pure $
-      FormData
-        { title = "Create Entry",
-          createUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDCreate EntryCreate)))),
-          updateUrl = Nothing,
-          fields =
-            [ FieldData
-                { label = "Title",
-                  name = "title",
-                  type_ = "text",
-                  value = Nothing
-                },
-              FieldData
-                { label = "Value",
-                  name = "value",
-                  type_ = "textarea",
-                  value = Nothing
-                }
-            ]
-        }
-  updateForm entry = do
-    tz <- asks timeZone
-    pure $
-      FormData
-        { title = "Update Entry",
-          createUrl = Nothing,
-          updateUrl = pure $ unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
-          fields =
-            [ FieldData
-                { label = "Title",
-                  name = "title",
-                  type_ = "text",
-                  value = pure entry.title
-                },
-              StaticData
-                { label = "Created",
-                  name = "created",
-                  value = pure $ entryTimeFormat tz entry.created
-                },
-              FieldData
-                { label = "Value",
-                  name = "value",
-                  type_ = "textarea",
-                  value = pure entry.value
-                }
-            ]
-        }
 
 --
 -- SQL for managing entries in the DB
