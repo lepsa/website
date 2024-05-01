@@ -12,12 +12,12 @@ import Servant.Auth.Server
 import Servant.Server
 import System.Directory
 import Website.Data.Schema
-import Website.Data.User
 import Website.Network.API.Types
 import Website.Network.Server
 import Website.Types
 import Data.Kind
 import Website.Data.Env
+import Website.Auth.Authentication
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going

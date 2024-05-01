@@ -1,6 +1,17 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Website.Auth.Authentication where
 import GHC.Generics
 import Web.FormUrlEncoded
+import Database.SQLite.Simple
+import Servant.Auth.Server
+import Website.Data.User
+import Control.Monad.IO.Class
+import Data.Text
+import Control.Monad.Except
+import Data.Password.Argon2
+import Data.Text.Encoding
+import Data.Bifunctor
 
 data Login = Login
   { email :: String
@@ -11,3 +22,33 @@ instance FromForm Login where
   fromForm f = Login
     <$> parseUnique "login" f
     <*> parseUnique "password" f
+
+newtype BasicAuthCfg' = BasicAuthCfg' Connection
+type instance BasicAuthCfg = BasicAuthCfg'
+
+instance FromBasicAuthData UserKey where
+  -- If anything goes wrong at any point, return BadPassword.
+  -- This won't save us from timing attacks, but it'll do for now.
+  -- NOTE: Attackers could guess at what we are doing based on the
+  -- time it takes to return a result. This could allow them to
+  -- guess how far through these checks they made it before being
+  -- kicked out.
+  fromBasicAuthData (BasicAuthData user pass) (BasicAuthCfg' conn) = do
+    either pure (pure . Authenticated) <=< runExceptT $ do
+      -- Decode the email into a friendlier type
+      email <- either (const $ throwError BadPassword) pure (decodeUtf8' user)
+      -- Convert the type for the hash
+      password <- either (const $ throwError BadPassword) pure (decodeUtf8' pass)
+      checkUserPassword conn email password
+
+checkUserPassword :: (MonadIO m) => Connection -> Text -> Text -> ExceptT (AuthResult UserKey) m UserKey
+checkUserPassword conn email pass = do
+  -- Look up the user's id by their email
+  uid <- liftIO (getUserId conn email) >>= liftEither . first (const BadPassword)
+  -- Get the associated password hash
+  hash <- liftIO (getUserHash conn uid) >>= liftEither . first (const BadPassword)
+  -- Run the password check
+  case checkPassword (mkPassword pass) hash of
+    PasswordCheckFail -> throwError BadPassword
+    -- If the password was correct, fetch the user
+    PasswordCheckSuccess -> pure uid
