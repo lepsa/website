@@ -33,7 +33,7 @@ server cookieSettings jwtSettings currentDirectory =
     unprotected =
       getIndex
         :<|> login
-        :<|> register
+        :<|> mapServerErrors . register cookieSettings jwtSettings
         :<|> serveDirectoryWebApp currentDirectory
 
     login :: Login -> AppM Env ServerError IO (SetCookies NoContent)
@@ -45,14 +45,6 @@ server cookieSettings jwtSettings currentDirectory =
         Nothing -> throwError err401
         Just cookies -> pure $ cookies NoContent
     
-    register :: UserCreate -> AppM Env ServerError IO (SetCookies NoContent)
-    register cUser = do
-      user <- mapServerErrors $ createUser cUser
-      mApplyCookies <- mapServerErrors $ liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
-      case mApplyCookies of
-        Nothing -> throwError err500
-        Just cookies -> pure $ cookies NoContent
-
     crudEntry =
       (mapServerErrors . postEntry)
         :<|> mapServerErrors entryCreationForm

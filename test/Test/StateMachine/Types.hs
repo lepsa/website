@@ -11,8 +11,9 @@ import Website.Data.User
 import Web.FormUrlEncoded
 import Servant (ToHttpApiData(..))
 import GHC.Exts (IsList(fromList))
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
+import Website.Auth.Authorisation (Group)
+import Data.Maybe
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -21,16 +22,15 @@ import qualified Data.ByteString.Char8 as BS8
 data ApiState v = ApiState
   { users   :: [TestUser v],
     entries :: [TestEntry v]
-  }
-  deriving (Generic)
+  } deriving (Generic)
 instance FunctorB ApiState
 instance TraversableB ApiState
 
 initialState :: ApiState v
 initialState =
   ApiState
-    { users = []
-    , entries = []
+    { users = mempty
+    , entries = mempty
     }
 
 data TestEnv = TestEnv
@@ -53,10 +53,10 @@ instance FunctorB TestEntry
 instance TraversableB TestEntry
 
 data TestUser v = TestUser
-  { email    :: Text
+  { key      :: Var BS8.ByteString v
+  , email    :: Text
   , password :: Text
   , group    :: Auth.Group
-  , jwt      :: Maybe (Var ByteString v)
   }
   deriving (Eq, Generic, Show)
 instance FunctorB TestUser
@@ -131,6 +131,63 @@ instance ToForm (UpdateEntry v) where
   toForm (UpdateEntry _ _ title value) = fromList
     [ ("title", toQueryParam title)
     , ("value", toQueryParam value)
+    ]
+
+data RegisterUser v = RegisterUser
+  { email :: Text
+  , password :: Text
+  , group :: Group
+  } deriving (Show, Generic)
+instance FunctorB RegisterUser
+instance TraversableB RegisterUser
+
+instance ToForm (RegisterUser v) where
+  toForm (RegisterUser email password group) = fromList
+    [ ("email", toQueryParam email)
+    , ("password", toQueryParam password)
+    , ("group", toQueryParam group)
+    ]
+
+data RegisterOutput = RegisterOutput
+  { cookie :: BS8.ByteString
+  , key :: BS8.ByteString
+  } deriving (Show, Generic)
+
+data CreateUser v = CreateUser
+  { auth :: Auth v
+  , group :: Group
+  , email :: Text
+  , password :: Text
+  } deriving (Show, Generic)
+instance FunctorB CreateUser
+instance TraversableB CreateUser
+instance ToForm (CreateUser v) where
+  toForm (CreateUser _ group email password) = fromList
+    [ ("group", toQueryParam group)
+    , ("email", toQueryParam email)
+    , ("password", toQueryParam password)
+    ]
+
+data PasswordUpdate v = PasswordUpdate
+  { oldPassword :: Text
+  , newPassword :: Text
+  } deriving (Show, Generic)
+instance FunctorB PasswordUpdate
+instance TraversableB PasswordUpdate
+
+data UpdateUser v = UpdateUser
+  { password :: Maybe (PasswordUpdate v)
+  , group :: Maybe Group
+  , auth :: Auth v
+  , key :: Var BS8.ByteString v
+  } deriving (Show, Generic)
+instance FunctorB UpdateUser
+instance TraversableB UpdateUser
+instance ToForm (UpdateUser v) where
+  toForm update = fromList
+    [ ("oldPassword", toQueryParam $ (.oldPassword) <$> update.password)
+    , ("newPassword", toQueryParam $ (.newPassword) <$> update.password)
+    , ("group", toQueryParam update.group)
     ]
 
 --

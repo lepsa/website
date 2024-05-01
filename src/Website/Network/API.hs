@@ -16,6 +16,8 @@ import Website.Data.Error
 import Website.Content.User (userDisplayFullPage, userDisplay)
 import Control.Monad
 import Website.Data.User
+import Control.Monad.IO.Class
+import Servant.Auth.Server
 
 getIndex :: (CanAppM c e m) => m H.Html
 getIndex = pure index
@@ -68,3 +70,12 @@ deleteUser :: CanAppM Env Err m => UserKey -> m H.Html
 deleteUser key = do
   Website.Data.User.deleteUser key
   pure $ H.toHtml @String "Delete"
+
+register :: CanAppM Env Err m => CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
+register cookieSettings jwtSettings cUser = do
+  user <- createUser cUser
+  mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
+  case mApplyCookies of
+    Nothing -> throwError $ Other "Could not build login cookies"
+    Just cookies -> pure $ cookies $ addHeader link NoContent
