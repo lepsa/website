@@ -1,29 +1,35 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 module Website.Auth.Authentication where
-import GHC.Generics
-import Web.FormUrlEncoded
-import Database.SQLite.Simple
-import Servant.Auth.Server
-import Website.Data.User
-import Control.Monad.IO.Class
-import Data.Text
+
+import Control.Monad
 import Control.Monad.Except
-import Data.Password.Argon2
-import Data.Text.Encoding
+import Control.Monad.IO.Class
 import Data.Bifunctor
+import Data.Password.Argon2
+import Data.Text
+import Data.Text.Encoding
+import Database.SQLite.Simple
+import GHC.Generics
+import Servant.Auth.Server
+import Web.FormUrlEncoded
+import Website.Data.User
 
 data Login = Login
-  { email :: String
-  , password :: String
-  } deriving Generic
+  { email :: String,
+    password :: String
+  }
+  deriving (Generic)
 
 instance FromForm Login where
-  fromForm f = Login
-    <$> parseUnique "login" f
-    <*> parseUnique "password" f
+  fromForm f =
+    Login
+      <$> parseUnique "login" f
+      <*> parseUnique "password" f
 
 newtype BasicAuthCfg' = BasicAuthCfg' Connection
+
 type instance BasicAuthCfg = BasicAuthCfg'
 
 instance FromBasicAuthData UserKey where
