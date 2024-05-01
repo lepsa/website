@@ -61,7 +61,6 @@ entryDisplayFullPage = fmap basicPage . entryDisplay
 entryList :: (MonadReader Env m) => [Entry] -> m Html
 entryList entries = do
   tz <- asks timeZone
-
   pure $
     basicPage $
       mconcat

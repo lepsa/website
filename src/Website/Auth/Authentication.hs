@@ -50,9 +50,9 @@ instance FromBasicAuthData UserKey where
 checkUserPassword :: (MonadIO m) => Connection -> Text -> Text -> ExceptT (AuthResult UserKey) m UserKey
 checkUserPassword conn email pass = do
   -- Look up the user's id by their email
-  uid <- liftIO (getUserId conn email) >>= liftEither . first (const BadPassword)
+  uid <- liftIO (getUserIdIO conn email) >>= liftEither . first (const BadPassword)
   -- Get the associated password hash
-  hash <- liftIO (getUserHash conn uid) >>= liftEither . first (const BadPassword)
+  hash <- liftIO (getUserHashIO conn uid) >>= liftEither . first (const BadPassword)
   -- Run the password check
   case checkPassword (mkPassword pass) hash of
     PasswordCheckFail -> throwError BadPassword

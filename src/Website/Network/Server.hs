@@ -8,14 +8,13 @@ import Data.UUID ()
 import Servant
 import Servant.Auth.Server
 import Website.Auth.Authentication
-import Website.Data.User
+import Website.Data.User (UserCreate, User(uuid), createUser)
 import Website.Network.API
 import Website.Network.API.Types
 import Website.Types
 import Website.Data.Env
 import Website.Data.Error
 import Website.Content.Forms
-import Website.Content.User
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env ServerError IO)
 server cookieSettings jwtSettings currentDirectory =
@@ -56,24 +55,16 @@ server cookieSettings jwtSettings currentDirectory =
 
     crudEntry =
       (mapServerErrors . postEntry)
-        :<|> mapServerErrors getEntryInitial
+        :<|> mapServerErrors entryCreationForm
         :<|> (mapServerErrors . getEntry)
         :<|> (\k -> mapServerErrors . putEntry k)
         :<|> (mapServerErrors . getEntryForUpdate)
         :<|> (mapServerErrors . deleteEntry)
 
-    getUser' key = do
-      c <- asks conn
-      user <- liftIO $ getUser c key
-      pure mempty
-    putUser = undefined
-    getUserForUpdate = undefined
-    deleteUser = undefined
-
     crudUser =
       (mapServerErrors . postUser)
         :<|> mapServerErrors userCreationForm
-        :<|> (mapServerErrors . getUser')
+        :<|> (mapServerErrors . getUser)
         :<|> (\k -> mapServerErrors . putUser k)
         :<|> (mapServerErrors . getUserForUpdate)
         :<|> (mapServerErrors . deleteUser)

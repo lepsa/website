@@ -72,7 +72,7 @@ instance FromRow Entry where
 createEntry :: (CanAppM Env Err m) => EntryCreate -> m Entry
 createEntry (EntryCreate title value) = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning *" (title, value)
+  entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning key, created, title, value" (title, value)
   case entries of
     [] -> throwError $ DbError NotFound
     [entry] -> pure entry
@@ -90,7 +90,7 @@ getEntry key = do
 updateEntry :: (CanAppM Env Err m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning *" (title, value, key)
+  entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning key, created, title, value" (title, value, key)
   case entries of
     [] -> throwError $ DbError NotFound
     [entry] -> pure entry

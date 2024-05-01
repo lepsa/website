@@ -39,7 +39,7 @@ main = do
         res <- H.httpNoBody req' mgr
         pure $ res.responseStatus == H.status204
   -- reset >>= bool (fail "Could not perform initial DB reset") (pure ())
-  results <- checkSequential $ Group "API Tests"
+  results <- checkParallel $ Group "API Tests"
     [ ("API State Machine", propApiTests env reset)
     ]
   killThread serverThread

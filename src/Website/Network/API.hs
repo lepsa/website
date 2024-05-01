@@ -13,6 +13,9 @@ import Data.Text (Text)
 import Website.Network.API.Types
 import Website.Data.Env
 import Website.Data.Error
+import Website.Content.User (userDisplayFullPage, userDisplay)
+import Control.Monad
+import Website.Data.User
 
 getIndex :: (CanAppM c e m) => m H.Html
 getIndex = pure index
@@ -45,3 +48,23 @@ deleteEntry key = do
 -- Get all of the Entries as a list
 getEntries :: (CanAppM Env Err m) => m H.Html
 getEntries = entryList =<< Website.Data.Entry.getEntries
+
+--
+-- User Pages
+--
+postUser :: (CanAppM Env Err m) => UserCreate -> m (Headers '[Header "Location" Text] H.Html)
+postUser create = do
+  user <- createUser create
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
+  pure $ addHeader link mempty
+
+getUser :: CanAppM Env Err m => UserKey -> m H.Html
+getUser key = userDisplayFullPage =<< Website.Data.User.getUser key
+
+putUser :: CanAppM Env Err m => UserKey -> UserUpdate -> m H.Html
+putUser key = userDisplay <=< updateUser key
+
+deleteUser :: CanAppM Env Err m => UserKey -> m H.Html
+deleteUser key = do
+  Website.Data.User.deleteUser key
+  pure $ H.toHtml @String "Delete"

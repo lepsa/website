@@ -1,20 +1,23 @@
 module Website.Content.Forms where
+
+import Control.Monad
+import Control.Monad.Reader
+import Data.Data
+import Data.List
+import Data.Text qualified as T
+import Servant
+import Text.Blaze.Html
+import Text.Blaze.Html5 qualified as H
+import Text.Blaze.Html5.Attributes qualified as HA
+import Website.Content.Common
+import Website.Data.Entry
+import Website.Data.Env
+import Website.Data.Error
 import Website.Data.User
 import Website.Network.API.CRUD
-import Text.Blaze.Html
-import Control.Monad.Reader
-import Website.Data.Env
-import Data.Data
-import Website.Data.Entry
 import Website.Network.API.Types
-import Website.Content.Common
-import Servant
-import qualified Data.Text as T
-import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as HA
-import Data.List
-import Website.Data.Error
 import Website.Types
+
 -- | Values for a given form field
 data FieldData
   = FieldData
@@ -101,9 +104,11 @@ instance GenerateForm Entry where
         }
 
 instance GenerateForm User where
-  newForm _ = pure $ FormData
-    { title = "Create User",
-    createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDCreate UserCreate)))),
+  newForm _ =
+    pure $
+      FormData
+        { title = "Create User",
+          createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDCreate UserCreate)))),
           updateUrl = Nothing,
           fields =
             [ FieldData
@@ -141,7 +146,6 @@ instance GenerateForm User where
             ]
         }
 
-
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
 generateNewForm :: (MonadReader Env m, GenerateForm a) => Proxy a -> m Html
 generateNewForm p = do
@@ -174,7 +178,17 @@ generateUpdateForm a = do
           ! HA.value "Update"
       ]
 
+-- User forms
+userUpdateForm :: (MonadReader Env m) => User -> m Html
+userUpdateForm = generateUpdateForm
 
+userCreationForm :: (MonadReader Env m) => m Html
+userCreationForm = basicPage <$> generateNewForm (Proxy @User)
+
+getUserForUpdate :: (CanAppM Env Err m) => UserKey -> m H.Html
+getUserForUpdate = userUpdateForm <=< Website.Data.User.getUser
+
+-- Entry forms
 entryUpdateForm :: (MonadReader Env m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
@@ -182,15 +196,5 @@ entryCreationForm :: (MonadReader Env m) => m Html
 entryCreationForm =
   basicPage <$> generateNewForm (Proxy @Entry)
 
-userUpdateForm :: MonadReader Env m => User -> m Html
-userUpdateForm = generateUpdateForm
-
-userCreationForm :: MonadReader Env m => m Html
-userCreationForm = basicPage <$> generateNewForm (Proxy @User)
-
-getEntryInitial :: MonadReader Env m => m H.Html
-getEntryInitial = entryCreationForm
-
-
 getEntryForUpdate :: (CanAppM Env Err m) => EntryKey -> m H.Html
-getEntryForUpdate key = entryUpdateForm =<< Website.Data.Entry.getEntry key
+getEntryForUpdate = entryUpdateForm <=< Website.Data.Entry.getEntry
