@@ -112,4 +112,5 @@ test-suite Website-test
         regex-tdfa,
         raw-strings-qq,
         base64,
-        containers
+        containers,
+        lens
