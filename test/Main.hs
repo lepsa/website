@@ -38,7 +38,6 @@ main = do
         let req' = req { H.method = H.methodPost }
         res <- H.httpNoBody req' mgr
         pure $ res.responseStatus == H.status204
-  -- reset >>= bool (fail "Could not perform initial DB reset") (pure ())
   results <- checkParallel $ Group "API Tests"
     [ ("API State Machine", propApiTests env reset)
     ]

@@ -10,7 +10,7 @@ import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Password.Argon2 (Argon2, PasswordHash (..), hashPassword, mkPassword, unPasswordHash, checkPassword, PasswordCheck (..))
+import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
 import Data.Text hiding (group)
 import Data.UUID
 import Data.UUID.V4
@@ -19,14 +19,14 @@ import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.FromRow
 import Database.SQLite.Simple.ToField
 import GHC.Generics
-import Website.Data.Util
 import Servant
 import Servant.Auth.JWT
 import Web.FormUrlEncoded
 import Website.Auth.Authorisation (Group)
-import Website.Types
 import Website.Data.Env
 import Website.Data.Error
+import Website.Data.Util
+import Website.Types
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
@@ -44,8 +44,11 @@ newtype UserKey = UserKey
   { uuid :: UUID
   }
   deriving (Eq, Ord, Show, Generic, FromField, ToField, ToHttpApiData, FromHttpApiData, ToJSON, FromJSON)
+
 instance FromRow UserKey
+
 instance ToJWT UserKey
+
 instance FromJWT UserKey
 
 data User = User
@@ -54,13 +57,16 @@ data User = User
     group :: Group
   }
   deriving (Eq, Show, Generic)
+
 instance FromRow User where
   fromRow = User <$> field <*> field <*> field
 
 data UpdatePassword = UpdatePassword
-  { oldPassword :: Text
-  , newPassword :: Text
-  } deriving (Generic)
+  { oldPassword :: Text,
+    newPassword :: Text
+  }
+  deriving (Generic)
+
 instance FromForm UpdatePassword where
   fromForm f =
     UpdatePassword
@@ -121,7 +127,7 @@ getUserHashIO c uid =
   query c "select hash from user_login where id = ?" (Only uid)
     >>= ensureSingleResult
 
-getUserHash :: CanAppM Env Err m => UserKey -> m (PasswordHash Argon2)
+getUserHash :: (CanAppM Env Err m) => UserKey -> m (PasswordHash Argon2)
 getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither
 
 getUserIO :: Connection -> UserKey -> IO (Either Err User)
@@ -129,7 +135,7 @@ getUserIO c uid =
   query c "select id, email, group_name from user where id = ?" (Only uid)
     >>= ensureSingleResult
 
-getUser :: CanAppM Env Err m => UserKey -> m User
+getUser :: (CanAppM Env Err m) => UserKey -> m User
 getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither
 
 getUserIdIO :: Connection -> Text -> IO (Either Err UserKey)
@@ -137,17 +143,18 @@ getUserIdIO c email =
   query c "select id from user where email = ?" (Only email)
     >>= ensureSingleResult
 
-getUserId :: CanAppM Env Err m => Text -> m UserKey
+getUserId :: (CanAppM Env Err m) => Text -> m UserKey
 getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither
 
-updateUser :: CanAppM Env Err m => UserKey -> UserUpdate -> m User
+updateUser :: (CanAppM Env Err m) => UserKey -> UserUpdate -> m User
 updateUser key update = do
   c <- asks conn
   case update.group of
     Nothing -> pure ()
-    Just group -> liftIO
-      $ withTransaction c
-      $ execute c "update user set group_name = ? where id = ?" (group, key)
+    Just group ->
+      liftIO $
+        withTransaction c $
+          execute c "update user set group_name = ? where id = ?" (group, key)
   case update.password of
     Nothing -> pure ()
     Just (UpdatePassword old new) -> do
@@ -156,16 +163,16 @@ updateUser key update = do
         PasswordCheckFail -> throwError $ Other "Could not verify old password"
         PasswordCheckSuccess -> do
           newHash <- hashPassword $ mkPassword new
-          liftIO
-            $ withTransaction c
-            $ execute c "update user_login set hash = ? where id = ?" (newHash, key)
+          liftIO $
+            withTransaction c $
+              execute c "update user_login set hash = ? where id = ?" (newHash, key)
   getUser key
 
-deleteUser :: CanAppM Env Err m => UserKey -> m ()
+deleteUser :: (CanAppM Env Err m) => UserKey -> m ()
 deleteUser key = do
   c <- asks conn
-  liftIO
-    $ withTransaction c
-    $ do
-      execute c "delete from user where id = ?" (Only key)
-      execute c "delete from user_login where id = ?" (Only key)
+  liftIO $
+    withTransaction c $
+      do
+        execute c "delete from user where id = ?" (Only key)
+        execute c "delete from user_login where id = ?" (Only key)

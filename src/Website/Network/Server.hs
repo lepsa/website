@@ -8,7 +8,6 @@ import Data.UUID ()
 import Servant
 import Servant.Auth.Server
 import Website.Auth.Authentication
-import Website.Data.User (UserCreate, User(uuid), createUser)
 import Website.Network.API
 import Website.Network.API.Types
 import Website.Types

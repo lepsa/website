@@ -16,7 +16,6 @@ import Website.Data.User ( UserCreate(UserCreate) )
 import Web.FormUrlEncoded
 import Servant (ToHttpApiData(..))
 import GHC.Exts (IsList(fromList))
-import qualified Data.ByteString.Char8 as BS8
 import Website.Auth.Authorisation (Group)
 import Data.Map (Map)
 import Data.Map qualified as M
@@ -27,14 +26,15 @@ import Data.Kind (Type)
 -- This will often end up mirroring the database in some way, as
 -- we want to track the same information, to ensure that the server
 -- is doing what we expect.
-type Key = Var BS8.ByteString
+-- type Key = Var BS8.ByteString
+type Key = Var String
 
 class HasEmail t where
   email :: Lens' t Text
 class HasPassword t where
   password :: Lens' t Text
 class HasKey (t :: (Type -> Type) -> Type) where
-  key :: Lens' (t v) (Var BS8.ByteString v)
+  key :: Lens' (t v) (Key v)
 class HasAuth (t :: (Type -> Type) -> Type) where
   auth :: Lens' (t v) (Auth v)
 
@@ -51,14 +51,15 @@ data TestUser v = TestUser
   { _tuEmail    :: Text
   , _tuPassword :: Text
   , _tuGroup    :: Auth.Group
+  , _tuJwt      :: Maybe (Var String v)
   }
   deriving (Eq, Generic, Show)
 instance FunctorB TestUser
 instance TraversableB TestUser
 
 data ApiState v = ApiState
-  { _stateUsers   :: Map (Key v) (TestUser v),
-    _stateEntries :: Map (Key v) (TestEntry v)
+  { _users   :: Map (Key v) (TestUser v),
+    _entries :: Map (Key v) (TestEntry v)
   } deriving (Generic)
 
 initialState :: ApiState v
@@ -88,21 +89,22 @@ instance FunctorB Auth
 instance TraversableB Auth
 
 -- Log into the API with the given email and password
-data LoginType = Good | Random | BadUser | BadPassword
+data LoginType = Good | BadUser | BadPassword
   deriving (Eq, Ord, Show)
 
 data TestLogin v = TestLogin
-  { _tlType_ :: LoginType
-  , _tlUser  :: Text
-  , _tlPass  :: Text
+  { _tlKey  :: Key v 
+  , _tlType :: LoginType
+  , _tlUser :: Text
+  , _tlPass :: Text
   } deriving (Eq, Show, Generic)
 instance FunctorB TestLogin
 instance TraversableB TestLogin
 
 instance ToForm (TestLogin v) where
-  toForm (TestLogin _ user pass) = fromList
-    [ ("login", toQueryParam user)
-    , ("password", toQueryParam pass)
+  toForm u = fromList
+    [ ("login", toQueryParam $ _tlUser u)
+    , ("password", toQueryParam $ _tlPass u)
     ]
 
 toUserCreate :: TestUser v -> UserCreate
@@ -119,7 +121,7 @@ instance FunctorB GetEntries
 instance TraversableB GetEntries
 
 data EntryAccess v = EntryAccess
-  { _eaKey :: Var BS8.ByteString v
+  { _eaKey :: Key v
   , _eaAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB EntryAccess
@@ -141,7 +143,7 @@ instance ToForm (CreateEntry v) where
 
 data UpdateEntry v = UpdateEntry
   { _ueAuth :: Auth v
-  , _ueKey :: Var BS8.ByteString v
+  , _ueKey :: Key v
   , _ueTitle :: Text
   , _ueValue :: Text
   } deriving (Show, Generic)
@@ -156,11 +158,6 @@ data RegisterUser v = RegisterUser
 instance FunctorB RegisterUser
 instance TraversableB RegisterUser
 
-data RegisterOutput = RegisterOutput
-  { _roCookie :: BS8.ByteString
-  , _roKey :: BS8.ByteString
-  } deriving (Show, Generic)
-
 data CreateUser v = CreateUser
   { _cuAuth :: Auth v
   , _cuGroup :: Group
@@ -170,6 +167,20 @@ data CreateUser v = CreateUser
 instance FunctorB CreateUser
 instance TraversableB CreateUser
 
+data DeleteUser v = DeleteUser
+  { _duAuth :: Auth v
+  , _duKey :: Key v
+  } deriving (Show, Generic)
+instance FunctorB DeleteUser
+instance TraversableB DeleteUser
+
+data GetUser v = GetUser
+  { _guAuth :: Auth v
+  , _guKey :: Key v
+  } deriving (Show, Generic)
+instance FunctorB GetUser
+instance TraversableB GetUser
+
 data PasswordUpdate v = PasswordUpdate
   { _oldPassword :: Text
   , _newPassword :: Text
@@ -178,7 +189,7 @@ instance FunctorB PasswordUpdate
 instance TraversableB PasswordUpdate
 
 data UpdateUser v = UpdateUser
-  { _uuKey :: Var BS8.ByteString v
+  { _uuKey :: Key v
   , _uuPassword :: Maybe (PasswordUpdate v)
   , _uuGroup :: Maybe Group
   , _uuAuth :: Auth v
@@ -221,8 +232,9 @@ makeLenses ''EntryAccess
 makeLenses ''CreateEntry
 makeLenses ''UpdateEntry
 makeLenses ''RegisterUser
-makeLenses ''RegisterOutput
 makeLenses ''CreateUser
+makeLenses ''DeleteUser
+makeLenses ''GetUser
 makeLenses ''PasswordUpdate
 makeLenses ''UpdateUser
 
@@ -235,6 +247,8 @@ instance HasPassword (TestUser v) where
 instance HasKey AuthKey where
   key = akKey
 
+instance HasKey TestLogin where
+  key = tlKey
 instance HasEmail (TestLogin v) where
   email = tlUser
 instance HasPassword (TestLogin v) where
@@ -278,6 +292,17 @@ instance HasAuth CreateUser where
 instance HasKey UpdateUser where
   key = uuKey
 
+instance HasAuth DeleteUser where
+  auth = duAuth
+
+instance HasKey DeleteUser where
+  key = duKey
+
+instance HasAuth GetUser where
+  auth = guAuth
+
+instance HasKey GetUser where
+  key = guKey
 
 
 instance ToForm (UpdateEntry v) where

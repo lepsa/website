@@ -24,3 +24,13 @@ Things I want to add over time:
   As always, XKCD always has something for any situation.
 
   ![xkcd 949](https://imgs.xkcd.com/comics/file_transfer.png)
+
+### How
+
+#### Running The Server
+Do this `cabal run Website` from the project root.
+
+Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy `favicon.ico`, `htmx.min.js`, and `main.css` to wherever you are running the server.
+
+#### Tests
+Run this `cabal run Website-test`. It will create a new testing database and stomp all over that as it throws requests left, right, and all over the place.
