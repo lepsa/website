@@ -96,7 +96,7 @@ test-suite Website-test
     hs-source-dirs:   test
     main-is:          Main.hs
     other-modules:    Test.StateMachine
-                    , Test.StateMachine.Types
+                    , Test.Types
                     , Test.Api
                     , Test.Db
                     , Test.Db.Entry

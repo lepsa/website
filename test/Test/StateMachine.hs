@@ -28,19 +28,20 @@ import Hedgehog hiding (Group)
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Network.HTTP.Client qualified as H
-import Network.HTTP.Types (Header, Method, Status, methodDelete, methodGet, methodPost, methodPut, status200, status204, status303, status401)
-import Test.StateMachine.Types
+import Network.HTTP.Types (Header, Method, Status, methodDelete, methodGet, methodPost, methodPut, status200, status204, status303, status401, status404)
+import Test.Types
 import Text.RawString.QQ
 import Text.Regex.TDFA
 import Web.FormUrlEncoded
--- Reference the following QFPL blog posts to refresh yourself.
--- https://qfpl.io/posts/intro-to-state-machine-testing-1/
--- https://qfpl.io/posts/intro-to-state-machine-testing-2/
--- https://qfpl.io/posts/intro-to-state-machine-testing-3/
 import Website.Auth.Authorisation ()
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User (User)
 import Website.Data.User qualified (User (..))
+
+-- Reference the following QFPL blog posts to refresh yourself.
+-- https://qfpl.io/posts/intro-to-state-machine-testing-1/
+-- https://qfpl.io/posts/intro-to-state-machine-testing-2/
+-- https://qfpl.io/posts/intro-to-state-machine-testing-3/
 
 --
 -- Generators
@@ -316,14 +317,14 @@ cGetEntriesBadAuth env = Command gen execute []
 cGetEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetEntry env = Command gen execute []
   where
-    gen :: ApiState Symbolic -> Maybe (gen (EntryAccess Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
     gen state =
       if M.null state._users || M.null state._entries
         then Nothing
         else pure $ do
           k <- Gen.element (M.keys state._entries)
-          EntryAccess k <$> mkAuth state
-    execute :: EntryAccess Concrete -> m String
+          GetEntry k <$> mkAuth state
+    execute :: GetEntry Concrete -> m String
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
@@ -331,18 +332,35 @@ cGetEntry env = Command gen execute []
       res.responseStatus === status200
       pure $ BSL8.unpack res.responseBody
 
+cGetEntryBadKey :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntryBadKey env = Command gen execute []
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntryMissing Symbolic))
+    gen state =
+      if M.null state._users
+        then Nothing
+        else pure $ do
+          k <- ("/entry/" <>) <$> Gen.string (Range.linear 1 10) Gen.alpha
+          GetEntryMissing k <$> mkAuth state
+    execute :: GetEntryMissing Concrete -> m ()
+    execute getEntry = do
+      req <- H.parseRequest $ env.baseUrl <> getEntry ^. gemKey
+      let req' = mkReq methodGet (mkAuthHeader getEntry) req
+      res <- liftIO $ H.httpLbs req' env.manager
+      res.responseStatus === status404
+
 cGetEntryBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetEntryBadAuth env = Command gen execute []
   where
-    gen :: ApiState Symbolic -> Maybe (gen (EntryAccess Symbolic))
+    gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
     gen state =
       if M.null state._entries
         then Nothing
         else pure $ do
-          EntryAccess
+          GetEntry
             <$> Gen.element (M.keys state._entries)
             <*> mkBadAuth state
-    execute :: EntryAccess Concrete -> m ()
+    execute :: GetEntry Concrete -> m ()
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
@@ -412,15 +430,15 @@ cDeleteEntry env =
           & entries %~ M.delete (input ^. key)
     ]
   where
-    gen :: (Ord1 v) => ApiState v -> Maybe (gen (EntryAccess v))
+    gen :: (Ord1 v) => ApiState v -> Maybe (gen (GetEntry v))
     gen state =
       if not (M.null state._users) && not (M.null state._entries)
         then Just $ do
-          EntryAccess
+          GetEntry
             <$> Gen.element (M.keys state._entries)
             <*> mkAuth state
         else Nothing
-    execute :: EntryAccess Concrete -> m ()
+    execute :: GetEntry Concrete -> m ()
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (deleteEntry ^. key) <> "/delete"
       let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
@@ -430,15 +448,15 @@ cDeleteEntry env =
 cDeleteEntryBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cDeleteEntryBadAuth env = Command gen execute []
   where
-    gen :: (Ord1 v) => ApiState v -> Maybe (gen (EntryAccess v))
+    gen :: (Ord1 v) => ApiState v -> Maybe (gen (GetEntry v))
     gen state =
       if not (M.null state._users) && not (M.null state._entries)
         then Just $ do
-          EntryAccess
+          GetEntry
             <$> Gen.element (M.keys state._entries)
             <*> mkBadAuth state
         else Nothing
-    execute :: EntryAccess Concrete -> m ()
+    execute :: GetEntry Concrete -> m ()
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (deleteEntry ^. key) <> "/delete"
       let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
@@ -789,6 +807,7 @@ propApiTests env reset = withTests 100 . property $ do
               cTestGetUsers,
               -- Entry commands
               cGetEntry,
+              cGetEntryBadKey,
               cGetEntryBadAuth,
               cGetEntries,
               cGetEntriesBadAuth,

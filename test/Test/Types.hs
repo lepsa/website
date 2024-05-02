@@ -2,9 +2,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Test.StateMachine.Types where
+module Test.Types where
 
-import Data.Text (Text)
+import Data.Text
 import GHC.Generics
 import Hedgehog hiding (Group)
 import Network.HTTP.Client qualified as H
@@ -12,21 +12,20 @@ import Website.Auth.Authentication ()
 import Test.Db.Entry ()
 import Test.Db.User ()
 import Website.Auth.Authorisation qualified as Auth
-import Website.Data.User ( UserCreate(UserCreate) )
+import Website.Data.User (UserCreate(UserCreate))
 import Web.FormUrlEncoded
-import Servant (ToHttpApiData(..))
-import GHC.Exts (IsList(fromList))
+import Servant
+import GHC.Exts
 import Website.Auth.Authorisation (Group)
 import Data.Map (Map)
 import Data.Map qualified as M
 import Control.Lens
-import Data.Kind (Type)
+import Data.Kind
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
 -- we want to track the same information, to ensure that the server
 -- is doing what we expect.
--- type Key = Var BS8.ByteString
 type Key = Var String
 
 class HasEmail t where
@@ -120,12 +119,19 @@ newtype GetEntries v = GetEntries
 instance FunctorB GetEntries
 instance TraversableB GetEntries
 
-data EntryAccess v = EntryAccess
-  { _eaKey :: Key v
-  , _eaAuth :: Auth v
+data GetEntry v = GetEntry
+  { _geKey :: Key v
+  , _geAuth :: Auth v
   } deriving (Show, Generic)
-instance FunctorB EntryAccess
-instance TraversableB EntryAccess
+instance FunctorB GetEntry
+instance TraversableB GetEntry
+
+data GetEntryMissing v = GetEntryMissing
+  { _gemKey :: String
+  , _gemAuth :: Auth v
+  } deriving (Show, Generic)
+instance FunctorB GetEntryMissing
+instance TraversableB GetEntryMissing
 
 data CreateEntry v = CreateEntry
   { _ceAuth :: Auth v
@@ -228,7 +234,8 @@ makePrisms ''Auth
 makeLenses ''LoginType
 makeLenses ''TestLogin
 makeWrapped ''GetEntries
-makeLenses ''EntryAccess
+makeLenses ''GetEntry
+makeLenses ''GetEntryMissing
 makeLenses ''CreateEntry
 makeLenses ''UpdateEntry
 makeLenses ''RegisterUser
@@ -237,7 +244,6 @@ makeLenses ''DeleteUser
 makeLenses ''GetUser
 makeLenses ''PasswordUpdate
 makeLenses ''UpdateUser
-
 
 instance HasEmail (TestUser v) where
   email = tuEmail
@@ -257,8 +263,11 @@ instance HasPassword (TestLogin v) where
 instance HasAuth GetEntries where
   auth = _Wrapped
 
-instance HasAuth EntryAccess where
-  auth = eaAuth
+instance HasAuth GetEntry where
+  auth = geAuth
+
+instance HasAuth GetEntryMissing where
+  auth = gemAuth
 
 instance HasAuth CreateEntry where
   auth = ceAuth
@@ -280,8 +289,8 @@ instance HasPassword (CreateUser v) where
 instance HasAuth UpdateUser where
   auth = uuAuth
 
-instance HasKey EntryAccess where
-  key = eaKey
+instance HasKey GetEntry where
+  key = geKey
 
 instance HasKey UpdateEntry where
   key = ueKey
@@ -303,7 +312,6 @@ instance HasAuth GetUser where
 
 instance HasKey GetUser where
   key = guKey
-
 
 instance ToForm (UpdateEntry v) where
   toForm u = fromList
