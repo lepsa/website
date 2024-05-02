@@ -67,6 +67,7 @@ library
                     , Website.Data.Env
                     , Website.Data.Error
                     , Website.Data.Entry
+                    , Website.Data.Permission
                     , Website.Data.Schema
                     , Website.Data.User
                     , Website.Auth.Authentication

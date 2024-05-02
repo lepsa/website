@@ -13,9 +13,10 @@ import qualified Data.Text as T
 -- Authorisation based on Unix style permissions.
 --
 
+-- Admins inherit all user permissions
 data Group
-  = Admin
-  | User
+  = User
+  | Admin
   deriving (Eq, Show, Read, Ord, Generic)
 instance FromHttpApiData Group where
   parseQueryParam t = maybe (Left $ "Could not parse Group: " <> t) pure . readMaybe $ T.unpack t
@@ -26,12 +27,12 @@ instance FromField Group where
 instance ToField Group where
   toField = toField . show
 
-data Permission
-  = Read
+data Access
+  = None
+  | Read
   | Write
-  | Execute
   deriving (Eq, Show, Read, Ord)
-instance FromField Permission where
-  fromField = fromField >=> maybe (fail "Could not parse Permission") pure . readMaybe
-instance ToField Permission where
+instance FromField Access where
+  fromField = fromField >=> maybe (fail "Could not parse Access") pure . readMaybe
+instance ToField Access where
   toField = toField . show

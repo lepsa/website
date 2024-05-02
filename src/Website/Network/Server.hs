@@ -23,10 +23,10 @@ server cookieSettings jwtSettings currentDirectory =
       asks . runReaderT
         >=> ReaderT . const . withExceptT errToServerError
 
-    protected (Authenticated _user) =
-      crudEntry
-        :<|> mapServerErrors getEntries
-        :<|> crudUser
+    protected (Authenticated user) =
+      crudEntry user
+        :<|> mapServerErrors (getEntries user)
+        :<|> crudUser user
     protected _ = throwAll err401
 
     unprotected =
@@ -44,18 +44,18 @@ server cookieSettings jwtSettings currentDirectory =
         Nothing -> throwError err401
         Just cookies -> pure $ cookies NoContent
     
-    crudEntry =
-      (mapServerErrors . postEntry)
-        :<|> mapServerErrors entryCreationForm
-        :<|> (mapServerErrors . getEntry)
-        :<|> (\k -> mapServerErrors . putEntry k)
-        :<|> (mapServerErrors . getEntryForUpdate)
-        :<|> (mapServerErrors . deleteEntry)
+    crudEntry user =
+      (mapServerErrors . postEntry user)
+        :<|> mapServerErrors (entryCreationForm user)
+        :<|> (mapServerErrors . getEntry user)
+        :<|> (\k -> mapServerErrors . putEntry user k)
+        :<|> (mapServerErrors . getEntryForUpdate user)
+        :<|> (mapServerErrors . deleteEntry user)
 
-    crudUser =
-      (mapServerErrors . postUser)
-        :<|> mapServerErrors userCreationForm
-        :<|> (mapServerErrors . getUser)
-        :<|> (\k -> mapServerErrors . putUser k)
-        :<|> (mapServerErrors . getUserForUpdate)
-        :<|> (mapServerErrors . deleteUser)
+    crudUser user =
+      (mapServerErrors . postUser user)
+        :<|> mapServerErrors (userCreationForm user)
+        :<|> (mapServerErrors . getUser user)
+        :<|> (\k -> mapServerErrors . putUser user k)
+        :<|> (mapServerErrors . getUserForUpdate user)
+        :<|> (mapServerErrors . deleteUser user)

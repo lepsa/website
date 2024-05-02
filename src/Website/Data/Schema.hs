@@ -120,10 +120,15 @@ migrateSchemaV3 =
     "create table if not exists user_login(id text not null, hash text not null)"
   ]
 
+migrateSchemaV4 :: [Query]
+migrateSchemaV4 =
+  [ "create table if not exists permission(id integer not null, name text not null, group_name text not null, access text not null)"]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
     (1, migrateSchemaV1),
     (2, migrateSchemaV2),
-    (3, migrateSchemaV3)
+    (3, migrateSchemaV3),
+    (4, migrateSchemaV4)
   ]

@@ -17,6 +17,8 @@ import Website.Data.User
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
+import Website.Auth.Authorisation (Access(Read))
+import Website.Data.Permission
 
 -- | Values for a given form field
 data FieldData
@@ -180,21 +182,29 @@ generateUpdateForm a = do
 
 -- User forms
 userUpdateForm :: (MonadReader Env m) => User -> m Html
-userUpdateForm = generateUpdateForm
+userUpdateForm user = do
+  generateUpdateForm user
 
-userCreationForm :: (MonadReader Env m) => m Html
-userCreationForm = basicPage <$> generateNewForm (Proxy @User)
+userCreationForm :: (CanAppM Env Err m) => UserKey -> m Html
+userCreationForm userId = do
+  checkPermission userId "GET new user" Read
+  basicPage <$> generateNewForm (Proxy @User)
 
-getUserForUpdate :: (CanAppM Env Err m) => UserKey -> m H.Html
-getUserForUpdate = userUpdateForm <=< Website.Data.User.getUser
+getUserForUpdate :: (CanAppM Env Err m) => UserKey -> UserKey -> m H.Html
+getUserForUpdate userId user = do
+  checkPermission userId "GET update user" Read
+  userUpdateForm =<< Website.Data.User.getUser user
 
 -- Entry forms
 entryUpdateForm :: (MonadReader Env m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
-entryCreationForm :: (MonadReader Env m) => m Html
-entryCreationForm =
+entryCreationForm :: (CanAppM Env Err m) => UserKey -> m Html
+entryCreationForm user = do
+  checkPermission user "GET new entry" Read
   basicPage <$> generateNewForm (Proxy @Entry)
 
-getEntryForUpdate :: (CanAppM Env Err m) => EntryKey -> m H.Html
-getEntryForUpdate = entryUpdateForm <=< Website.Data.Entry.getEntry
+getEntryForUpdate :: (CanAppM Env Err m) => UserKey -> EntryKey -> m H.Html
+getEntryForUpdate user entry = do
+  checkPermission user "GET update entry" Read
+  entryUpdateForm =<< Website.Data.Entry.getEntry entry
