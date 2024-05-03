@@ -13,3 +13,5 @@ Setup
 dist/
 dist-newstyle/
 .ghc.environment.*
+# Profiling data
+*.prof
