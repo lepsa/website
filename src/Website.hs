@@ -49,12 +49,18 @@ startServer' onStartup api serverM dbPath port = do
     runMigrations
   jwtKey <- getJwtKey env
   let jwtSettings = defaultJWTSettings jwtKey
-      cfg = BasicAuthCfg' (conn env) :. defaultCookieSettings :. jwtSettings :. EmptyContext
+      cookieSettings = defaultCookieSettings
+        -- TODO: check what htmx gives us for automatically setting
+        -- the xsrf cookies. I don't want to have to write that JS
+        -- myself.
+        { cookieXsrfSetting = Nothing
+        }
+      cfg = BasicAuthCfg' (conn env) :. cookieSettings :. jwtSettings :. EmptyContext
       warpSettings = setBeforeMainLoop onStartup $ setPort port defaultSettings
   runSettings warpSettings $
     serveWithContext api cfg $
       hoistServerWithContext api (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings]) (runAppMToHandler env) $
-        serverM defaultCookieSettings jwtSettings currentDirectory
+        serverM cookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()
 startServer = startServer' (pure ()) topAPI server

@@ -17,7 +17,7 @@ import Website.Data.User
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
-import Website.Auth.Authorisation (Access(Read))
+import Website.Auth.Authorisation (Access(Read, Write))
 import Website.Data.Permission
 
 -- | Values for a given form field
@@ -201,7 +201,7 @@ entryUpdateForm = generateUpdateForm
 
 entryCreationForm :: (CanAppM Env Err m) => UserKey -> m Html
 entryCreationForm user = do
-  checkPermission user "GET new entry" Read
+  checkPermission user "GET new entry" Write
   basicPage <$> generateNewForm (Proxy @Entry)
 
 getEntryForUpdate :: (CanAppM Env Err m) => UserKey -> EntryKey -> m H.Html

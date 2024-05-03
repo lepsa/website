@@ -10,6 +10,7 @@ import Text.Blaze.Html5.Attributes qualified as HA
 import Website.Network.API.Types
 import Website.Data.User
 import Servant.Auth
+import Website.Auth.Authentication
 
 type AuthEntry a = Auth Auths UserKey :> "entry" :> a
 type AuthUser a = Auth Auths UserKey :> "user" :> a
@@ -70,6 +71,7 @@ sideNav =
       mconcat
         [ H.li $ H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $ "Home",
           H.li $ H.a ! htmlLink (Proxy @(Auth Auths UserKey :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a ! htmlLink (Proxy @("login" :> Get '[HTML] H.Html)) $ "Login",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
@@ -131,3 +133,23 @@ formFieldTextArea fieldName fieldLabel value =
     [ H.label ! HA.for (toValue fieldName) $ toHtml fieldLabel,
       H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
     ]
+
+loginForm :: Html
+loginForm =
+  basicPage $
+  H.form
+    ! HA.class_ "contentform"
+    ! HA.action (textValue $ linkText (Proxy @("login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
+    ! HA.method "POST"
+    $ mconcat
+      [ H.label ! HA.class_ "formlabel" ! HA.for "login" $ "Username"
+      , H.input ! HA.class_ "formvalue" ! HA.name "login" ! HA.type_ "text"
+      , H.br
+      , H.label ! HA.class_ "formlabel" ! HA.for "password" $ "Password"
+      , H.input ! HA.class_ "formvalue" ! HA.name "password" ! HA.type_ "password"
+      , H.br
+      , H.input
+          ! HA.type_ "submit"
+          ! HA.class_ "formbutton"
+          ! HA.value "Login"
+      ]

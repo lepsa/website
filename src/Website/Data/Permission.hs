@@ -6,7 +6,6 @@ import Website.Data.User
 import Control.Monad.Reader
 import Website.Auth.Authorisation
 import Database.SQLite.Simple
-import Database.SQLite.Simple.FromField (FromField(fromField))
 import Control.Monad.Except
 
 checkPermission :: CanAppM Env Err m => UserKey -> String -> Access -> m ()
@@ -28,7 +27,7 @@ checkPermission userKey name requested = do
         -- do anything to it. Reading it has no side effects,
         -- and `None` means that the user should not be allowed
         -- to interact with it at all.
-        requested >= permission.permissionAccess
+        requested <= permission.permissionAccess
       -- If no permissions are set, or none match, default to
       -- denying access to everyone. This is relying on the trade
       -- off of annoying a user or admin is far less costly than

@@ -19,16 +19,16 @@ import Data.Text (Text)
 topAPI :: Proxy TopAPI
 topAPI = Proxy
 
-type Auths = '[BasicAuth, JWT]
+type Auths = '[BasicAuth, Cookie, JWT]
 
 type TopAPI = TopAPI' Auths
 type TopAPI' auths = Auth auths UserKey :> Protected :<|> Unprotected
 
-type SetCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie] a
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a
 type Unprotected =
   Get '[HTML] Html
-    :<|> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 204 '[HTML] (SetCookies NoContent)
+    :<|> "login" :> Get '[HTML] Html
+    :<|> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent)
     :<|> "register" :> ReqBody '[FormUrlEncoded] UserCreate :> Verb 'POST 204 '[HTML] (SetLoginCookies NoContent)
     :<|> Raw
 

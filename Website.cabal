@@ -60,6 +60,7 @@ library
                     , Website.Network.Server
                     , Website.Content.Common
                     , Website.Content.Forms
+                    , Website.Content.Error
                     , Website.Content.Entry
                     , Website.Content.User
                     , Website.Types

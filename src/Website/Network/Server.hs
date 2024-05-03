@@ -12,8 +12,11 @@ import Website.Network.API
 import Website.Network.API.Types
 import Website.Types
 import Website.Data.Env
-import Website.Data.Error
+import Website.Content.Error
 import Website.Content.Forms
+import Text.Blaze.Html
+import Website.Content.Common
+import Servant.HTML.Blaze
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env ServerError IO)
 server cookieSettings jwtSettings currentDirectory =
@@ -27,22 +30,28 @@ server cookieSettings jwtSettings currentDirectory =
       crudEntry user
         :<|> mapServerErrors (getEntries user)
         :<|> crudUser user
-    protected _ = throwAll err401
+    protected _ = throwAll unauthentricated
 
     unprotected =
       getIndex
+        :<|> getLogin
         :<|> login
         :<|> mapServerErrors . register cookieSettings jwtSettings
         :<|> serveDirectoryWebApp currentDirectory
 
-    login :: Login -> AppM Env ServerError IO (SetCookies NoContent)
+    getLogin :: AppM Env ServerError IO Html
+    getLogin = pure loginForm
+
+    login :: Login -> AppM Env ServerError IO (SetLoginCookies NoContent)
     login (Login user pass) = do
       c <- asks conn
-      userId <- lift $ withExceptT (const err401) $ checkUserPassword c (T.pack user) (T.pack pass)
+      userId <- lift $ withExceptT (const unauthentricated) $ checkUserPassword c (T.pack user) (T.pack pass)
       mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings userId
       case mApplyCookies of
-        Nothing -> throwError err401
-        Just cookies -> pure $ cookies NoContent
+        Nothing -> throwError unauthentricated
+        Just cookies -> pure $ cookies $ addHeader root NoContent
+      where
+        root = linkText (Proxy @(Get '[HTML] Html))
     
     crudEntry user =
       (mapServerErrors . postEntry user)

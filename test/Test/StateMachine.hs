@@ -32,10 +32,10 @@ import Test.Types
 import Text.RawString.QQ
 import Text.Regex.TDFA
 import Web.FormUrlEncoded
+import Website.Auth.Authorisation (Group (..))
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User (User)
 import Website.Data.User qualified (User (..))
-import Website.Auth.Authorisation (Group (..))
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -137,9 +137,7 @@ response204 _old _new _input output = output.responseStatus === status204
 
 mkAuthHeader :: (HasAuth command) => command Concrete -> [Header]
 mkAuthHeader command = case command ^. auth of
-  Normal user ->
-    let u = user ^. akUser
-    in pure $ maybe (mkBasicAuthHeader u) (mkBearerAuthHeader . concrete) $ u ^. tuJwt
+  Normal (AuthKey _ u) -> pure $ maybe (mkBasicAuthHeader u) (mkBearerAuthHeader . concrete) $ u ^. tuJwt
   Bad user -> badHeader $ view akUser <$> user
   where
     badHeader :: Maybe (TestUser Concrete) -> [Header]
@@ -162,7 +160,7 @@ mkBadAuth :: (MonadGen m) => ApiState v -> m (Auth v)
 mkBadAuth state =
   Gen.choice
     [ pure $ Bad Nothing,
-      if M.null state._users
+      if not (M.null state._users)
         then pure $ Bad Nothing
         else do
           (k, u') <- Gen.element $ M.toList state._users
@@ -263,16 +261,18 @@ cLogin env =
       req <- H.parseRequest $ env.baseUrl <> "/login"
       let req' = mkReq methodPost [formHeader] req {H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm login}
       res <- liftIO $ H.httpNoBody req' env.manager
-      res.responseStatus === status204
+      res.responseStatus === status303
       extractJwt res
 
 cLoginFail :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cLoginFail env = Command gen execute []
   where
     gen :: ApiState Symbolic -> Maybe (gen (TestLogin Symbolic))
-    gen apiState = if M.null apiState._users
-          then Nothing
-          else Just $
+    gen apiState =
+      if M.null apiState._users
+        then Nothing
+        else
+          Just $
             Gen.choice
               [ do
                   (k, u) <- Gen.element $ M.toList apiState._users
@@ -296,31 +296,34 @@ cGetEntries env =
     gen
     execute
     [ Require $ \state input -> case input ^. auth of
-      Normal _ -> userExists state input
-      Bad Nothing -> True
-      Bad (Just (AuthKey _ user)) -> none
-        (\u -> u ^. tuEmail == user ^. tuEmail && u ^. tuPassword == user ^. tuPassword)
-        $ state ^. users
-    , Ensure $ \_oldState newState input output -> do
-      case input ^. auth of
-        Normal _ -> do
-          output.responseStatus === status200
-          -- Commit the great sin of "parsing" html with regex
-          let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
-          length newState._entries === length matches
-        Bad _ -> do
-          output.responseStatus === status401
+        Normal _ -> userExists state input
+        Bad Nothing -> True
+        Bad (Just (AuthKey _ user)) ->
+          none
+            (\u -> u ^. tuEmail == user ^. tuEmail && u ^. tuPassword == user ^. tuPassword)
+            $ state ^. users,
+      Ensure $ \_oldState newState input output -> do
+        case input ^. auth of
+          Normal _ -> do
+            output.responseStatus === status200
+            -- Commit the great sin of "parsing" html with regex
+            let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
+            length newState._entries === length matches
+          Bad _ -> do
+            output.responseStatus === status401
     ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
     gen state =
       if M.null state._users
         then Nothing
-        else Just $ GetEntries
-          <$> Gen.choice
-            [ Normal . uncurry AuthKey <$> Gen.element (M.toList state._users)
-            , mkBadAuth state
-            ]
+        else
+          Just $
+            GetEntries
+              <$> Gen.choice
+                [ Normal . uncurry AuthKey <$> Gen.element (M.toList state._users),
+                  mkBadAuth state
+                ]
     execute :: GetEntries Concrete -> m (H.Response BSL8.ByteString)
     execute getEntries = do
       req <- H.parseRequest $ env.baseUrl <> "/entries"
@@ -340,35 +343,41 @@ cGetEntriesBadAuth env = Command gen execute []
       res.responseStatus === status401
 
 cGetEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntry env = Command gen execute
-  [ Require $ \state input -> case input ^. auth of
-    Normal (AuthKey k u) -> (Just u ==) $ M.lookup k $ state ^. users
-    Bad _ -> True
-  , Ensure $ \old _new input output -> do
-    case input ^. geAuth of
-      Normal (AuthKey k u) -> case old ^? users . ix k of
-        Nothing -> fail "User key doesn't exist in old state"
-        Just user -> do
-          user === u
-          output.responseStatus === status200
-      Bad _ -> do
-        output.responseStatus === status401
-        output.responseBody === mempty
-  ]
+cGetEntry env =
+  Command
+    gen
+    execute
+    [ Require $ \state input -> case input ^. auth of
+        Normal (AuthKey k u) -> (Just u ==) $ M.lookup k $ state ^. users
+        Bad _ -> True,
+      Ensure $ \old _new input output -> do
+        case input ^. geAuth of
+          Normal (AuthKey k u) -> case old ^? users . ix k of
+            Nothing -> fail "User key doesn't exist in old state"
+            Just user -> do
+              user === u
+              output.responseStatus === status200
+          Bad _ -> do
+            output.responseStatus === status401
+            output.responseBody === mempty
+    ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
-    gen state = if M.null state._users || M.null state._entries
-      then Nothing
-      else pure $ GetEntry
-        <$> Gen.element (M.keys state._entries)
-        <*> Gen.choice [mkAuth state, mkBadAuth state]
+    gen state =
+      if M.null state._users || M.null state._entries
+        then Nothing
+        else
+          pure $
+            GetEntry
+              <$> Gen.element (M.keys state._entries)
+              <*> Gen.choice [mkAuth state, mkBadAuth state]
     execute :: GetEntry Concrete -> m (H.Response BSL8.ByteString)
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
       liftIO $ H.httpLbs req' env.manager
 
-cGetEntryBadKey :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
+cGetEntryBadKey :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetEntryBadKey env = Command gen execute []
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntryMissing Symbolic))
@@ -555,8 +564,9 @@ cCreateUser env =
     [ Require userExists,
       Require userGroupAdmin,
       Require $ \state input -> all (\u -> u ^. tuEmail /= input ^. cuEmail) (state ^. users),
-      Update $ \state input output -> state &
-        users %~ M.insert output (TestUser (input ^. email) (input ^. password) (input ^. cuGroup) Nothing),
+      Update $ \state input output ->
+        state
+          & users %~ M.insert output (TestUser (input ^. email) (input ^. password) (input ^. cuGroup) Nothing),
       Ensure $ \old new input _output -> do
         length old._users + 1 === length new._users
         assert $ any (\u -> u ^. email == input ^. email) new._users
@@ -617,9 +627,9 @@ cUpdateUser env =
   Command
     gen
     execute
-    [ Require userExists
-    , Require userGroupAdmin
-    , Update $ \state input _output ->
+    [ Require userExists,
+      Require userGroupAdmin,
+      Update $ \state input _output ->
         let update u =
               u
                 & tuPassword .~ maybe (u ^. tuPassword) (view newPassword) (input ^. uuPassword)
@@ -729,38 +739,43 @@ cDeleteUserBadAuth env = Command gen execute []
       res.responseStatus === status401
 
 cGetUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetUser env = Command gen execute
-  [ Require $ \state input -> do
-    case input ^. auth of
-      Normal _ -> userExists state input
-               && userGroupAdmin state input
-      Bad Nothing -> True
-      Bad (Just (AuthKey _ u)) ->
-        all (\u' -> u ^. tuEmail == u' ^. tuEmail && u ^. tuPassword == u' ^. tuPassword)
-        $ state ^. users
-  , Ensure $ \_old _new input output -> do
-    case input ^. auth of
-      Normal _ -> do
-        output.responseStatus === status200
-        output.responseBody /== mempty
-      Bad _ -> do
-        output.responseStatus === status401
-        output.responseBody === mempty
-  ]
+cGetUser env =
+  Command
+    gen
+    execute
+    [ Require $ \state input -> do
+        case input ^. auth of
+          Normal _ ->
+            userExists state input
+              && userGroupAdmin state input
+          Bad Nothing -> True
+          Bad (Just (AuthKey _ u)) ->
+            all (\u' -> u ^. tuEmail == u' ^. tuEmail && u ^. tuPassword == u' ^. tuPassword) $
+              state ^. users,
+      Ensure $ \_old _new input output -> do
+        case input ^. auth of
+          Normal _ -> do
+            output.responseStatus === status200
+            output.responseBody /== mempty
+          Bad _ -> do
+            output.responseStatus === status401
+            output.responseBody === mempty
+    ]
   where
     gen :: ApiState v -> Maybe (gen (GetUser v))
     gen state =
       if none (\u -> u ^. tuGroup == Admin) state._users
         then Nothing
         else Just $ do
-          (k, u) <- Gen.element
-            $ filter (\(_, u) -> u ^. tuGroup == Admin)
-            $ M.toList state._users
+          (k, u) <-
+            Gen.element $
+              filter (\(_, u) -> u ^. tuGroup == Admin) $
+                M.toList state._users
           k' <- Gen.element $ M.keys state._users
           let f = flip GetUser k'
           Gen.choice
-            [ pure $ f $ Normal $ AuthKey k u
-            , f <$> mkBadAuth state
+            [ pure $ f $ Normal $ AuthKey k u,
+              f <$> mkBadAuth state
             ]
     execute :: GetUser Concrete -> m (H.Response BSL8.ByteString)
     execute getUser = do
