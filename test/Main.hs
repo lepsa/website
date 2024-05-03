@@ -18,15 +18,13 @@ main = do
   --       $ BasicAuthCfg' undefined :. defaultCookieSettings :. defaultJWTSettings undefined :. EmptyContext
   -- dumpRoutes
 
-  serverThread <- forkIO $ startServer' testTopAPI testTopServer "test_db.sqlite" port
+  ready <- newEmptyMVar
+  let onStart = putMVar ready ()
+  serverThread <- forkIO $ startServer' onStart testTopAPI testTopServer "test_db.sqlite" port
   
-  -- TODO
-  -- find some way to have the server tell us when it is up and stable.
-  -- This 3 second delay is janky and _will_ break sooner than later when
-  -- the server has to start doing large migrations or actually tring to
-  -- do anything more than trying to open the DB and host HTTP routes.
-  threadDelay $ 3 * 1000 * 1000
-  
+  -- Wait for the server to start
+  takeMVar ready
+
   mgr <- H.newManager H.defaultManagerSettings
   let baseUrl = "http://localhost:" <> show port
       env = TestEnv mgr baseUrl

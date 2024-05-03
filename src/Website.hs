@@ -25,12 +25,13 @@ import Website.Auth.Authentication
 
 startServer'
   :: (HasServer (api :: Type) '[BasicAuthCfg', CookieSettings, JWTSettings])
-  => Proxy api
+  => IO ()
+  -> Proxy api
   -> (CookieSettings -> JWTSettings -> FilePath -> ServerT api (AppM Env ServerError IO))
   -> String
   -> Port
   -> IO ()
-startServer' api serverM dbPath port = do
+startServer' onStartup api serverM dbPath port = do
   putStrLn "Starting server"
   currentDirectory <- getCurrentDirectory
   env <-
@@ -49,13 +50,14 @@ startServer' api serverM dbPath port = do
   jwtKey <- getJwtKey env
   let jwtSettings = defaultJWTSettings jwtKey
       cfg = BasicAuthCfg' (conn env) :. defaultCookieSettings :. jwtSettings :. EmptyContext
-  run port $
+      warpSettings = setBeforeMainLoop onStartup $ setPort port defaultSettings
+  runSettings warpSettings $
     serveWithContext api cfg $
       hoistServerWithContext api (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings]) (runAppMToHandler env) $
         serverM defaultCookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()
-startServer = startServer' topAPI server
+startServer = startServer' (pure ()) topAPI server
 
 getJwtKey :: Env -> IO JWK
 getJwtKey env = do
