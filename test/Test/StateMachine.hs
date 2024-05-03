@@ -37,6 +37,7 @@ import Website.Auth.Authorisation ()
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User (User)
 import Website.Data.User qualified (User (..))
+import Website.Auth.Authorisation (Group)
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -107,6 +108,19 @@ userExists :: (HasAuth r, Ord1 v) => ApiState v -> r v -> Bool
 userExists state command = case command ^. auth of
   Normal user -> M.member (user ^. key) state._users
   Bad _ -> True
+
+userGroupAdmin :: (HasAuth r) => a -> r v -> Bool
+userGroupAdmin _ = userGroup Auth.Admin
+
+userGroupUser :: (HasAuth r) => a -> r v -> Bool
+userGroupUser _ = userGroup Auth.User
+
+userGroup :: (HasAuth r) => Auth.Group -> r v -> Bool
+userGroup group command =
+  case command ^. auth of
+    Normal user -> user ^. akUser . tuGroup == group
+    Bad Nothing -> False
+    Bad (Just user) -> user ^. akUser . tuGroup == group
 
 entryExists :: (HasKey r, Ord1 v) => ApiState v -> r v -> Bool
 entryExists state command = M.member (command ^. key) state._entries
@@ -315,22 +329,33 @@ cGetEntriesBadAuth env = Command gen execute []
       res.responseStatus === status401
 
 cGetEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntry env = Command gen execute []
+cGetEntry env = Command gen execute
+  [ Require $ \state input -> case input ^. auth of
+    Normal (AuthKey k u) -> maybe False (== u) $ M.lookup k $ state ^. users
+    Bad _ -> True
+  , Ensure $ \old new input output -> do
+    case input ^. geAuth of
+      Normal (AuthKey k u) -> case old ^? users . ix k of
+        Nothing -> fail "User key doesn't exist in old state"
+        Just user -> do
+          user === u
+          output.responseStatus === status200
+      Bad _ -> do
+        output.responseStatus === status401
+        output.responseBody === mempty
+  ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
-    gen state =
-      if M.null state._users || M.null state._entries
-        then Nothing
-        else pure $ do
-          k <- Gen.element (M.keys state._entries)
-          GetEntry k <$> mkAuth state
-    execute :: GetEntry Concrete -> m String
+    gen state = if M.null state._users || M.null state._entries
+      then Nothing
+      else pure $ GetEntry
+        <$> Gen.element (M.keys state._entries)
+        <*> Gen.choice [mkAuth state, mkBadAuth state]
+    execute :: GetEntry Concrete -> m (H.Response BSL8.ByteString)
     execute getEntry = do
       req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status200
-      pure $ BSL8.unpack res.responseBody
+      liftIO $ H.httpLbs req' env.manager
 
 cGetEntryBadKey :: forall gen m. CanStateM gen m => TestEnv -> Command gen m ApiState
 cGetEntryBadKey env = Command gen execute []
@@ -348,24 +373,6 @@ cGetEntryBadKey env = Command gen execute []
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
       res <- liftIO $ H.httpLbs req' env.manager
       res.responseStatus === status404
-
-cGetEntryBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntryBadAuth env = Command gen execute []
-  where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
-    gen state =
-      if M.null state._entries
-        then Nothing
-        else pure $ do
-          GetEntry
-            <$> Gen.element (M.keys state._entries)
-            <*> mkBadAuth state
-    execute :: GetEntry Concrete -> m ()
-    execute getEntry = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
-      let req' = mkReq methodGet (mkAuthHeader getEntry) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status401
 
 cCreateEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cCreateEntry env =
@@ -597,7 +604,9 @@ cUpdateUser env =
   Command
     gen
     execute
-    [ Update $ \state input _output ->
+    [ Require userExists
+    , Require userGroupAdmin
+    , Update $ \state input _output ->
         let update u =
               u
                 & tuPassword .~ maybe (u ^. tuPassword) (view newPassword) (input ^. uuPassword)
@@ -661,7 +670,9 @@ cDeleteUser env =
   Command
     gen
     execute
-    [ Update $ \state input _output ->
+    [ Require userExists,
+      Require userGroupAdmin,
+      Update $ \state input _output ->
         state & users %~ M.delete (input ^. key),
       Ensure $ \old new input _output -> do
         length old._users === length new._users + 1
@@ -705,7 +716,10 @@ cDeleteUserBadAuth env = Command gen execute []
       res.responseStatus === status401
 
 cGetUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetUser env = Command gen execute []
+cGetUser env = Command gen execute
+  [ Require userExists
+  , Require userGroupAdmin
+  ]
   where
     gen :: ApiState v -> Maybe (gen (GetUser v))
     gen state =
@@ -808,7 +822,7 @@ propApiTests env reset = withTests 100 . property $ do
               -- Entry commands
               cGetEntry,
               cGetEntryBadKey,
-              cGetEntryBadAuth,
+              -- cGetEntryBadAuth,
               cGetEntries,
               cGetEntriesBadAuth,
               cCreateEntry,

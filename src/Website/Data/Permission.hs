@@ -38,15 +38,14 @@ checkPermission userKey name requested = do
   unless allowed $ throwError Unauthorised
 
 data Permission = Permission
-  { permissionId :: Int
-  , permissionName :: String
+  { permissionName :: String
   , permissionGroup :: Group
   , permissionAccess :: Access
   } deriving (Eq, Show, Read, Ord)
 instance FromRow Permission where
-  fromRow = Permission <$> field <*> field <*> field <*> field
+  fromRow = Permission <$> field <*> field <*> field
 
 getPermissions :: CanAppM Env Err m => String -> m [Permission]
 getPermissions name = do
   c <- asks conn
-  liftIO $ query c "select id, name, group_name, access from permission where name = ?" (Only name)
+  liftIO $ query c "select name, group_name, access from permission where name = ?" (Only name)

@@ -11,18 +11,9 @@ import Servant
 import Website.Types
 import Website.Data.Env
 
--- Create the Entry table
-createEntry :: Query
-createEntry = "create table if not exists entry (key integer primary key, created datetime not null, title text not null, value text not null)"
-
 -- Create a table for tracking the schema version
 createVersion :: Query
 createVersion = "create table if not exists schema_version (version integer not null)"
-
--- Set an initial value for schema versions, as otherwise the table will be empty and break
--- the other schema version bumping
-initialVersion :: Query
-initialVersion = "insert into schema_version (version) values (0)"
 
 getSchemaVersion :: Query
 getSchemaVersion = "select version from schema_version"
@@ -101,12 +92,12 @@ runMigration c (version, queries) = do
 -- so the rest of the migration code can run properly.
 migrateSchemaV0 :: [Query]
 migrateSchemaV0 =
-  [ initialVersion
+  [ "insert into schema_version (version) values (0)"
   ]
 
 migrateSchemaV1 :: [Query]
 migrateSchemaV1 =
-  [ createEntry
+  [ "create table if not exists entry (key integer primary key, created datetime not null, title text not null, value text not null)"
   ]
 
 migrateSchemaV2 :: [Query]
@@ -116,13 +107,27 @@ migrateSchemaV2 =
 
 migrateSchemaV3 :: [Query]
 migrateSchemaV3 =
-  [ "create table if not exists user(id text not null, email text not null, group_name text not null)",
-    "create table if not exists user_login(id text not null, hash text not null)"
+  [ "create table if not exists user(id text not null primary key, email text not null unique, group_name text not null)",
+    "create table if not exists user_login(id text not null primary key, hash text not null)"
   ]
 
 migrateSchemaV4 :: [Query]
 migrateSchemaV4 =
-  [ "create table if not exists permission(id integer not null, name text not null, group_name text not null, access text not null)"]
+  [ "create table if not exists permission(name text not null primary key, group_name text not null, access text not null)",
+    "insert into permission(name, group_name, access) values ('GET new user', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET update user', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET new entry', 'User', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET update entry', 'User', 'Write')",
+    "insert into permission(name, group_name, access) values ('POST entry', 'User', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET entry', 'User', 'Read')",
+    "insert into permission(name, group_name, access) values ('PUT entry', 'User', 'Write')",
+    "insert into permission(name, group_name, access) values ('DELETE entry', 'User', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET entries', 'User', 'Read')",
+    "insert into permission(name, group_name, access) values ('POST user', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET user', 'Admin', 'Read')",
+    "insert into permission(name, group_name, access) values ('PUT user', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('DELETE user', 'Admin', 'Write')"
+  ]
 
 migrations :: [(Version, [Query])]
 migrations =

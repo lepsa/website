@@ -33,6 +33,6 @@ type Unprotected =
     :<|> Raw
 
 type Protected =
-  "entry" :> CRUD EntryCreate EntryUpdate EntryKey
+  "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
     :<|> "entries" :> Get '[HTML] Html
-    :<|> "user" :> CRUD UserCreate UserUpdate UserKey
+    :<|> "user" :> CRUDForm UserCreate UserUpdate UserKey

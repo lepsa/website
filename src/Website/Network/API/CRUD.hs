@@ -25,10 +25,16 @@ type CRUDDelete key = Capture "key" key :> "delete" :> Delete '[HTML] Html
 
 -- A template for creating CRUD servers for specific types.
 -- It will ensure that pages are provided so that users can perform the required actions
-type CRUD create update key =
+type CRUDForm create update key =
          CRUDCreate create
     :<|> CRUDCreateForm create
     :<|> CRUDRead key
     :<|> CRUDUpdate update key
     :<|> CRUDUpdateForm key
+    :<|> CRUDDelete key
+
+type CRUD create update key =
+         CRUDCreate create
+    :<|> CRUDRead key
+    :<|> CRUDUpdate update key
     :<|> CRUDDelete key
