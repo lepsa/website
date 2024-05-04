@@ -17,7 +17,7 @@ import Website.Data.Env
 
 
 -- | Display an entry, with edit and delete buttons
-entryDisplay :: (MonadReader Env m) => Entry -> m Html
+entryDisplay :: (HasEnv c, MonadReader c m) => Entry -> m Html
 entryDisplay entry = do
   tz <- asks timeZone
   pure
@@ -41,6 +41,8 @@ entryDisplay entry = do
         ! dataAttribute "hx-trigger" "click"
         ! dataAttribute "hx-swap" "outerHTML"
         ! dataAttribute "hx-target" "#entry"
+        ! dataAttribute "hx-boost" "true"
+        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
         ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
         $ "Edit"
     delete :: Html
@@ -50,15 +52,17 @@ entryDisplay entry = do
         ! dataAttribute "hx-swap" "outerHTML"
         ! dataAttribute "hx-target" "#edit-delete-buttons"
         ! dataAttribute "hx-confirm" "Confirm deletion"
+        ! dataAttribute "hx-boost" "true"
+        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
         ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
-entryDisplayFullPage :: (MonadReader Env m) => Authed -> Entry -> m Html
+entryDisplayFullPage :: (HasEnv c, MonadReader c m) => Authed -> Entry -> m Html
 entryDisplayFullPage auth = fmap (basicPage auth) . entryDisplay
 
 -- | List all entries as a page
-entryList :: (MonadReader Env m) => Authed -> [Entry] -> m Html
+entryList :: (HasEnv c, MonadReader c m) => Authed -> [Entry] -> m Html
 entryList auth entries = do
   tz <- asks timeZone
   pure $
@@ -76,12 +80,17 @@ entryList auth entries = do
       H.li $
         mconcat
           [ H.a
+              ! dataAttribute "hx-boost" "true"
+              ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
               ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
               $ toHtml entry.title,
             toHtml $ " " <> entryTimeFormat tz entry.created
           ]
     newEntry :: Html
     newEntry =
-      H.a ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
+      H.a 
+        ! dataAttribute "hx-boost" "true"
+        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+        ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
     sortEntries = sortBy $ \a b ->
       compare a.created b.created

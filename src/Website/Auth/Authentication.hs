@@ -5,7 +5,6 @@ module Website.Auth.Authentication where
 
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.IO.Class
 import Data.Bifunctor
 import Data.Password.Argon2
 import Data.Text

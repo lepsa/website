@@ -11,7 +11,6 @@ import Text.Blaze.Html5.Attributes qualified as HA
 import Website.Content.Common
 import Website.Data.Entry
 import Website.Data.Env
-import Website.Data.Error
 import Website.Data.User
 import Website.Network.API.CRUD
 import Website.Network.API.Types
@@ -48,8 +47,8 @@ generateField fd = case fd of
   StaticData {} -> staticField fd.name fd.label fd.value
 
 class GenerateForm a where
-  newForm :: (MonadReader Env m) => Proxy a -> m FormData
-  updateForm :: (MonadReader Env m) => a -> m FormData
+  newForm :: (HasEnv c, MonadReader c m) => Proxy a -> m FormData
+  updateForm :: (HasEnv c, MonadReader c m) => a -> m FormData
 
 --
 -- What an Entry should look like in HTML
@@ -148,27 +147,34 @@ instance GenerateForm User where
         }
 
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
-generateNewForm :: (MonadReader Env m, GenerateForm a) => Proxy a -> m Html
+generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a) => Proxy a -> m Html
 generateNewForm p = do
   fd <- newForm p
   pure
     $ H.form
       ! HA.class_ "contentform"
+      ! dataAttribute "hx-boost" "true"
+      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
       ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
     $ mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
         H.br,
-        H.input ! HA.class_ "formbutton" ! HA.type_ "submit" ! HA.value "Create"
+        H.input
+          ! HA.class_ "formbutton"
+          ! HA.type_ "submit"
+          ! HA.value "Create"
       ]
 
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
-generateUpdateForm :: (MonadReader Env m, GenerateForm a) => a -> m Html
+generateUpdateForm :: (HasEnv c, MonadReader c m, GenerateForm a) => a -> m Html
 generateUpdateForm a = do
   fd <- updateForm a
   pure
     $ H.form
       ! HA.class_ "contentform"
       ! dataAttribute "hx-swap" "outerHTML"
+      ! dataAttribute "hx-boost" "true"
+      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
       ! maybe mempty (dataAttribute "hx-put" . stringValue) fd.updateUrl
     $ mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
@@ -180,30 +186,30 @@ generateUpdateForm a = do
       ]
 
 -- User forms
-userUpdateForm :: (MonadReader Env m) => User -> m Html
+userUpdateForm :: (HasEnv c, MonadReader c m) => User -> m Html
 userUpdateForm user = do
   generateUpdateForm user
 
-userCreationForm :: (CanAppM Env Err m) => Authed -> UserLogin -> m Html
+userCreationForm :: (CanAppM c e m) => Authed -> UserLogin -> m Html
 userCreationForm auth userId = do
   checkPermission userId "GET new user" Read
   basicPage auth <$> generateNewForm (Proxy @User)
 
-getUserForUpdate :: (CanAppM Env Err m) => UserLogin -> UserKey -> m H.Html
+getUserForUpdate :: (CanAppM c e m) => UserLogin -> UserKey -> m H.Html
 getUserForUpdate userId user = do
   checkPermission userId "GET update user" Read
   userUpdateForm =<< Website.Data.User.getUser user
 
 -- Entry forms
-entryUpdateForm :: (MonadReader Env m) => Entry -> m Html
+entryUpdateForm :: (HasEnv c, MonadReader c m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
-entryCreationForm :: (CanAppM Env Err m) => Authed -> UserLogin -> m Html
+entryCreationForm :: (CanAppM c e m) => Authed -> UserLogin -> m Html
 entryCreationForm auth user = do
   checkPermission user "GET new entry" Write
   basicPage auth <$> generateNewForm (Proxy @Entry)
 
-getEntryForUpdate :: (CanAppM Env Err m) => UserLogin -> EntryKey -> m H.Html
+getEntryForUpdate :: (CanAppM c e m) => UserLogin -> EntryKey -> m H.Html
 getEntryForUpdate user entry = do
   checkPermission user "GET update entry" Read
   entryUpdateForm =<< Website.Data.Entry.getEntry entry

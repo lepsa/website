@@ -13,6 +13,7 @@ import Website.Data.Entry (Entry)
 import Control.Monad.Reader
 import Test.Db
 import Website.Data.Env
+import Website.Data.Error
 
 -- Top level API for testing. This is the main api with a set of test specific routes bolted onto the side.
 -- These test APIs only exist in the test suite.
@@ -21,7 +22,7 @@ import Website.Data.Env
 type TestTopAPI = TestAPI :<|> TopAPI
 
 -- Top level server for testing. This runs the main server and also bolts some extra functionality on the side.
-testTopServer :: CookieSettings -> JWTSettings -> FilePath -> ServerT TestTopAPI (AppM Env ServerError IO)
+testTopServer :: CookieSettings -> JWTSettings -> FilePath -> ServerT TestTopAPI (AppM Env Err IO)
 testTopServer cs jwt fp = testServer :<|> server cs jwt fp
 
 testTopAPI :: Proxy TestTopAPI
@@ -33,15 +34,15 @@ type TestAPI =
   :<|> "getUsers" :> Get '[JSON] [User]
   :<|> "getEntries" :> Get '[JSON] [Entry]
 
-testServer :: ServerT TestAPI (AppM Env ServerError IO)
+testServer :: ServerT TestAPI (AppM Env Err IO)
 testServer = reset :<|> getUsers :<|> getEntries
 
-reset :: AppM Env ServerError IO NoContent
+reset :: AppM Env Err IO NoContent
 reset = do
   asks conn >>= liftIO . resetDb
 
-getUsers :: AppM Env ServerError IO [User]
+getUsers :: AppM Env Err IO [User]
 getUsers = asks conn >>= liftIO . getAllUsers
 
-getEntries :: AppM Env ServerError IO [Entry]
+getEntries :: AppM Env Err IO [Entry]
 getEntries = asks conn >>= liftIO . getAllEntries

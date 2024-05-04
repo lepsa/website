@@ -18,6 +18,8 @@ import Website.Types
 import Data.Kind
 import Website.Data.Env
 import Website.Auth.Authentication
+import Website.Data.Error
+import Website.Content.Error
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -27,46 +29,47 @@ startServer'
   :: (HasServer (api :: Type) '[BasicAuthCfg', CookieSettings, JWTSettings])
   => IO ()
   -> Proxy api
-  -> (CookieSettings -> JWTSettings -> FilePath -> ServerT api (AppM Env ServerError IO))
+  -> (CookieSettings -> JWTSettings -> FilePath -> ServerT api (AppM Env Err IO))
   -> String
   -> Port
   -> IO ()
 startServer' onStartup api serverM dbPath port = do
   putStrLn "Starting server"
   currentDirectory <- getCurrentDirectory
-  env <-
+  conf <-
     Env
       <$> open dbPath
       <*> getCurrentTimeZone
   -- Do all the steps to get our database up and running as
   -- we expect it to be.
-  either (error . show) pure <=< runAppM env $ do
+  either (error . show @Err) pure <=< runAppM conf $ do
     -- Pragma and feature support
     setupDatabase
     -- Table schema
     createSchema
     -- Update the schema to what the application wants
     runMigrations
-  jwtKey <- getJwtKey env
+  jwtKey <- getJwtKey conf
   let jwtSettings = defaultJWTSettings jwtKey
       cookieSettings = defaultCookieSettings
-        -- TODO: check what htmx gives us for automatically setting
-        -- the xsrf cookies. I don't want to have to write that JS
-        -- myself.
-        { cookieXsrfSetting = Nothing
+        { cookieXsrfSetting = pure defaultXsrfCookieSettings
+          { xsrfExcludeGet = True
+          }
         }
-      cfg = BasicAuthCfg' (conn env) :. cookieSettings :. jwtSettings :. EmptyContext
+      cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
       warpSettings = setBeforeMainLoop onStartup $ setPort port defaultSettings
   runSettings warpSettings $
     serveWithContext api cfg $
-      hoistServerWithContext api (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings]) (runAppMToHandler env) $
+      hoistServerWithContext api
+        (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
+        (runAppMToHandler (errToServerError Indefinite) conf) $
         serverM cookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()
 startServer = startServer' (pure ()) topAPI server
 
-getJwtKey :: Env -> IO JWK
-getJwtKey env = do
+getJwtKey :: HasEnv c => c -> IO JWK
+getJwtKey conf = do
   withTransaction c $ do
     jsons <- query_ c getJWK
     case jsons of
@@ -82,4 +85,4 @@ getJwtKey env = do
           Left s -> error s
       _ -> error "Too many JWKs in the database"
   where
-    c = conn env
+    c = conn conf

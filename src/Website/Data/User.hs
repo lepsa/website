@@ -7,7 +7,6 @@ module Website.Data.User where
 
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
@@ -19,7 +18,6 @@ import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.FromRow
 import Database.SQLite.Simple.ToField
 import GHC.Generics
-import Servant
 import Servant.Auth.JWT
 import Web.FormUrlEncoded
 import Website.Auth.Authorisation (Group)
@@ -111,14 +109,14 @@ instance FromRow (PasswordHash Argon2) where
 instance ToField (PasswordHash Argon2) where
   toField = toField . unPasswordHash
 
-createUser :: (CanAppM Env Err m) => UserCreate -> m User
+createUser :: (CanAppM c e m) => UserCreate -> m User
 createUser (UserCreate group email password) = do
   c <- asks conn
   userId <- liftIO nextRandom
   user <-
     liftIO (query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group))
       >>= ensureSingleInsert
-      >>= liftEither
+      >>= liftEither_
   hash <- hashPassword $ mkPassword password
   liftIO $ execute c "insert into user_login(id, hash) values (?, ?)" (userId, hash)
   pure user
@@ -128,26 +126,26 @@ getUserHashIO c uid =
   query c "select hash from user_login where id = ?" (Only uid)
     >>= ensureSingleResult
 
-getUserHash :: (CanAppM Env Err m) => UserKey -> m (PasswordHash Argon2)
-getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither
+getUserHash :: (CanAppM c e m) => UserKey -> m (PasswordHash Argon2)
+getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither_
 
 getUserIO :: Connection -> UserKey -> IO (Either Err User)
 getUserIO c uid =
   query c "select id, email, group_name from user where id = ?" (Only uid)
     >>= ensureSingleResult
 
-getUser :: (CanAppM Env Err m) => UserKey -> m User
-getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither
+getUser :: (CanAppM c e m) => UserKey -> m User
+getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither_
 
 getUserIdIO :: Connection -> Text -> IO (Either Err UserKey)
 getUserIdIO c email =
   query c "select id from user where email = ?" (Only email)
     >>= ensureSingleResult
 
-getUserId :: (CanAppM Env Err m) => Text -> m UserKey
-getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither
+getUserId :: (CanAppM c e m) => Text -> m UserKey
+getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
 
-updateUser :: (CanAppM Env Err m) => UserKey -> UserUpdate -> m User
+updateUser :: (CanAppM c e m) => UserKey -> UserUpdate -> m User
 updateUser key update = do
   c <- asks conn
   case update.group of
@@ -161,7 +159,7 @@ updateUser key update = do
     Just (UpdatePassword old new) -> do
       oldHash <- getUserHash key
       case checkPassword (mkPassword old) oldHash of
-        PasswordCheckFail -> throwError $ Other "Could not verify old password"
+        PasswordCheckFail -> throwError_ $ Other "Could not verify old password"
         PasswordCheckSuccess -> do
           newHash <- hashPassword $ mkPassword new
           liftIO $
@@ -169,7 +167,7 @@ updateUser key update = do
               execute c "update user_login set hash = ? where id = ?" (newHash, key)
   getUser key
 
-deleteUser :: (CanAppM Env Err m) => UserKey -> m ()
+deleteUser :: (CanAppM c e m) => UserKey -> m ()
 deleteUser key = do
   c <- asks conn
   liftIO $

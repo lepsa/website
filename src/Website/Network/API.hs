@@ -11,10 +11,8 @@ import Servant
 import Website.Network.API.CRUD
 import Data.Text (Text)
 import Website.Network.API.Types
-import Website.Data.Env
 import Website.Data.Error
 import Website.Content.User (userDisplayFullPage, userDisplay)
-import Control.Monad
 import Website.Data.User
 import Control.Monad.IO.Class
 import Servant.Auth.Server
@@ -29,7 +27,7 @@ getIndex = pure . index
 --
 
 -- Create an Entry and get its value back as Html
-postEntry :: (CanAppM Env Err m) => UserLogin -> EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
+postEntry :: (CanAppM c e m) => UserLogin -> EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
 postEntry user create = do
   checkPermission user "POST entry" Write
   entry <- createEntry create
@@ -37,26 +35,26 @@ postEntry user create = do
   pure $ addHeader link mempty
 
 -- Get a given Entry
-getEntry :: (CanAppM Env Err m) => Authed -> UserLogin -> EntryKey -> m H.Html
+getEntry :: (CanAppM c e m) => Authed -> UserLogin -> EntryKey -> m H.Html
 getEntry auth user key = do
   checkPermission user "GET entry" Read
   entryDisplayFullPage auth =<< Website.Data.Entry.getEntry key
 
 -- Update a given entry and get the new value back
-putEntry :: (CanAppM Env Err m) => UserLogin -> EntryKey -> EntryUpdate -> m H.Html
+putEntry :: (CanAppM c e m) => UserLogin -> EntryKey -> EntryUpdate -> m H.Html
 putEntry user key value = do
   checkPermission user "PUT entry" Write
   entryDisplay =<< updateEntry key value
 
 -- Delete a given Entry, and get a confirmation response
-deleteEntry :: (CanAppM Env Err m) => UserLogin -> EntryKey -> m H.Html
+deleteEntry :: (CanAppM c e m) => UserLogin -> EntryKey -> m H.Html
 deleteEntry user key = do
   checkPermission user "DELETE entry" Write
   Website.Data.Entry.deleteEntry key
   pure $ H.toHtml @String "Deleted"
 
 -- Get all of the Entries as a list
-getEntries :: (CanAppM Env Err m) => Authed -> UserLogin -> m H.Html
+getEntries :: (CanAppM c e m) => Authed -> UserLogin -> m H.Html
 getEntries auth user = do
   checkPermission user "GET entries" Read
   entryList auth =<< Website.Data.Entry.getEntries
@@ -64,34 +62,34 @@ getEntries auth user = do
 --
 -- User Pages
 --
-postUser :: (CanAppM Env Err m) => UserLogin -> UserCreate -> m (Headers '[Header "Location" Text] H.Html)
+postUser :: (CanAppM c e m) => UserLogin -> UserCreate -> m (Headers '[Header "Location" Text] H.Html)
 postUser userId create = do
   checkPermission userId "POST user" Write
   user <- createUser create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
   pure $ addHeader link mempty
 
-getUser :: CanAppM Env Err m => Authed -> UserLogin -> UserKey -> m H.Html
+getUser :: CanAppM c e m => Authed -> UserLogin -> UserKey -> m H.Html
 getUser auth userId key = do
   checkPermission userId "GET user" Read
   userDisplayFullPage auth =<< Website.Data.User.getUser key
 
-putUser :: CanAppM Env Err m => UserLogin -> UserKey -> UserUpdate -> m H.Html
+putUser :: CanAppM c e m => UserLogin -> UserKey -> UserUpdate -> m H.Html
 putUser userId key update = do
   checkPermission userId "PUT user" Write
   userDisplay =<< updateUser key update
 
-deleteUser :: CanAppM Env Err m => UserLogin -> UserKey -> m H.Html
+deleteUser :: CanAppM c e m => UserLogin -> UserKey -> m H.Html
 deleteUser userId key = do
   checkPermission userId "DELETE user" Write
   Website.Data.User.deleteUser key
   pure $ H.toHtml @String "Delete"
 
-register :: CanAppM Env Err m => Authed -> CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
+register :: CanAppM c e m => Authed -> CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register _auth cookieSettings jwtSettings cUser = do
   user <- createUser cUser
   mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
   case mApplyCookies of
-    Nothing -> throwError $ Other "Could not build login cookies"
+    Nothing -> throwError_ $ Other "Could not build login cookies"
     Just cookies -> pure $ cookies $ addHeader link NoContent

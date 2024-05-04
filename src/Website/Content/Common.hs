@@ -72,6 +72,7 @@ commonHead =
   H.head $
     mconcat
       [ H.link ! HA.rel (stringValue "stylesheet") ! HA.href (stringValue "/main.css"),
+        H.script ! HA.src (stringValue "/main.js") $ mempty,
         H.script ! HA.src (stringValue "/htmx.min.js") $ mempty,
         H.title $ toHtml siteTitle
       ]
@@ -83,7 +84,10 @@ sideNav =
     H.ul $
       mconcat
         [ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a
+            ! dataAttribute "hx-boost" "true"
+            ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+            ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
           H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
@@ -98,8 +102,8 @@ basicPage auth content =
   mconcat
     [ H.docType,
       commonHead,
-      H.body $
-        mconcat
+      H.body
+        $ mconcat
           [ pageHeader auth,
             H.hr,
             H.div ! HA.id (stringValue "main-content") $
@@ -154,6 +158,9 @@ loginForm auth =
     ! HA.class_ "contentform"
     ! HA.action (textValue $ linkText (Proxy @(AuthLogin :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
     ! HA.method "POST"
+    -- ! dataAttribute "hx-post" (textValue $ linkText (Proxy @(AuthLogin :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
+    ! dataAttribute "hx-boost" "true"
+    ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
     $ mconcat
       [ H.label ! HA.class_ "formlabel" ! HA.for "login" $ "Username"
       , H.input ! HA.class_ "formvalue" ! HA.name "login" ! HA.type_ "text"
@@ -164,5 +171,6 @@ loginForm auth =
       , H.input
           ! HA.type_ "submit"
           ! HA.class_ "formbutton"
+          ! dataAttribute "hx-boost" "true"
           ! HA.value "Login"
       ]

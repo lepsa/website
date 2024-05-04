@@ -7,9 +7,9 @@ import Data.Foldable
 import Data.List
 import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
-import Servant
 import Website.Types
 import Website.Data.Env
+import Website.Data.Error (DbErr(NotFound), Err (DbError), throwError_)
 
 -- Create a table for tracking the schema version
 createVersion :: Query
@@ -28,7 +28,7 @@ insertJWK :: Query
 insertJWK = "insert into jwk (value) values (?)"
 
 -- This is run on application start to ensure that the schema_version table exists
-createSchema :: (CanAppM Env e m) => m ()
+createSchema :: (CanAppM c e m) => m ()
 createSchema = do
   c <- asks conn
   liftIO $ execute_ c createVersion
@@ -42,7 +42,7 @@ instance FromRow Version where
 instance ToRow Version where
   toRow (Version v) = pure $ toField v
 
-setupDatabase :: (CanAppM Env ServerError m) => m ()
+setupDatabase :: (CanAppM c e m) => m ()
 setupDatabase = do
   c <- asks conn
   -- Explicitly enable foreign keys, as SQLite doesn't turn
@@ -54,14 +54,14 @@ setupDatabase = do
     [Only (enabled :: Bool)] <- query_ c "PRAGMA foreign_keys"
     unless enabled $ error "Foreign keys aren't supported in this version of SQLite. Please use a version with foreign key support."
 
-runMigrations :: (CanAppM Env ServerError m) => m ()
+runMigrations :: (CanAppM c e m) => m ()
 runMigrations = do
   c <- asks conn
   versions <- liftIO $ withTransaction c $ query_ c getSchemaVersion
   currentVersion <- case versions of
     [] -> pure 0 -- When there is no result from the schema_version table set a minimum value to start the process
     [version] -> pure version
-    _ -> throwError err404
+    _ -> throwError_ $ DbError NotFound
   liftIO $ putStrLn $ "Schema: " <> show currentVersion
   let migrationsToRun =
         filter (\(v, _) -> v >= currentVersion) $

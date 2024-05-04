@@ -69,39 +69,39 @@ instance FromRow Entry where
       <*> field
       <*> field
 
-createEntry :: (CanAppM Env Err m) => EntryCreate -> m Entry
+createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
 createEntry (EntryCreate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning key, created, title, value" (title, value)
   case entries of
-    [] -> throwError $ DbError NotFound
+    [] -> throwError $ err $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ DbError TooManyResults
+    _ -> throwError $ err $ DbError TooManyResults
 
-getEntry :: (CanAppM Env Err m) => EntryKey -> m Entry
+getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value from entry where key = ?" (Only key)
   case entries of
-    [] -> throwError $ DbError NotFound
+    [] -> throwError $ err $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ DbError TooManyResults
+    _ -> throwError $ err $ DbError TooManyResults
 
-updateEntry :: (CanAppM Env Err m) => EntryKey -> EntryUpdate -> m Entry
+updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning key, created, title, value" (title, value, key)
   case entries of
-    [] -> throwError $ DbError NotFound
+    [] -> throwError $ err $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ DbError TooManyResults
+    _ -> throwError $ err $ DbError TooManyResults
 
-deleteEntry :: (CanAppM Env e m) => EntryKey -> m ()
+deleteEntry :: (CanAppM c e m) => EntryKey -> m ()
 deleteEntry key = do
   c <- asks conn
   liftIO $ withTransaction c $ execute c "delete from entry where key = ?" (Only key)
 
-getEntries :: (CanAppM Env e m) => m [Entry]
+getEntries :: (CanAppM c e m) => m [Entry]
 getEntries = do
   c <- asks conn
   liftIO $ withTransaction c $ query_ c "select key, created, title, value from entry"

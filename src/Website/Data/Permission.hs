@@ -8,7 +8,7 @@ import Website.Auth.Authorisation
 import Database.SQLite.Simple
 import Control.Monad.Except
 
-checkPermission :: CanAppM Env Err m => UserLogin -> String -> Access -> m ()
+checkPermission :: CanAppM c e m => UserLogin -> String -> Access -> m ()
 checkPermission userLogin name requested = do
   -- Permissions are checked each time, rather than baking them
   -- into the JWT or initial checkup, as we want to have the
@@ -34,7 +34,7 @@ checkPermission userLogin name requested = do
       -- accidently leaving a route open somehow and having it be
       -- noticed and tampered with.
       allowed = any check permissions
-  unless allowed $ throwError Unauthorised
+  unless allowed $ throwError $ err Unauthorised
 
 data Permission = Permission
   { permissionName :: String
@@ -44,7 +44,7 @@ data Permission = Permission
 instance FromRow Permission where
   fromRow = Permission <$> field <*> field <*> field
 
-getPermissions :: CanAppM Env Err m => String -> m [Permission]
+getPermissions :: CanAppM c e m => String -> m [Permission]
 getPermissions name = do
   c <- asks conn
   liftIO $ query c "select name, group_name, access from permission where name = ?" (Only name)

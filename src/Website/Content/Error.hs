@@ -6,8 +6,8 @@ import Website.Content.Common
 import Text.Blaze.Html.Renderer.Utf8 qualified as H
 import Text.Blaze.Html5 qualified as H
 
-unauthentricated :: Authed -> ServerError
-unauthentricated auth = err401
+unauthenticated :: Authed -> ServerError
+unauthenticated auth = err401
   { errBody = H.renderHtml $ basicPage auth $ H.p "Unauthenticated"
   }
 
@@ -28,7 +28,7 @@ notFound auth = err404
 
 errToServerError :: Authed -> Err -> ServerError
 errToServerError auth (DbError e) = dbErrToServerError auth e
-errToServerError auth Unauthenticated = unauthentricated auth
+errToServerError auth Unauthenticated = unauthenticated auth
 errToServerError auth Unauthorised = unauthorised auth
 errToServerError auth (Other _) = internalServerError auth
 
