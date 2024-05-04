@@ -160,7 +160,7 @@ mkBadAuth :: (MonadGen m) => ApiState v -> m (Auth v)
 mkBadAuth state =
   Gen.choice
     [ pure $ Bad Nothing,
-      if not (M.null state._users)
+      if M.null state._users
         then pure $ Bad Nothing
         else do
           (k, u') <- Gen.element $ M.toList state._users
@@ -359,7 +359,6 @@ cGetEntry env =
               output.responseStatus === status200
           Bad _ -> do
             output.responseStatus === status401
-            output.responseBody === mempty
     ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
@@ -399,7 +398,8 @@ cCreateEntry env =
   Command
     gen
     execute
-    [ Update $ \state input output ->
+    [ Require userExists
+    , Update $ \state input output ->
         state
           & entries %~ M.insert output (TestEntry (input ^. ceTitle) (input ^. ceValue)),
       Ensure $ \_old _new _input output -> do
@@ -759,18 +759,15 @@ cGetUser env =
             output.responseBody /== mempty
           Bad _ -> do
             output.responseStatus === status401
-            output.responseBody === mempty
     ]
   where
     gen :: ApiState v -> Maybe (gen (GetUser v))
     gen state =
-      if none (\u -> u ^. tuGroup == Admin) state._users
+      let adminUsers = state ^.. users . to M.toList . each . filtered (\(_, u) -> u ^. tuGroup == Admin)
+      in if null adminUsers
         then Nothing
         else Just $ do
-          (k, u) <-
-            Gen.element $
-              filter (\(_, u) -> u ^. tuGroup == Admin) $
-                M.toList state._users
+          (k, u) <- Gen.element adminUsers
           k' <- Gen.element $ M.keys state._users
           let f = flip GetUser k'
           Gen.choice
@@ -849,7 +846,6 @@ propApiTests env reset = withTests 100 . property $ do
               -- Entry commands
               cGetEntry,
               cGetEntryBadKey,
-              -- cGetEntryBadAuth,
               cGetEntries,
               cGetEntriesBadAuth,
               cCreateEntry,

@@ -42,4 +42,4 @@ main = do
   killThread serverThread
   pure results
   where
-    port = 8080
+    port = 8081
