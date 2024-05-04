@@ -1,6 +1,5 @@
 module Website.Content.Forms where
 
-import Control.Monad
 import Control.Monad.Reader
 import Data.Data
 import Data.List
@@ -185,12 +184,12 @@ userUpdateForm :: (MonadReader Env m) => User -> m Html
 userUpdateForm user = do
   generateUpdateForm user
 
-userCreationForm :: (CanAppM Env Err m) => UserKey -> m Html
-userCreationForm userId = do
+userCreationForm :: (CanAppM Env Err m) => Authed -> UserLogin -> m Html
+userCreationForm auth userId = do
   checkPermission userId "GET new user" Read
-  basicPage <$> generateNewForm (Proxy @User)
+  basicPage auth <$> generateNewForm (Proxy @User)
 
-getUserForUpdate :: (CanAppM Env Err m) => UserKey -> UserKey -> m H.Html
+getUserForUpdate :: (CanAppM Env Err m) => UserLogin -> UserKey -> m H.Html
 getUserForUpdate userId user = do
   checkPermission userId "GET update user" Read
   userUpdateForm =<< Website.Data.User.getUser user
@@ -199,12 +198,12 @@ getUserForUpdate userId user = do
 entryUpdateForm :: (MonadReader Env m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
-entryCreationForm :: (CanAppM Env Err m) => UserKey -> m Html
-entryCreationForm user = do
+entryCreationForm :: (CanAppM Env Err m) => Authed -> UserLogin -> m Html
+entryCreationForm auth user = do
   checkPermission user "GET new entry" Write
-  basicPage <$> generateNewForm (Proxy @Entry)
+  basicPage auth <$> generateNewForm (Proxy @Entry)
 
-getEntryForUpdate :: (CanAppM Env Err m) => UserKey -> EntryKey -> m H.Html
+getEntryForUpdate :: (CanAppM Env Err m) => UserLogin -> EntryKey -> m H.Html
 getEntryForUpdate user entry = do
   checkPermission user "GET update entry" Read
   entryUpdateForm =<< Website.Data.Entry.getEntry entry

@@ -11,12 +11,23 @@ import Website.Network.API.Types
 import Website.Data.User
 import Servant.Auth
 import Website.Auth.Authentication
+import Data.Maybe (catMaybes)
+import Servant.Auth.Server (AuthResult (Authenticated))
 
-type AuthEntry a = Auth Auths UserKey :> "entry" :> a
-type AuthUser a = Auth Auths UserKey :> "user" :> a
+type Authed = AuthResult UserLogin
+type AuthLogin = Auth Auths UserLogin
+type AuthEntry a = AuthLogin :> "entry" :> a
+type AuthUser a = AuthLogin :> "user" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
+
+whenLoggedIn :: Authed -> (UserLogin -> H.Html) -> Maybe H.Html
+whenLoggedIn (Authenticated l) f = pure $ f l
+whenLoggedIn _ _ = Nothing
+
+greetUser :: UserLogin -> H.Html
+greetUser (UserLogin _ e) = H.toHtml $ "Welcome back, " <> e
 
 -- | Helper function for generating typesafe internal API links for use in HTML attributes
 htmlLink ::
@@ -41,12 +52,14 @@ linkText ::
 linkText api = pack "/" <> toUrlPiece (safeLink topAPI api)
 
 -- | A common location for common header elements
-pageHeader :: Html
-pageHeader =
+pageHeader :: Authed -> Html
+pageHeader auth =
   H.header $
-    H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $
-      H.h1 $
-        toHtml siteTitle
+    mconcat $ catMaybes
+      [ pure $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
+          H.h1 $ toHtml siteTitle
+      , whenLoggedIn auth greetUser
+      ]
 
 -- | A common location for common footer elements
 pageFooter :: Html
@@ -69,9 +82,9 @@ sideNav =
   H.nav $
     H.ul $
       mconcat
-        [ H.li $ H.a ! htmlLink (Proxy @(Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a ! htmlLink (Proxy @(Auth Auths UserKey :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
-          H.li $ H.a ! htmlLink (Proxy @("login" :> Get '[HTML] H.Html)) $ "Login",
+        [ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
+          H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
           H.hr,
           H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
@@ -80,14 +93,14 @@ sideNav =
 --  user. This could be due to a page refresh, bookmark, history, etc.
 --  'basicPage' includes all content and overall page structure that is required for styling and
 --  HTMX interactivity.
-basicPage :: Html -> Html
-basicPage content =
+basicPage :: Authed -> Html -> Html
+basicPage auth content =
   mconcat
     [ H.docType,
       commonHead,
       H.body $
         mconcat
-          [ pageHeader,
+          [ pageHeader auth,
             H.hr,
             H.div ! HA.id (stringValue "main-content") $
               mconcat
@@ -99,9 +112,9 @@ basicPage content =
     ]
 
 -- | Initial landing page.
-index :: Html
-index =
-  basicPage $
+index :: Authed -> Html
+index auth =
+  basicPage auth $
     mconcat
       [ H.p "Welcome to my website.",
         H.p "I use this as a test bed for various ways of deploying code and working with server-driven client interactions.",
@@ -134,12 +147,12 @@ formFieldTextArea fieldName fieldLabel value =
       H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
     ]
 
-loginForm :: Html
-loginForm =
-  basicPage $
+loginForm :: Authed -> Html
+loginForm auth =
+  basicPage auth $
   H.form
     ! HA.class_ "contentform"
-    ! HA.action (textValue $ linkText (Proxy @("login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
+    ! HA.action (textValue $ linkText (Proxy @(AuthLogin :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
     ! HA.method "POST"
     $ mconcat
       [ H.label ! HA.class_ "formlabel" ! HA.for "login" $ "Username"

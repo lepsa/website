@@ -19,52 +19,52 @@ import Website.Content.Common
 import Servant.HTML.Blaze
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env ServerError IO)
-server cookieSettings jwtSettings currentDirectory =
-  protected :<|> unprotected
+server cookieSettings jwtSettings currentDirectory = api
   where
-    mapServerErrors =
+    api auth = protected auth :<|> unprotected auth
+    mapServerErrors auth =
       asks . runReaderT
-        >=> ReaderT . const . withExceptT errToServerError
+        >=> ReaderT . const . withExceptT (errToServerError auth)
 
-    protected (Authenticated user) =
-      crudEntry user
-        :<|> mapServerErrors (getEntries user)
-        :<|> crudUser user
-    protected _ = throwAll unauthentricated
+    protected auth@(Authenticated user) =
+      crudEntry auth user
+        :<|> mapServerErrors auth (getEntries auth user)
+        :<|> crudUser auth user
+    protected auth = throwAll $ unauthentricated auth
 
-    unprotected =
-      getIndex
-        :<|> getLogin
-        :<|> login
-        :<|> mapServerErrors . register cookieSettings jwtSettings
+    unprotected auth =
+      getIndex auth
+        :<|> getLogin auth
+        :<|> login auth
+        :<|> mapServerErrors auth . register auth cookieSettings jwtSettings
         :<|> serveDirectoryWebApp currentDirectory
 
-    getLogin :: AppM Env ServerError IO Html
-    getLogin = pure loginForm
+    getLogin :: Authed -> AppM Env ServerError IO Html
+    getLogin = pure . loginForm
 
-    login :: Login -> AppM Env ServerError IO (SetLoginCookies NoContent)
-    login (Login user pass) = do
+    login :: Authed -> Login -> AppM Env ServerError IO (SetLoginCookies NoContent)
+    login auth (Login user pass) = do
       c <- asks conn
-      userId <- lift $ withExceptT (const unauthentricated) $ checkUserPassword c (T.pack user) (T.pack pass)
+      userId <- lift $ withExceptT (const $ unauthentricated auth) $ checkUserPassword c (T.pack user) (T.pack pass)
       mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings userId
       case mApplyCookies of
-        Nothing -> throwError unauthentricated
+        Nothing -> throwError $ unauthentricated auth
         Just cookies -> pure $ cookies $ addHeader root NoContent
       where
-        root = linkText (Proxy @(Get '[HTML] Html))
+        root = linkText (Proxy @(AuthLogin :> Get '[HTML] Html))
     
-    crudEntry user =
-      (mapServerErrors . postEntry user)
-        :<|> mapServerErrors (entryCreationForm user)
-        :<|> (mapServerErrors . getEntry user)
-        :<|> (\k -> mapServerErrors . putEntry user k)
-        :<|> (mapServerErrors . getEntryForUpdate user)
-        :<|> (mapServerErrors . deleteEntry user)
+    crudEntry auth user =
+      (mapServerErrors auth . postEntry user)
+        :<|> mapServerErrors auth (entryCreationForm auth user)
+        :<|> (mapServerErrors auth . getEntry auth user)
+        :<|> (\k -> mapServerErrors auth . putEntry user k)
+        :<|> (mapServerErrors auth . getEntryForUpdate user)
+        :<|> (mapServerErrors auth . deleteEntry user)
 
-    crudUser user =
-      (mapServerErrors . postUser user)
-        :<|> mapServerErrors (userCreationForm user)
-        :<|> (mapServerErrors . getUser user)
-        :<|> (\k -> mapServerErrors . putUser user k)
-        :<|> (mapServerErrors . getUserForUpdate user)
-        :<|> (mapServerErrors . deleteUser user)
+    crudUser auth user =
+      (mapServerErrors auth . postUser user)
+        :<|> mapServerErrors auth (userCreationForm auth user)
+        :<|> (mapServerErrors auth . getUser auth user)
+        :<|> (\k -> mapServerErrors auth . putUser user k)
+        :<|> (mapServerErrors auth . getUserForUpdate user)
+        :<|> (mapServerErrors auth . deleteUser user)

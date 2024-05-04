@@ -8,13 +8,13 @@ import Website.Auth.Authorisation
 import Database.SQLite.Simple
 import Control.Monad.Except
 
-checkPermission :: CanAppM Env Err m => UserKey -> String -> Access -> m ()
-checkPermission userKey name requested = do
+checkPermission :: CanAppM Env Err m => UserLogin -> String -> Access -> m ()
+checkPermission userLogin name requested = do
   -- Permissions are checked each time, rather than baking them
   -- into the JWT or initial checkup, as we want to have the
   -- most up to date information when we are doing the check
   -- even if it does hit the database more.
-  user <- getUser userKey
+  user <- getUser userLogin.uuid
   permissions <- getPermissions name
   let check permission =
         -- Admins inherit all user permissions.

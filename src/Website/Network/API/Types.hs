@@ -22,7 +22,7 @@ topAPI = Proxy
 type Auths = '[BasicAuth, Cookie, JWT]
 
 type TopAPI = TopAPI' Auths
-type TopAPI' auths = Auth auths UserKey :> Protected :<|> Unprotected
+type TopAPI' auths = Auth auths UserLogin :> (Protected :<|> Unprotected)
 
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a
 type Unprotected =

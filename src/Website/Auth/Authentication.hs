@@ -32,7 +32,7 @@ newtype BasicAuthCfg' = BasicAuthCfg' Connection
 
 type instance BasicAuthCfg = BasicAuthCfg'
 
-instance FromBasicAuthData UserKey where
+instance FromBasicAuthData UserLogin where
   -- If anything goes wrong at any point, return BadPassword.
   -- This won't save us from timing attacks, but it'll do for now.
   -- NOTE: Attackers could guess at what we are doing based on the
@@ -47,7 +47,7 @@ instance FromBasicAuthData UserKey where
       password <- either (const $ throwError BadPassword) pure (decodeUtf8' pass)
       checkUserPassword conn email password
 
-checkUserPassword :: (MonadIO m) => Connection -> Text -> Text -> ExceptT (AuthResult UserKey) m UserKey
+checkUserPassword :: (MonadIO m) => Connection -> Text -> Text -> ExceptT (AuthResult UserLogin) m UserLogin
 checkUserPassword conn email pass = do
   -- Look up the user's id by their email
   uid <- liftIO (getUserIdIO conn email) >>= liftEither . first (const BadPassword)
@@ -57,4 +57,4 @@ checkUserPassword conn email pass = do
   case checkPassword (mkPassword pass) hash of
     PasswordCheckFail -> throwError BadPassword
     -- If the password was correct, fetch the user
-    PasswordCheckSuccess -> pure uid
+    PasswordCheckSuccess -> pure $ UserLogin uid email

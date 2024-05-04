@@ -30,6 +30,9 @@ import Website.Types
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
+type UserKey = UUID
+instance ToJWT UserKey
+instance FromJWT UserKey
 instance FromField UUID where
   fromField :: FieldParser UUID
   fromField = fromField @String >=> maybe (fail "Could not parse UUID") pure . fromString
@@ -40,16 +43,14 @@ instance ToField UUID where
 instance FromRow UUID where
   fromRow = fieldWith fromField
 
-newtype UserKey = UserKey
-  { uuid :: UUID
-  }
-  deriving (Eq, Ord, Show, Generic, FromField, ToField, ToHttpApiData, FromHttpApiData, ToJSON, FromJSON)
-
-instance FromRow UserKey
-
-instance ToJWT UserKey
-
-instance FromJWT UserKey
+data UserLogin = UserLogin
+  { uuid :: UserKey
+  , email :: Text
+  } deriving (Eq, Show, Generic)
+instance ToJSON UserLogin
+instance FromJSON UserLogin
+instance ToJWT UserLogin
+instance FromJWT UserLogin
 
 data User = User
   { uuid :: UserKey,

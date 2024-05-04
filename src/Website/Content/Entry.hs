@@ -54,15 +54,15 @@ entryDisplay entry = do
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
-entryDisplayFullPage :: (MonadReader Env m) => Entry -> m Html
-entryDisplayFullPage = fmap basicPage . entryDisplay
+entryDisplayFullPage :: (MonadReader Env m) => Authed -> Entry -> m Html
+entryDisplayFullPage auth = fmap (basicPage auth) . entryDisplay
 
 -- | List all entries as a page
-entryList :: (MonadReader Env m) => [Entry] -> m Html
-entryList entries = do
+entryList :: (MonadReader Env m) => Authed -> [Entry] -> m Html
+entryList auth entries = do
   tz <- asks timeZone
   pure $
-    basicPage $
+    basicPage auth $
       mconcat
         [ H.h2 "Entries",
           newEntry,

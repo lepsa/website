@@ -6,33 +6,33 @@ import Website.Content.Common
 import Text.Blaze.Html.Renderer.Utf8 qualified as H
 import Text.Blaze.Html5 qualified as H
 
-unauthentricated :: ServerError
-unauthentricated = err401
-  { errBody = H.renderHtml $ basicPage $ H.p "Unauthenticated"
+unauthentricated :: Authed -> ServerError
+unauthentricated auth = err401
+  { errBody = H.renderHtml $ basicPage auth $ H.p "Unauthenticated"
   }
 
-unauthorised :: ServerError
-unauthorised = err403
-  { errBody = H.renderHtml $ basicPage $ H.p "Unauthorised"
+unauthorised :: Authed -> ServerError
+unauthorised auth = err403
+  { errBody = H.renderHtml $ basicPage auth $ H.p "Unauthorised"
   }
 
-internalServerError :: ServerError
-internalServerError = err500
-  { errBody = H.renderHtml $ basicPage $ H.p "Internal Server Error"
+internalServerError :: Authed -> ServerError
+internalServerError auth = err500
+  { errBody = H.renderHtml $ basicPage auth $ H.p "Internal Server Error"
   }
 
-notFound :: ServerError
-notFound = err404
-  { errBody = H.renderHtml $ basicPage $ H.p "Not Found"
+notFound :: Authed -> ServerError
+notFound auth = err404
+  { errBody = H.renderHtml $ basicPage auth $ H.p "Not Found"
   }
 
-errToServerError :: Err -> ServerError
-errToServerError (DbError e) = dbErrToServerError e
-errToServerError Unauthenticated = unauthentricated
-errToServerError Unauthorised = unauthorised
-errToServerError (Other _) = internalServerError
+errToServerError :: Authed -> Err -> ServerError
+errToServerError auth (DbError e) = dbErrToServerError auth e
+errToServerError auth Unauthenticated = unauthentricated auth
+errToServerError auth Unauthorised = unauthorised auth
+errToServerError auth (Other _) = internalServerError auth
 
-dbErrToServerError :: DbErr -> ServerError
-dbErrToServerError NotFound = notFound
-dbErrToServerError TooManyResults = notFound
-dbErrToServerError FailedToInsertRecord = internalServerError
+dbErrToServerError :: Authed -> DbErr -> ServerError
+dbErrToServerError auth NotFound = notFound auth
+dbErrToServerError auth TooManyResults = notFound auth
+dbErrToServerError auth FailedToInsertRecord = internalServerError auth
