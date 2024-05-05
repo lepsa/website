@@ -15,3 +15,6 @@ dist-newstyle/
 .ghc.environment.*
 # Profiling data
 *.prof
+# SSL certs
+*.csr
+*.pem

@@ -22,7 +22,7 @@ topAPI = Proxy
 type Auths = '[BasicAuth, Cookie, JWT]
 
 type TopAPI = TopAPI' Auths
-type TopAPI' auths = Auth auths UserLogin :> (Protected :<|> Unprotected)
+type TopAPI' auths = Auth auths UserKey :> (Protected :<|> Unprotected)
 
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a
 type Unprotected =
@@ -36,3 +36,4 @@ type Protected =
   "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
     :<|> "entries" :> Get '[HTML] Html
     :<|> "user" :> CRUDForm UserCreate UserUpdate UserKey
+    :<|> "users" :> Get '[HTML] Html

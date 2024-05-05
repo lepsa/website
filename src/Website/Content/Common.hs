@@ -12,19 +12,32 @@ import Website.Data.User
 import Servant.Auth
 import Website.Auth.Authentication
 import Data.Maybe (catMaybes)
-import Servant.Auth.Server (AuthResult (Authenticated))
+import Servant.Auth.Server (AuthResult)
+import Control.Monad.Except
+import Control.Monad.Reader
+import Website.Data.Env
 
-type Authed = AuthResult UserLogin
-type AuthLogin = Auth Auths UserLogin
+type Authed = AuthResult UserKey
+type AuthLogin = Auth Auths UserKey
 type AuthEntry a = AuthLogin :> "entry" :> a
 type AuthUser a = AuthLogin :> "user" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
 
-whenLoggedIn :: Authed -> (UserLogin -> H.Html) -> Maybe H.Html
-whenLoggedIn (Authenticated l) f = pure $ f l
-whenLoggedIn _ _ = Nothing
+-- tryError and withError are copied from mtl-2.3.1
+tryError :: MonadError e m => m a -> m (Either e a)
+tryError action = (Right <$> action) `catchError` (pure . Left)
+
+withError :: MonadError e m => (e -> e) -> m a -> m a
+withError f action = tryError action >>= either (throwError . f) pure
+
+whenLoggedIn :: (HasAuth c (Maybe UserLogin), MonadReader c m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
+whenLoggedIn f = do
+  mUser <- asks auth
+  case mUser of
+    Nothing -> pure Nothing
+    Just user -> pure $ pure $ f user
 
 greetUser :: UserLogin -> H.Html
 greetUser (UserLogin _ e) = H.toHtml $ "Welcome back, " <> e
@@ -52,13 +65,14 @@ linkText ::
 linkText api = pack "/" <> toUrlPiece (safeLink topAPI api)
 
 -- | A common location for common header elements
-pageHeader :: Authed -> Html
-pageHeader auth =
-  H.header $
+pageHeader :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+pageHeader = do
+  loggedIn <- whenLoggedIn greetUser
+  pure $ H.header $
     mconcat $ catMaybes
       [ pure $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
           H.h1 $ toHtml siteTitle
-      , whenLoggedIn auth greetUser
+      , loggedIn
       ]
 
 -- | A common location for common footer elements
@@ -78,37 +92,47 @@ commonHead =
       ]
 
 -- | Builds the list of links on the side. Invoked by 'basicPage'
-sideNav :: Html
-sideNav =
-  H.nav $
+sideNav :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+sideNav = do
+  mHtml <- whenLoggedIn $ \_ -> mconcat
+    [ H.li $ H.a
+      ! dataAttribute "hx-boost" "true"
+      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+      ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+      H.li $ H.a
+      ! dataAttribute "hx-boost" "true"
+      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+      ! htmlLink (Proxy @(AuthLogin :> "users" :> Get '[HTML] H.Html)) $ "Users"
+    ]
+  pure $ H.nav $
     H.ul $
-      mconcat
-        [ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
-          H.li $ H.a
-            ! dataAttribute "hx-boost" "true"
-            ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-            ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
-          H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
-          H.hr,
-          H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
+      mconcat $ catMaybes
+        [ pure $ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
+          mHtml,
+          pure H.hr,
+          pure $ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
+          pure H.hr,
+          pure $ H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
 
 -- | 'basicPage' should be used as a wrapper on any route that could be loaded directly by a
 --  user. This could be due to a page refresh, bookmark, history, etc.
 --  'basicPage' includes all content and overall page structure that is required for styling and
 --  HTMX interactivity.
-basicPage :: Authed -> Html -> Html
-basicPage auth content =
-  mconcat
+basicPage :: MonadReader (EnvAuthed (Maybe UserLogin)) m => Html -> m Html
+basicPage content = do
+  header <- pageHeader
+  nav <- sideNav
+  pure $ mconcat
     [ H.docType,
       commonHead,
       H.body
         $ mconcat
-          [ pageHeader auth,
+          [ header,
             H.hr,
             H.div ! HA.id (stringValue "main-content") $
               mconcat
-                [ sideNav,
+                [ nav,
                   H.main content
                 ],
             pageFooter
@@ -116,9 +140,8 @@ basicPage auth content =
     ]
 
 -- | Initial landing page.
-index :: Authed -> Html
-index auth =
-  basicPage auth $
+index :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+index = basicPage $
     mconcat
       [ H.p "Welcome to my website.",
         H.p "I use this as a test bed for various ways of deploying code and working with server-driven client interactions.",
@@ -151,9 +174,8 @@ formFieldTextArea fieldName fieldLabel value =
       H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
     ]
 
-loginForm :: Authed -> Html
-loginForm auth =
-  basicPage auth $
+loginForm :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+loginForm = basicPage $
   H.form
     ! HA.class_ "contentform"
     ! HA.action (textValue $ linkText (Proxy @(AuthLogin :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))

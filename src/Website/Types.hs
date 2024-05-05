@@ -13,11 +13,12 @@ import Website.Data.Error
 type AppM c e m = ReaderT c (ExceptT e m)
 
 type CanAppM c e m = (HasEnv c, AsErr e, MonadReader c m, MonadError e m, MonadIO m)
+type CanAppM' a c e m = (HasAuth c a, HasEnv c, AsErr e, MonadReader c m, MonadError e m, MonadIO m)
 
 runAppM :: c -> AppM c e m a -> m (Either e a)
 runAppM c m = runExceptT $ runReaderT m c
 
-runAppMToHandler :: (Err -> ServerError) -> c -> AppM c Err IO a -> Handler a
+runAppMToHandler :: (Err -> AppM c ServerError IO ServerError) -> c -> AppM c Err IO a -> Handler a
 runAppMToHandler f c m = do
   e <- liftIO $ runAppM c m
-  either (throwError . f) pure e
+  either (either throwError throwError <=< liftIO . runAppM c . f) pure e

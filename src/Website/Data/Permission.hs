@@ -34,7 +34,7 @@ checkPermission userLogin name requested = do
       -- accidently leaving a route open somehow and having it be
       -- noticed and tampered with.
       allowed = any check permissions
-  unless allowed $ throwError $ err Unauthorised
+  unless allowed $ throwError $ fromErr Unauthorised
 
 data Permission = Permission
   { permissionName :: String

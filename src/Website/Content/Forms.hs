@@ -17,6 +17,7 @@ import Website.Network.API.Types
 import Website.Types
 import Website.Auth.Authorisation (Access(Read, Write))
 import Website.Data.Permission
+import Website.Data.Error
 
 -- | Values for a given form field
 data FieldData
@@ -118,6 +119,12 @@ instance GenerateForm User where
                   value = Nothing
                 },
               FieldData
+                { label = "Password",
+                  name = "password",
+                  type_ = "password",
+                  value = Nothing
+                },
+              FieldData
                 { label = "Group",
                   name = "group",
                   type_ = "group",
@@ -132,15 +139,27 @@ instance GenerateForm User where
           createUrl = Nothing,
           updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
           fields =
-            [ FieldData
+            [ StaticData
                 { label = "Email",
                   name = "email",
-                  type_ = "text",
                   value = pure $ T.unpack user.email
                 },
-              StaticData
+              FieldData
+                { label = "Old Password",
+                  name = "oldPassword",
+                  type_ = "password",
+                  value = Nothing
+                },
+              FieldData
+                { label = "New Password",
+                  name = "newPassword",
+                  type_ = "password",
+                  value = Nothing
+                },
+              FieldData
                 { label = "Group",
                   name = "group",
+                  type_ = "text",
                   value = pure $ show user.group
                 }
             ]
@@ -190,26 +209,30 @@ userUpdateForm :: (HasEnv c, MonadReader c m) => User -> m Html
 userUpdateForm user = do
   generateUpdateForm user
 
-userCreationForm :: (CanAppM c e m) => Authed -> UserLogin -> m Html
-userCreationForm auth userId = do
-  checkPermission userId "GET new user" Read
-  basicPage auth <$> generateNewForm (Proxy @User)
+userCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
+userCreationForm = do
+  user <- asks auth
+  checkPermission user "GET new user" Read
+  withReaderT (fmap pure) . basicPage =<< generateNewForm (Proxy @User)
 
-getUserForUpdate :: (CanAppM c e m) => UserLogin -> UserKey -> m H.Html
-getUserForUpdate userId user = do
-  checkPermission userId "GET update user" Read
-  userUpdateForm =<< Website.Data.User.getUser user
+getUserForUpdate :: (CanAppM' UserLogin c e m) => UserKey -> m H.Html
+getUserForUpdate userKey = do
+  user <- asks auth
+  checkPermission user "GET update user" Read
+  userUpdateForm =<< Website.Data.User.getUser userKey
 
 -- Entry forms
 entryUpdateForm :: (HasEnv c, MonadReader c m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
-entryCreationForm :: (CanAppM c e m) => Authed -> UserLogin -> m Html
-entryCreationForm auth user = do
+entryCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
+entryCreationForm = do
+  user <- asks auth
   checkPermission user "GET new entry" Write
-  basicPage auth <$> generateNewForm (Proxy @Entry)
+  withReaderT (fmap pure) . basicPage =<< generateNewForm (Proxy @Entry)
 
-getEntryForUpdate :: (CanAppM c e m) => UserLogin -> EntryKey -> m H.Html
-getEntryForUpdate user entry = do
+getEntryForUpdate :: (CanAppM' UserLogin c e m) => EntryKey -> m H.Html
+getEntryForUpdate entry = do
+  user <- asks auth
   checkPermission user "GET update entry" Read
   entryUpdateForm =<< Website.Data.Entry.getEntry entry

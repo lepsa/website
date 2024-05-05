@@ -49,6 +49,8 @@ instance ToJSON UserLogin
 instance FromJSON UserLogin
 instance ToJWT UserLogin
 instance FromJWT UserLogin
+instance FromRow UserLogin where
+  fromRow = UserLogin <$> field <*> field
 
 data User = User
   { uuid :: UserKey,
@@ -80,9 +82,9 @@ data UserUpdate = UserUpdate
 
 instance FromForm UserUpdate where
   fromForm f = do
-    old <- parseUnique "oldPassword" f
-    new <- parseUnique "newPassword" f
-    group <- parseUnique "group" f
+    old <- parseMaybe "oldPassword" f
+    new <- parseMaybe "newPassword" f
+    group <- parseMaybe "group" f
     let password = UpdatePassword <$> old <*> new
     pure $ UserUpdate password group
 
@@ -145,6 +147,15 @@ getUserIdIO c email =
 getUserId :: (CanAppM c e m) => Text -> m UserKey
 getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
 
+getUserLoginIO :: Connection -> UserKey -> IO (Either Err UserLogin)
+getUserLoginIO c k =
+  query c "select id, email from user where id = ?" (Only k)
+    >>= ensureSingleResult
+
+getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
+getUserLogin k =
+  asks conn >>= liftIO . flip getUserLoginIO k >>= liftEither_
+
 updateUser :: (CanAppM c e m) => UserKey -> UserUpdate -> m User
 updateUser key update = do
   c <- asks conn
@@ -175,3 +186,8 @@ deleteUser key = do
       do
         execute c "delete from user where id = ?" (Only key)
         execute c "delete from user_login where id = ?" (Only key)
+
+getUsers :: CanAppM c e m => m [User]
+getUsers = do
+  c <- asks conn
+  liftIO $ withTransaction c $ query_ c "select id, email, group_name from user"

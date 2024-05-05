@@ -5,34 +5,37 @@ import Website.Data.Error
 import Website.Content.Common
 import Text.Blaze.Html.Renderer.Utf8 qualified as H
 import Text.Blaze.Html5 qualified as H
+import Website.Data.User
+import Website.Data.Env
+import Control.Monad.Reader
 
-unauthenticated :: Authed -> ServerError
-unauthenticated auth = err401
-  { errBody = H.renderHtml $ basicPage auth $ H.p "Unauthenticated"
-  }
+unauthenticated :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m ServerError
+unauthenticated = do
+  h <- basicPage $ H.p "Unauthenticated"
+  pure $ err401 { errBody = H.renderHtml h }
 
-unauthorised :: Authed -> ServerError
-unauthorised auth = err403
-  { errBody = H.renderHtml $ basicPage auth $ H.p "Unauthorised"
-  }
+unauthorised :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m ServerError
+unauthorised = do
+  h <- basicPage $ H.p "Unauthorised"
+  pure $ err403 { errBody = H.renderHtml h }
 
-internalServerError :: Authed -> ServerError
-internalServerError auth = err500
-  { errBody = H.renderHtml $ basicPage auth $ H.p "Internal Server Error"
-  }
+internalServerError :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m ServerError
+internalServerError = do
+  h <- basicPage $ H.p "Internal Server Error"
+  pure $ err500 { errBody = H.renderHtml h }
 
-notFound :: Authed -> ServerError
-notFound auth = err404
-  { errBody = H.renderHtml $ basicPage auth $ H.p "Not Found"
-  }
+notFound :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m ServerError
+notFound = do
+  h <- basicPage $ H.p "Not Found"
+  pure $ err404 { errBody = H.renderHtml h }
 
-errToServerError :: Authed -> Err -> ServerError
-errToServerError auth (DbError e) = dbErrToServerError auth e
-errToServerError auth Unauthenticated = unauthenticated auth
-errToServerError auth Unauthorised = unauthorised auth
-errToServerError auth (Other _) = internalServerError auth
+errToServerError :: MonadReader (EnvAuthed (Maybe UserLogin)) m => Err -> m ServerError
+errToServerError (DbError e) = dbErrToServerError e
+errToServerError Unauthenticated = unauthenticated
+errToServerError Unauthorised = unauthorised
+errToServerError (Other _) = internalServerError
 
-dbErrToServerError :: Authed -> DbErr -> ServerError
-dbErrToServerError auth NotFound = notFound auth
-dbErrToServerError auth TooManyResults = notFound auth
-dbErrToServerError auth FailedToInsertRecord = internalServerError auth
+dbErrToServerError :: MonadReader (EnvAuthed (Maybe UserLogin)) m => DbErr -> m ServerError
+dbErrToServerError NotFound = notFound
+dbErrToServerError TooManyResults = notFound
+dbErrToServerError FailedToInsertRecord = internalServerError

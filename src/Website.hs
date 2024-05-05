@@ -8,6 +8,7 @@ import Data.Proxy
 import Data.Time
 import Database.SQLite.Simple hiding ((:.))
 import Network.Wai.Handler.Warp
+import Network.Wai.Handler.WarpTLS
 import Servant.Auth.Server
 import Servant.Server
 import System.Directory
@@ -20,6 +21,7 @@ import Website.Data.Env
 import Website.Auth.Authentication
 import Website.Data.Error
 import Website.Content.Error
+import Control.Monad.Reader
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -50,19 +52,28 @@ startServer' onStartup api serverM dbPath port = do
     -- Update the schema to what the application wants
     runMigrations
   jwtKey <- getJwtKey conf
-  let jwtSettings = defaultJWTSettings jwtKey
+  let -- TODO: Find a way to check if the user identified
+      -- by the JWT/Cookie still exists, as it is possible that a
+      -- user accound is deleted while the JWT is valid, meaning
+      -- that the website will accept a non-associated UUID as
+      -- user
+      jwtSettings = defaultJWTSettings jwtKey
       cookieSettings = defaultCookieSettings
         { cookieXsrfSetting = pure defaultXsrfCookieSettings
           { xsrfExcludeGet = True
           }
+        , cookieMaxAge = pure $ 7 * 24 * 60 * 60 -- 7 days to seconds
         }
+      -- Basic auth checks the user/password each time, so it already
+      -- handles a user being deleted between user requests.
       cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
       warpSettings = setBeforeMainLoop onStartup $ setPort port defaultSettings
-  runSettings warpSettings $
+  let tls = defaultTlsSettings
+  runTLS tls warpSettings $
     serveWithContext api cfg $
       hoistServerWithContext api
         (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
-        (runAppMToHandler (errToServerError Indefinite) conf) $
+        (runAppMToHandler (flip runReaderT (mkEnvAuthed Nothing conf) . errToServerError) conf) $
         serverM cookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()

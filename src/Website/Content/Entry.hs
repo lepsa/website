@@ -14,6 +14,7 @@ import Website.Data.Entry
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Data.Env
+import Website.Data.User (UserLogin)
 
 
 -- | Display an entry, with edit and delete buttons
@@ -58,22 +59,21 @@ entryDisplay entry = do
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
-entryDisplayFullPage :: (HasEnv c, MonadReader c m) => Authed -> Entry -> m Html
-entryDisplayFullPage auth = fmap (basicPage auth) . entryDisplay
+entryDisplayFullPage :: MonadReader (EnvAuthed (Maybe UserLogin)) m => Entry -> m Html
+entryDisplayFullPage = basicPage <=< entryDisplay
 
 -- | List all entries as a page
-entryList :: (HasEnv c, MonadReader c m) => Authed -> [Entry] -> m Html
-entryList auth entries = do
+entryList :: MonadReader (EnvAuthed (Maybe UserLogin)) m => [Entry] -> m Html
+entryList entries = do
   tz <- asks timeZone
-  pure $
-    basicPage auth $
-      mconcat
-        [ H.h2 "Entries",
-          newEntry,
-          H.ul $
-            mconcat $
-              entryLink tz <$> sortEntries entries
-        ]
+  basicPage $
+    mconcat
+      [ H.h2 "Entries",
+        newEntry,
+        H.ul $
+          mconcat $
+            entryLink tz <$> sortEntries entries
+      ]
   where
     entryLink :: TimeZone -> Entry -> Html
     entryLink tz entry =

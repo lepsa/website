@@ -17,12 +17,14 @@ data DbErr
   deriving (Eq, Ord, Show)
 
 class AsErr e where
-  err :: Err -> e
+  fromErr :: Err -> e
+  toErr :: e -> Maybe Err
 instance AsErr Err where
-  err = id
+  fromErr = id
+  toErr = pure
 
 liftEither_ :: (MonadError e m, AsErr e) => Either Err a -> m a
-liftEither_ = either (throwError . err) pure
+liftEither_ = either (throwError . fromErr) pure
 
 throwError_ :: (MonadError e m, AsErr e) => Err -> m a
-throwError_ = throwError . err
+throwError_ = throwError . fromErr

@@ -74,27 +74,27 @@ createEntry (EntryCreate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning key, created, title, value" (title, value)
   case entries of
-    [] -> throwError $ err $ DbError NotFound
+    [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ err $ DbError TooManyResults
+    _ -> throwError $ fromErr $ DbError TooManyResults
 
 getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value from entry where key = ?" (Only key)
   case entries of
-    [] -> throwError $ err $ DbError NotFound
+    [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ err $ DbError TooManyResults
+    _ -> throwError $ fromErr $ DbError TooManyResults
 
 updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning key, created, title, value" (title, value, key)
   case entries of
-    [] -> throwError $ err $ DbError NotFound
+    [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ err $ DbError TooManyResults
+    _ -> throwError $ fromErr $ DbError TooManyResults
 
 deleteEntry :: (CanAppM c e m) => EntryKey -> m ()
 deleteEntry key = do

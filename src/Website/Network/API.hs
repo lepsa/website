@@ -12,78 +12,95 @@ import Website.Network.API.CRUD
 import Data.Text (Text)
 import Website.Network.API.Types
 import Website.Data.Error
-import Website.Content.User (userDisplayFullPage, userDisplay)
+import Website.Content.User (userDisplayFullPage, userDisplay, userList)
 import Website.Data.User
 import Control.Monad.IO.Class
 import Servant.Auth.Server
 import Website.Data.Permission (checkPermission)
 import Website.Auth.Authorisation (Access(Read, Write))
+import Website.Data.Env (EnvAuthed, auth)
+import Control.Monad.Reader
 
-getIndex :: (CanAppM c e m) => Authed -> m H.Html
-getIndex = pure . index
+getIndex :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m H.Html
+getIndex = index
 
 --
 -- Entry pages
 --
 
 -- Create an Entry and get its value back as Html
-postEntry :: (CanAppM c e m) => UserLogin -> EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
-postEntry user create = do
+postEntry :: (CanAppM' UserLogin c e m) => EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
+postEntry create = do
+  user <- asks auth
   checkPermission user "POST entry" Write
   entry <- createEntry create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key
   pure $ addHeader link mempty
 
 -- Get a given Entry
-getEntry :: (CanAppM c e m) => Authed -> UserLogin -> EntryKey -> m H.Html
-getEntry auth user key = do
+getEntry :: EntryKey -> AppM (EnvAuthed UserLogin) Err IO H.Html
+getEntry key = do
+  user <- asks auth
   checkPermission user "GET entry" Read
-  entryDisplayFullPage auth =<< Website.Data.Entry.getEntry key
+  withReaderT (fmap pure) . entryDisplayFullPage =<< Website.Data.Entry.getEntry key
 
 -- Update a given entry and get the new value back
-putEntry :: (CanAppM c e m) => UserLogin -> EntryKey -> EntryUpdate -> m H.Html
-putEntry user key value = do
+putEntry :: (CanAppM' UserLogin c e m) => EntryKey -> EntryUpdate -> m H.Html
+putEntry key value = do
+  user <- asks auth
   checkPermission user "PUT entry" Write
   entryDisplay =<< updateEntry key value
 
 -- Delete a given Entry, and get a confirmation response
-deleteEntry :: (CanAppM c e m) => UserLogin -> EntryKey -> m H.Html
-deleteEntry user key = do
+deleteEntry :: (CanAppM' UserLogin c e m) => EntryKey -> m H.Html
+deleteEntry key = do
+  user <- asks auth
   checkPermission user "DELETE entry" Write
   Website.Data.Entry.deleteEntry key
   pure $ H.toHtml @String "Deleted"
 
 -- Get all of the Entries as a list
-getEntries :: (CanAppM c e m) => Authed -> UserLogin -> m H.Html
-getEntries auth user = do
+getEntries :: AppM (EnvAuthed UserLogin) Err IO H.Html
+getEntries = do
+  user <- asks auth
   checkPermission user "GET entries" Read
-  entryList auth =<< Website.Data.Entry.getEntries
+  withReaderT (fmap pure) . entryList =<< Website.Data.Entry.getEntries
 
 --
 -- User Pages
 --
-postUser :: (CanAppM c e m) => UserLogin -> UserCreate -> m (Headers '[Header "Location" Text] H.Html)
-postUser userId create = do
-  checkPermission userId "POST user" Write
-  user <- createUser create
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
+postUser :: (CanAppM' UserLogin c e m) => UserCreate -> m (Headers '[Header "Location" Text] H.Html)
+postUser create = do
+  user <- asks auth
+  checkPermission user "POST user" Write
+  newUser <- createUser create
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) newUser.uuid
   pure $ addHeader link mempty
 
-getUser :: CanAppM c e m => Authed -> UserLogin -> UserKey -> m H.Html
-getUser auth userId key = do
-  checkPermission userId "GET user" Read
-  userDisplayFullPage auth =<< Website.Data.User.getUser key
+getUser :: UserKey -> AppM (EnvAuthed UserLogin) Err IO H.Html
+getUser key = do
+  user <- asks auth
+  checkPermission user "GET user" Read
+  userDisplayFullPage =<< Website.Data.User.getUser key
 
-putUser :: CanAppM c e m => UserLogin -> UserKey -> UserUpdate -> m H.Html
-putUser userId key update = do
-  checkPermission userId "PUT user" Write
+putUser :: CanAppM' UserLogin c e m => UserKey -> UserUpdate -> m H.Html
+putUser key update = do
+  user <- asks auth
+  checkPermission user "PUT user" Write
   userDisplay =<< updateUser key update
 
-deleteUser :: CanAppM c e m => UserLogin -> UserKey -> m H.Html
-deleteUser userId key = do
-  checkPermission userId "DELETE user" Write
+deleteUser :: CanAppM' UserLogin c e m => UserKey -> m H.Html
+deleteUser key = do
+  user <- asks auth
+  checkPermission user "DELETE user" Write
   Website.Data.User.deleteUser key
   pure $ H.toHtml @String "Delete"
+
+getUsers :: AppM (EnvAuthed UserLogin) Err IO H.Html
+getUsers = do
+  user <- asks auth
+  checkPermission user "GET users" Read
+  userList =<< Website.Data.User.getUsers
 
 register :: CanAppM c e m => Authed -> CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register _auth cookieSettings jwtSettings cUser = do

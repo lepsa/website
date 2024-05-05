@@ -38,8 +38,7 @@ testServer :: ServerT TestAPI (AppM Env Err IO)
 testServer = reset :<|> getUsers :<|> getEntries
 
 reset :: AppM Env Err IO NoContent
-reset = do
-  asks conn >>= liftIO . resetDb
+reset = asks conn >>= liftIO . resetDb
 
 getUsers :: AppM Env Err IO [User]
 getUsers = asks conn >>= liftIO . getAllUsers

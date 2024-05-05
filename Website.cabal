@@ -24,6 +24,7 @@ common warnings
                   , servant
                   , servant-server
                   , warp
+                  , warp-tls
                   , aeson
                   , blaze-html
                   , blaze-markup

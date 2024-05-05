@@ -126,7 +126,8 @@ migrateSchemaV4 =
     "insert into permission(name, group_name, access) values ('POST user', 'Admin', 'Write')",
     "insert into permission(name, group_name, access) values ('GET user', 'Admin', 'Read')",
     "insert into permission(name, group_name, access) values ('PUT user', 'Admin', 'Write')",
-    "insert into permission(name, group_name, access) values ('DELETE user', 'Admin', 'Write')"
+    "insert into permission(name, group_name, access) values ('DELETE user', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET users', 'Admin', 'Read')"
   ]
 
 migrations :: [(Version, [Query])]
