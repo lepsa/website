@@ -8,7 +8,6 @@ import Data.Proxy
 import Data.Time
 import Database.SQLite.Simple hiding ((:.))
 import Network.Wai.Handler.Warp
-import Network.Wai.Handler.Warp.Internal
 import Network.Wai.Handler.WarpTLS
 import Servant.Auth.Server
 import Servant.Server
@@ -69,9 +68,7 @@ startServer' onStartup api serverM dbPath port = do
       -- handles a user being deleted between user requests.
       cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
       warpSettings =
-        setBeforeMainLoop onStartup $
-          setPort port $ defaultSettings
-            { settingsHTTP2Enabled = False}
+        setBeforeMainLoop onStartup $ setPort port defaultSettings
   let tls = defaultTlsSettings
   runTLS tls warpSettings $
     serveWithContext api cfg $
