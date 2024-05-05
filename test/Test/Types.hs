@@ -21,6 +21,7 @@ import Data.Map (Map)
 import Data.Map qualified as M
 import Control.Lens
 import Data.Kind
+import Data.Maybe (catMaybes)
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -334,8 +335,8 @@ instance ToForm (CreateUser v) where
     ]
 
 instance ToForm (UpdateUser v) where
-  toForm update = fromList
-    [ ("oldPassword", toQueryParam $ update ^? uuPassword . _Just . oldPassword)
-    , ("newPassword", toQueryParam $ update ^? uuPassword . _Just . newPassword)
-    , ("group", maybe mempty toQueryParam $ update ^. uuGroup)
+  toForm update = fromList $ catMaybes
+    [ (\p -> ("oldPassword", toQueryParam p)) <$> update ^? uuPassword . _Just . oldPassword
+    , (\p -> ("newPassword", toQueryParam p)) <$> update ^? uuPassword . _Just . newPassword
+    , (\g -> ("group", toQueryParam g)) <$> update ^. uuGroup
     ]

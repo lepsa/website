@@ -64,9 +64,10 @@ data UpdatePassword = UpdatePassword
   { oldPassword :: Text,
     newPassword :: Text
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance FromForm UpdatePassword where
+  fromForm :: Form -> Either Text UpdatePassword
   fromForm f =
     UpdatePassword
       <$> parseUnique "oldPassword" f
@@ -76,7 +77,7 @@ data UserUpdate = UserUpdate
   { password :: Maybe UpdatePassword,
     group :: Maybe Group
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance FromForm UserUpdate where
   fromForm f = do
