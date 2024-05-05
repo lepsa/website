@@ -104,7 +104,11 @@ emailExists state command = any (\u -> u ^. email == command ^. email) state._us
 
 userExists :: (HasAuth r, Ord1 v) => ApiState v -> r v -> Bool
 userExists state command = case command ^. auth of
-  Normal user -> M.member (user ^. key) state._users
+  Normal user -> case M.lookup (user ^. key) state._users of
+    Just u -> u ^. tuEmail == user ^. akUser . tuEmail &&
+              u ^. tuPassword == user ^. akUser . tuPassword &&
+              u ^. tuGroup == user ^. akUser . tuGroup
+    Nothing -> False
   Bad _ -> True
 
 userGroupAdmin :: (HasAuth r) => a -> r v -> Bool

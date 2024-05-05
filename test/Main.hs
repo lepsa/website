@@ -3,11 +3,13 @@ module Main (main) where
 import Control.Concurrent
 import Hedgehog
 import Network.HTTP.Client qualified as H
+import Network.HTTP.Client.TLS qualified as H
 import Network.HTTP.Types qualified as H
 import Test.Api (testTopAPI, testTopServer)
 import Test.StateMachine
 import Test.Types
 import Website
+import Network.Connection (TLSSettings(..))
 
 main :: IO Bool
 main = do
@@ -25,8 +27,8 @@ main = do
   -- Wait for the server to start
   takeMVar ready
 
-  mgr <- H.newManager H.defaultManagerSettings
-  let baseUrl = "http://localhost:" <> show port
+  mgr <- H.newTlsManagerWith $ H.mkManagerSettings (TLSSettingsSimple True undefined undefined) Nothing
+  let baseUrl = "https://localhost:" <> show port
       env = TestEnv mgr baseUrl
       reset = do
         -- This request here isn't type checked, but as it

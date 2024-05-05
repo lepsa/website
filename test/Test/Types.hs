@@ -337,5 +337,5 @@ instance ToForm (UpdateUser v) where
   toForm update = fromList
     [ ("oldPassword", toQueryParam $ update ^? uuPassword . _Just . oldPassword)
     , ("newPassword", toQueryParam $ update ^? uuPassword . _Just . newPassword)
-    , ("group", toQueryParam $ update ^. uuGroup)
+    , ("group", maybe mempty toQueryParam $ update ^. uuGroup)
     ]
