@@ -8,6 +8,7 @@ import Data.Proxy
 import Data.Time
 import Database.SQLite.Simple hiding ((:.))
 import Network.Wai.Handler.Warp
+import Network.Wai.Handler.Warp.Internal
 import Network.Wai.Handler.WarpTLS
 import Servant.Auth.Server
 import Servant.Server
@@ -59,7 +60,7 @@ startServer' onStartup api serverM dbPath port = do
       -- user
       jwtSettings = defaultJWTSettings jwtKey
       cookieSettings = defaultCookieSettings
-        { cookieXsrfSetting = pure defaultXsrfCookieSettings
+        { cookieXsrfSetting = pure $ defaultXsrfCookieSettings
           { xsrfExcludeGet = True
           }
         , cookieMaxAge = pure $ 7 * 24 * 60 * 60 -- 7 days to seconds
@@ -67,7 +68,10 @@ startServer' onStartup api serverM dbPath port = do
       -- Basic auth checks the user/password each time, so it already
       -- handles a user being deleted between user requests.
       cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
-      warpSettings = setBeforeMainLoop onStartup $ setPort port defaultSettings
+      warpSettings =
+        setBeforeMainLoop onStartup $
+          setPort port $ defaultSettings
+            { settingsHTTP2Enabled = False}
   let tls = defaultTlsSettings
   runTLS tls warpSettings $
     serveWithContext api cfg $

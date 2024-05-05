@@ -21,7 +21,6 @@ import Website.Data.Error
 import Website.Network.API.CRUD
 import Website.Data.User (UserKey, getUserLogin, UserLogin, UserUpdate, UserCreate)
 import Website.Data.Entry (EntryCreate, EntryUpdate, EntryKey)
-import qualified Debug.Trace as T
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -115,7 +114,6 @@ server cookieSettings jwtSettings currentDirectory = api
       -> ReaderT Env (ExceptT Err m') b
     withUnprotected (Authenticated userKey) m = do
       userLogin <- withError userLookupErrors $ getUserLogin userKey
-      T.traceShowM userLogin
       withReaderT (mkEnvAuthed $ Just userLogin) m
     withUnprotected _ m = withReaderT (mkEnvAuthed Nothing) m
   

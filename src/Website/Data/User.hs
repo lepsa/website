@@ -47,8 +47,6 @@ data UserLogin = UserLogin
   } deriving (Eq, Show, Generic)
 instance ToJSON UserLogin
 instance FromJSON UserLogin
-instance ToJWT UserLogin
-instance FromJWT UserLogin
 instance FromRow UserLogin where
   fromRow = UserLogin <$> field <*> field
 

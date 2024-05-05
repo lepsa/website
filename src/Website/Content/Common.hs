@@ -70,7 +70,10 @@ pageHeader = do
   loggedIn <- whenLoggedIn greetUser
   pure $ H.header $
     mconcat $ catMaybes
-      [ pure $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
+      [ pure $ H.a
+          ! dataAttribute "hx-boost" "true"
+          ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+          ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
           H.h1 $ toHtml siteTitle
       , loggedIn
       ]
@@ -107,10 +110,16 @@ sideNav = do
   pure $ H.nav $
     H.ul $
       mconcat $ catMaybes
-        [ pure $ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
+        [ pure $ H.li $ H.a
+          ! dataAttribute "hx-boost" "true"
+          ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+          ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
           mHtml,
           pure H.hr,
-          pure $ H.li $ H.a ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
+          pure $ H.li $ H.a
+          ! dataAttribute "hx-boost" "true"
+          ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+          ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
           pure H.hr,
           pure $ H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
