@@ -52,12 +52,7 @@ startServer' onStartup api serverM dbPath port = do
     -- Update the schema to what the application wants
     runMigrations
   jwtKey <- getJwtKey conf
-  let -- TODO: Find a way to check if the user identified
-      -- by the JWT/Cookie still exists, as it is possible that a
-      -- user accound is deleted while the JWT is valid, meaning
-      -- that the website will accept a non-associated UUID as
-      -- user
-      jwtSettings = defaultJWTSettings jwtKey
+  let jwtSettings = defaultJWTSettings jwtKey
       cookieSettings = defaultCookieSettings
         { cookieXsrfSetting = pure $ defaultXsrfCookieSettings
           { xsrfExcludeGet = True
