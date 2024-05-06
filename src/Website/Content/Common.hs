@@ -175,6 +175,26 @@ formField fieldName fieldLabel type_ value =
         _ -> H.input ! HA.class_ "formvalue" ! HA.name (toValue fieldName) ! HA.type_ (toValue type_) ! maybe mempty (HA.value . stringValue) value
     ]
 
+selectField :: forall a. (Eq a, Enum a, Bounded a, Show a) => String -> String -> Maybe a -> Html
+selectField fieldName fieldLabel value =
+  mconcat
+    [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
+      H.select ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ mconcat $
+        mkOption <$> [minBound..maxBound]
+    ]
+  where
+    mkOption :: a -> Html
+    mkOption option =
+      H.option
+        ! HA.value (stringValue val)
+        ! maybe mempty selected value
+        $ toHtml val
+      where
+        val = show option
+        selected a = if a == option
+          then HA.selected "true"
+          else mempty
+
 -- | Helper function for building textarea inputs
 formFieldTextArea :: String -> String -> Maybe String -> Html
 formFieldTextArea fieldName fieldLabel value =

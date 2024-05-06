@@ -17,7 +17,7 @@ import qualified Data.Text as T
 data Group
   = User
   | Admin
-  deriving (Eq, Show, Read, Ord, Generic)
+  deriving (Eq, Show, Read, Ord, Generic, Bounded, Enum)
 instance FromHttpApiData Group where
   parseQueryParam t = maybe (Left $ "Could not parse Group: " <> t) pure . readMaybe $ T.unpack t
 -- instance ToJSON Group

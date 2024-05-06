@@ -1,3 +1,4 @@
+{-# LANGUAGE FunctionalDependencies #-}
 module Website.Content.Forms where
 
 import Control.Monad.Reader
@@ -15,46 +16,52 @@ import Website.Data.User
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
-import Website.Auth.Authorisation (Access(Read, Write))
+import Website.Auth.Authorisation (Access(Read, Write), Group)
 import Website.Data.Permission
 import Website.Data.Error
 
 -- | Values for a given form field
-data FieldData
+data FieldData a
   = FieldData
-      { label :: String,
-        name :: String,
-        type_ :: String,
-        value :: Maybe String
+      { fieldLabel :: String,
+        fieldName :: String,
+        fieldType :: String,
+        fieldValue :: Maybe String
       }
   | StaticData
-      { label :: String,
-        name :: String,
-        value :: Maybe String
+      { staticLabel :: String,
+        staticName :: String,
+        staticValue :: Maybe String
+      }
+  | SelectData
+      { selectLabel :: String
+      , selectName :: String
+      , selectValue :: Maybe a
       }
 
 -- | Overall data for creation and update forms.
-data FormData = FormData
+data FormData a = FormData
   { title :: String,
     createUrl :: Maybe String,
     updateUrl :: Maybe String,
-    fields :: [FieldData]
+    fields :: [FieldData a]
   }
 
 -- | Helper function for generating forms
-generateField :: FieldData -> Html
+generateField :: (Show a, Eq a, Enum a, Bounded a) => FieldData a -> Html
 generateField fd = case fd of
-  FieldData {} -> formField fd.name fd.label fd.type_ fd.value
-  StaticData {} -> staticField fd.name fd.label fd.value
+  FieldData {} -> formField fd.fieldName fd.fieldLabel fd.fieldType fd.fieldValue
+  StaticData {} -> staticField fd.staticName fd.staticLabel fd.staticValue
+  SelectData {} -> selectField fd.selectName fd.selectLabel fd.selectValue
 
-class GenerateForm a where
-  newForm :: (HasEnv c, MonadReader c m) => Proxy a -> m FormData
-  updateForm :: (HasEnv c, MonadReader c m) => a -> m FormData
+class (Show b, Bounded b, Enum b, Eq b) => GenerateForm a b | a -> b where
+  newForm :: (HasEnv c, MonadReader c m) => Proxy a -> m (FormData b)
+  updateForm :: (HasEnv c, MonadReader c m) => a -> m (FormData b)
 
 --
 -- What an Entry should look like in HTML
 --
-instance GenerateForm Entry where
+instance GenerateForm Entry () where
   newForm _ =
     pure $
       FormData
@@ -63,16 +70,16 @@ instance GenerateForm Entry where
           updateUrl = Nothing,
           fields =
             [ FieldData
-                { label = "Title",
-                  name = "title",
-                  type_ = "text",
-                  value = Nothing
+                { fieldLabel = "Title",
+                  fieldName = "title",
+                  fieldType = "text",
+                  fieldValue = Nothing
                 },
               FieldData
-                { label = "Value",
-                  name = "value",
-                  type_ = "textarea",
-                  value = Nothing
+                { fieldLabel = "Value",
+                  fieldName = "value",
+                  fieldType = "textarea",
+                  fieldValue = Nothing
                 }
             ]
         }
@@ -85,26 +92,26 @@ instance GenerateForm Entry where
           updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
           fields =
             [ FieldData
-                { label = "Title",
-                  name = "title",
-                  type_ = "text",
-                  value = pure entry.title
+                { fieldLabel = "Title",
+                  fieldName = "title",
+                  fieldType = "text",
+                  fieldValue = pure entry.title
                 },
               StaticData
-                { label = "Created",
-                  name = "created",
-                  value = pure $ entryTimeFormat tz entry.created
+                { staticLabel = "Created",
+                  staticName = "created",
+                  staticValue = pure $ entryTimeFormat tz entry.created
                 },
               FieldData
-                { label = "Value",
-                  name = "value",
-                  type_ = "textarea",
-                  value = pure entry.value
+                { fieldLabel = "Value",
+                  fieldName = "value",
+                  fieldType = "textarea",
+                  fieldValue = pure entry.value
                 }
             ]
         }
 
-instance GenerateForm User where
+instance GenerateForm User Group where
   newForm _ =
     pure $
       FormData
@@ -113,22 +120,21 @@ instance GenerateForm User where
           updateUrl = Nothing,
           fields =
             [ FieldData
-                { label = "Email",
-                  name = "email",
-                  type_ = "text",
-                  value = Nothing
+                { fieldLabel = "Email",
+                  fieldName = "email",
+                  fieldType = "text",
+                  fieldValue = Nothing
                 },
               FieldData
-                { label = "Password",
-                  name = "password",
-                  type_ = "password",
-                  value = Nothing
+                { fieldLabel = "Password",
+                  fieldName = "password",
+                  fieldType = "password",
+                  fieldValue = Nothing
                 },
-              FieldData
-                { label = "Group",
-                  name = "group",
-                  type_ = "group",
-                  value = Nothing
+              SelectData
+                { selectLabel = "Group",
+                  selectName = "group",
+                  selectValue = Nothing
                 }
             ]
         }
@@ -140,33 +146,32 @@ instance GenerateForm User where
           updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
           fields =
             [ StaticData
-                { label = "Email",
-                  name = "email",
-                  value = pure $ T.unpack user.email
+                { staticLabel = "Email",
+                  staticName = "email",
+                  staticValue = pure $ T.unpack user.email
                 },
               FieldData
-                { label = "Old Password",
-                  name = "oldPassword",
-                  type_ = "password",
-                  value = Nothing
+                { fieldLabel = "Old Password",
+                  fieldName = "oldPassword",
+                  fieldType = "password",
+                  fieldValue = Nothing
                 },
               FieldData
-                { label = "New Password",
-                  name = "newPassword",
-                  type_ = "password",
-                  value = Nothing
+                { fieldLabel = "New Password",
+                  fieldName = "newPassword",
+                  fieldType = "password",
+                  fieldValue = Nothing
                 },
-              FieldData
-                { label = "Group",
-                  name = "group",
-                  type_ = "text",
-                  value = pure $ show user.group
+              SelectData
+                { selectLabel = "Group",
+                  selectName = "group",
+                  selectValue = pure user.group
                 }
             ]
         }
 
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
-generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a) => Proxy a -> m Html
+generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a b) => Proxy a -> m Html
 generateNewForm p = do
   fd <- newForm p
   pure
@@ -185,7 +190,7 @@ generateNewForm p = do
       ]
 
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
-generateUpdateForm :: (HasEnv c, MonadReader c m, GenerateForm a) => a -> m Html
+generateUpdateForm :: (HasEnv c, MonadReader c m, GenerateForm a b) => a -> m Html
 generateUpdateForm a = do
   fd <- updateForm a
   pure

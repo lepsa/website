@@ -1,3 +1,11 @@
+html {
+  font-size: 100%;
+}
+
+select, textarea, input, button {
+  font: inherit;
+}
+
 body {
   background-color: #D3D3D3;
 }
@@ -17,12 +25,12 @@ h1 {
 
 nav {
   display: inline-block;
-  margin: 10px;
+  margin: 1rem;
 }
 
 main {
   display: inline-block;
-  margin: 10px;
+  margin: 1rem;
 }
 
 nav ul {
@@ -34,7 +42,7 @@ nav ul li {
 }
 
 label {
-  padding-right: 5px;
+  padding-right: 0.5rem;
 }
 
 .contentform {
