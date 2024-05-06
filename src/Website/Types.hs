@@ -18,7 +18,7 @@ type CanAppM' a c e m = (HasAuth c a, HasEnv c, AsErr e, MonadReader c m, MonadE
 runAppM :: c -> AppM c e m a -> m (Either e a)
 runAppM c m = runExceptT $ runReaderT m c
 
-runAppMToHandler :: (Err -> AppM c ServerError IO ServerError) -> c -> AppM c Err IO a -> Handler a
+runAppMToHandler :: (Err -> Reader c ServerError) -> c -> AppM c Err IO a -> Handler a
 runAppMToHandler f c m = do
   e <- liftIO $ runAppM c m
-  either (either throwError throwError <=< liftIO . runAppM c . f) pure e
+  either (throwError . flip runReader c . f) pure e

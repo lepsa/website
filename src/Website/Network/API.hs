@@ -38,11 +38,12 @@ postEntry create = do
   pure $ addHeader link mempty
 
 -- Get a given Entry
-getEntry :: EntryKey -> AppM (EnvAuthed UserLogin) Err IO H.Html
+getEntry :: (CanAppM c e m, RequiredUser c) => EntryKey -> m H.Html
 getEntry key = do
   user <- asks auth
   checkPermission user "GET entry" Read
-  withReaderT (fmap pure) . entryDisplayFullPage =<< Website.Data.Entry.getEntry key
+  e <- Website.Data.Entry.getEntry key
+  entryDisplayFullPage e
 
 -- Update a given entry and get the new value back
 putEntry :: (CanAppM' UserLogin c e m) => EntryKey -> EntryUpdate -> m H.Html
@@ -77,7 +78,7 @@ postUser create = do
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) newUser.uuid
   pure $ addHeader link mempty
 
-getUser :: UserKey -> AppM (EnvAuthed UserLogin) Err IO H.Html
+getUser :: (CanAppM c e m, RequiredUser c) => UserKey -> m H.Html
 getUser key = do
   user <- asks auth
   checkPermission user "GET user" Read

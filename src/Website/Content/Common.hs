@@ -32,9 +32,9 @@ tryError action = (Right <$> action) `catchError` (pure . Left)
 withError :: MonadError e m => (e -> e) -> m a -> m a
 withError f action = tryError action >>= either (throwError . f) pure
 
-whenLoggedIn :: (HasAuth c (Maybe UserLogin), MonadReader c m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
+whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
 whenLoggedIn f = do
-  mUser <- asks auth
+  mUser <- asks mAuth
   case mUser of
     Nothing -> pure Nothing
     Just user -> pure $ pure $ f user
@@ -65,7 +65,7 @@ linkText ::
 linkText api = pack "/" <> toUrlPiece (safeLink topAPI api)
 
 -- | A common location for common header elements
-pageHeader :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+pageHeader :: (OptionalUser c, MonadReader c m) => m Html
 pageHeader = do
   loggedIn <- whenLoggedIn greetUser
   pure $ H.header $
@@ -95,7 +95,7 @@ commonHead =
       ]
 
 -- | Builds the list of links on the side. Invoked by 'basicPage'
-sideNav :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+sideNav :: (OptionalUser c, MonadReader c m) => m Html
 sideNav = do
   mHtml <- whenLoggedIn $ \_ -> mconcat
     [ H.li $ H.a
@@ -128,7 +128,7 @@ sideNav = do
 --  user. This could be due to a page refresh, bookmark, history, etc.
 --  'basicPage' includes all content and overall page structure that is required for styling and
 --  HTMX interactivity.
-basicPage :: MonadReader (EnvAuthed (Maybe UserLogin)) m => Html -> m Html
+basicPage :: (OptionalUser c, MonadReader c m) => Html -> m Html
 basicPage content = do
   header <- pageHeader
   nav <- sideNav

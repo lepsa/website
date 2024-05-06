@@ -14,7 +14,7 @@ import Website.Data.Entry
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Data.Env
-import Website.Data.User (UserLogin)
+import Website.Data.User (UserLogin, OptionalUser)
 
 
 -- | Display an entry, with edit and delete buttons
@@ -59,7 +59,7 @@ entryDisplay entry = do
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
-entryDisplayFullPage :: MonadReader (EnvAuthed (Maybe UserLogin)) m => Entry -> m Html
+entryDisplayFullPage :: (HasEnv c, OptionalUser c) => MonadReader c m => Entry -> m Html
 entryDisplayFullPage = basicPage <=< entryDisplay
 
 -- | List all entries as a page

@@ -59,7 +59,7 @@ server cookieSettings jwtSettings currentDirectory = api
     getLogin :: AppM (EnvAuthed (Maybe UserLogin)) Err IO Html
     getLogin = loginForm
 
-    login :: Login -> AppM Env Err IO (SetLoginCookies NoContent)
+    login :: CanAppM c e m => Login -> m (SetLoginCookies NoContent)
     login (Login user pass) = do
       c <- asks conn
       eUserId <- runExceptT $ checkUserPassword c (T.pack user) (T.pack pass)
@@ -96,10 +96,10 @@ server cookieSettings jwtSettings currentDirectory = api
     -- 2) Gather up all of the information what we might want to
     --    use when customising pages for the user
     withProtected
-      :: MonadIO m'
+      :: MonadIO m
       => UserKey
-      -> ReaderT (EnvAuthed UserLogin) (ExceptT Err m') b
-      -> AppM Env Err m' b
+      -> AppM (EnvAuthed UserLogin) Err m b
+      -> AppM Env Err m b
     withProtected key m = do
       l <- withError userLookupErrors $ getUserLogin key
       withReaderT (mkEnvAuthed l) m
@@ -110,8 +110,8 @@ server cookieSettings jwtSettings currentDirectory = api
     withUnprotected
       :: MonadIO m'
       => AuthResult UserKey
-      -> ReaderT (EnvAuthed (Maybe UserLogin)) (ExceptT Err m') b
-      -> ReaderT Env (ExceptT Err m') b
+      -> AppM (EnvAuthed (Maybe UserLogin)) Err m' b
+      -> AppM Env Err m' b
     withUnprotected (Authenticated userKey) m = do
       userLogin <- withError userLookupErrors $ getUserLogin userKey
       withReaderT (mkEnvAuthed $ Just userLogin) m

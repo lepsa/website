@@ -14,7 +14,6 @@ import Data.Data
 import Servant
 import Website.Network.API.Types
 import Website.Types
-import Website.Data.Error
 
 userDisplay :: (HasEnv c, MonadReader c m) => User -> m Html
 userDisplay user = pure $ H.div ! HA.id "user"
@@ -48,11 +47,11 @@ userDisplay user = pure $ H.div ! HA.id "user"
         ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
         $ "Delete"
 
-userDisplayFullPage :: User -> AppM (EnvAuthed UserLogin) Err IO Html
-userDisplayFullPage = withReaderT (fmap pure) . basicPage <=< userDisplay
+userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
+userDisplayFullPage = basicPage <=< userDisplay
 
-userList :: [User] -> AppM (EnvAuthed UserLogin) Err IO Html
-userList users = withReaderT (fmap pure) $
+userList :: (CanAppM c e m, RequiredUser c) => [User] -> m Html
+userList users =
   basicPage $
     mconcat
       [ H.h2 "Users",

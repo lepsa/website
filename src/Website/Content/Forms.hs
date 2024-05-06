@@ -218,7 +218,7 @@ userCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
 userCreationForm = do
   user <- asks auth
   checkPermission user "GET new user" Read
-  withReaderT (fmap pure) . basicPage =<< generateNewForm (Proxy @User)
+  basicPage =<< generateNewForm (Proxy @User)
 
 getUserForUpdate :: (CanAppM' UserLogin c e m) => UserKey -> m H.Html
 getUserForUpdate userKey = do
@@ -234,7 +234,7 @@ entryCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
 entryCreationForm = do
   user <- asks auth
   checkPermission user "GET new entry" Write
-  withReaderT (fmap pure) . basicPage =<< generateNewForm (Proxy @Entry)
+  basicPage =<< generateNewForm (Proxy @Entry)
 
 getEntryForUpdate :: (CanAppM' UserLogin c e m) => EntryKey -> m H.Html
 getEntryForUpdate entry = do
