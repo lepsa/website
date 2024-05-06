@@ -21,7 +21,6 @@ import Website.Data.Env
 import Website.Auth.Authentication
 import Website.Data.Error
 import Website.Content.Error
-import Control.Monad.Reader
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -69,7 +68,7 @@ startServer' onStartup api serverM dbPath port = do
     serveWithContext api cfg $
       hoistServerWithContext api
         (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
-        (runAppMToHandler (flip runReaderT (mkEnvAuthed Nothing conf) . errToServerError) conf) $
+        (runAppMToHandler errToServerError conf) $
         serverM cookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()

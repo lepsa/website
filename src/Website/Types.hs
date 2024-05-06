@@ -13,7 +13,7 @@ import Website.Data.Error
 type AppM c e m = ReaderT c (ExceptT e m)
 
 type CanAppM c e m = (HasEnv c, AsErr e, MonadReader c m, MonadError e m, MonadIO m)
-type CanAppM' a c e m = (HasAuth c a, HasEnv c, AsErr e, MonadReader c m, MonadError e m, MonadIO m)
+-- type CanAppM' a c e m = (HasAuth c a, HasEnv c, AsErr e, MonadReader c m, MonadError e m, MonadIO m)
 
 runAppM :: c -> AppM c e m a -> m (Either e a)
 runAppM c m = runExceptT $ runReaderT m c

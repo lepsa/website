@@ -37,11 +37,11 @@ type TestAPI =
 testServer :: ServerT TestAPI (AppM Env Err IO)
 testServer = reset :<|> getUsers :<|> getEntries
 
-reset :: AppM Env Err IO NoContent
+reset :: CanAppM c e m => m NoContent
 reset = asks conn >>= liftIO . resetDb
 
-getUsers :: AppM Env Err IO [User]
+getUsers :: CanAppM c e m => m [User]
 getUsers = asks conn >>= liftIO . getAllUsers
 
-getEntries :: AppM Env Err IO [Entry]
+getEntries :: CanAppM c e m => m [Entry]
 getEntries = asks conn >>= liftIO . getAllEntries

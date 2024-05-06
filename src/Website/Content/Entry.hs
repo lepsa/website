@@ -14,8 +14,7 @@ import Website.Data.Entry
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Data.Env
-import Website.Data.User (UserLogin, OptionalUser)
-
+import Website.Data.User (OptionalUser)
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m) => Entry -> m Html
@@ -63,7 +62,7 @@ entryDisplayFullPage :: (HasEnv c, OptionalUser c) => MonadReader c m => Entry -
 entryDisplayFullPage = basicPage <=< entryDisplay
 
 -- | List all entries as a page
-entryList :: MonadReader (EnvAuthed (Maybe UserLogin)) m => [Entry] -> m Html
+entryList :: (OptionalUser c, HasEnv c, MonadReader c m) => [Entry] -> m Html
 entryList entries = do
   tz <- asks timeZone
   basicPage $

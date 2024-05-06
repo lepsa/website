@@ -19,7 +19,7 @@ import Website.Content.Common
 import Servant.HTML.Blaze
 import Website.Data.Error
 import Website.Network.API.CRUD
-import Website.Data.User (UserKey, getUserLogin, UserLogin, UserUpdate, UserCreate)
+import Website.Data.User (UserKey, getUserLogin, UserUpdate, UserCreate, UserLogin, OptionalUser, RequiredUser)
 import Website.Data.Entry (EntryCreate, EntryUpdate, EntryKey)
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
@@ -28,11 +28,11 @@ server cookieSettings jwtSettings currentDirectory = api
     api a = protected a :<|> unprotected a
 
     protected :: Authed -> ServerT Protected (AppM Env Err IO)
-    protected (Authenticated user) =
-      crudEntry user
-        :<|> withProtected user getEntries
-        :<|> crudUser user
-        :<|> withProtected user getUsers
+    protected (Authenticated user) = hoistServer (Proxy @Protected) (withProtected user) $
+      crudEntry
+        :<|> getEntries
+        :<|> crudUser
+        :<|> getUsers
     protected _ =
       crudUnauthed
         :<|> throwError_ Unauthenticated
@@ -49,14 +49,14 @@ server cookieSettings jwtSettings currentDirectory = api
         :<|> (\_ -> throwError_ Unauthenticated)
 
     unprotected :: Authed -> ServerT Unprotected (AppM Env Err IO)
-    unprotected a =
-      withUnprotected a getIndex
-        :<|> withUnprotected a getLogin
+    unprotected a = hoistServer (Proxy @Unprotected) (withUnprotected a) $
+      getIndex
+        :<|> getLogin
         :<|> login
-        :<|> register a cookieSettings jwtSettings
+        :<|> register cookieSettings jwtSettings
         :<|> serveDirectoryWebApp currentDirectory
 
-    getLogin :: AppM (EnvAuthed (Maybe UserLogin)) Err IO Html
+    getLogin :: (OptionalUser c, CanAppM c e m) => m Html
     getLogin = loginForm
 
     login :: CanAppM c e m => Login -> m (SetLoginCookies NoContent)
@@ -71,23 +71,23 @@ server cookieSettings jwtSettings currentDirectory = api
       where
         root = linkText (Proxy @(AuthLogin :> Get '[HTML] Html))
 
-    crudEntry :: UserKey -> ServerT (CRUDForm EntryCreate EntryUpdate EntryKey) (AppM Env Err IO)
-    crudEntry key =
-             (withProtected key . postEntry)
-        :<|> withProtected key entryCreationForm
-        :<|> (withProtected key . getEntry)
-        :<|> (\ek -> withProtected key . putEntry ek)
-        :<|> (withProtected key . getEntryForUpdate)
-        :<|> (withProtected key . deleteEntry)
+    crudEntry :: (RequiredUser c, CanAppM c e m) => ServerT (CRUDForm EntryCreate EntryUpdate EntryKey) m
+    crudEntry =
+             postEntry
+        :<|> entryCreationForm
+        :<|> getEntry
+        :<|> putEntry
+        :<|> getEntryForUpdate
+        :<|> deleteEntry
 
-    crudUser :: UserKey -> ServerT (CRUDForm UserCreate UserUpdate UserKey) (AppM Env Err IO)
-    crudUser key =
-             (withProtected key . postUser)
-        :<|> withProtected key userCreationForm
-        :<|> (withProtected key . getUser)
-        :<|> (\uk -> withProtected key . putUser uk)
-        :<|> (withProtected key . getUserForUpdate)
-        :<|> (withProtected key . deleteUser)
+    crudUser :: (RequiredUser c, CanAppM c e m) => ServerT (CRUDForm UserCreate UserUpdate UserKey) m
+    crudUser =
+             postUser
+        :<|> userCreationForm
+        :<|> getUser
+        :<|> putUser
+        :<|> getUserForUpdate
+        :<|> deleteUser
 
     -- When using a user token do a couple of things.
     -- 1) Ensure that the user actually exists in the database.

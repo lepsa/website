@@ -15,7 +15,6 @@ import Data.Maybe (catMaybes)
 import Servant.Auth.Server (AuthResult)
 import Control.Monad.Except
 import Control.Monad.Reader
-import Website.Data.Env
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -149,7 +148,7 @@ basicPage content = do
     ]
 
 -- | Initial landing page.
-index :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+index :: (OptionalUser c, MonadReader c m) => m Html
 index = basicPage $
     mconcat
       [ H.p "Welcome to my website.",
@@ -203,7 +202,7 @@ formFieldTextArea fieldName fieldLabel value =
       H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
     ]
 
-loginForm :: MonadReader (EnvAuthed (Maybe UserLogin)) m => m Html
+loginForm :: (OptionalUser c, MonadReader c m) => m Html
 loginForm = basicPage $
   H.form
     ! HA.class_ "contentform"

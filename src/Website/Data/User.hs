@@ -50,11 +50,14 @@ instance FromJSON UserLogin
 instance FromRow UserLogin where
   fromRow = UserLogin <$> field <*> field
 
-class (HasAuth c UserLogin, OptionalUser c) => RequiredUser c
+class (HasEnv c, HasAuth c UserLogin, OptionalUser c) => RequiredUser c
 instance RequiredUser (EnvAuthed UserLogin)
 
-class OptionalUser c where
+class HasEnv c => OptionalUser c where
   mAuth :: c -> Maybe UserLogin
+
+instance OptionalUser Env where
+  mAuth _ = Nothing
 
 instance OptionalUser (EnvAuthed UserLogin) where
   mAuth = pure . auth

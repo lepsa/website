@@ -18,7 +18,6 @@ import Website.Network.API.Types
 import Website.Types
 import Website.Auth.Authorisation (Access(Read, Write), Group)
 import Website.Data.Permission
-import Website.Data.Error
 
 -- | Values for a given form field
 data FieldData a
@@ -214,29 +213,29 @@ userUpdateForm :: (HasEnv c, MonadReader c m) => User -> m Html
 userUpdateForm user = do
   generateUpdateForm user
 
-userCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
+userCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 userCreationForm = do
   user <- asks auth
   checkPermission user "GET new user" Read
   basicPage =<< generateNewForm (Proxy @User)
 
-getUserForUpdate :: (CanAppM' UserLogin c e m) => UserKey -> m H.Html
+getUserForUpdate :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 getUserForUpdate userKey = do
   user <- asks auth
   checkPermission user "GET update user" Read
   userUpdateForm =<< Website.Data.User.getUser userKey
 
 -- Entry forms
-entryUpdateForm :: (HasEnv c, MonadReader c m) => Entry -> m Html
+entryUpdateForm :: (RequiredUser c, HasEnv c, MonadReader c m) => Entry -> m Html
 entryUpdateForm = generateUpdateForm
 
-entryCreationForm :: AppM (EnvAuthed UserLogin) Err IO Html
+entryCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 entryCreationForm = do
   user <- asks auth
   checkPermission user "GET new entry" Write
   basicPage =<< generateNewForm (Proxy @Entry)
 
-getEntryForUpdate :: (CanAppM' UserLogin c e m) => EntryKey -> m H.Html
+getEntryForUpdate :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
 getEntryForUpdate entry = do
   user <- asks auth
   checkPermission user "GET update entry" Read
