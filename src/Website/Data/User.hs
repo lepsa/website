@@ -128,13 +128,15 @@ createUser :: (CanAppM c e m) => UserCreate -> m User
 createUser (UserCreate group email password) = do
   c <- asks conn
   userId <- liftIO nextRandom
-  user <-
-    liftIO (query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group))
-      >>= ensureSingleInsert
-      >>= liftEither_
-  hash <- hashPassword $ mkPassword password
-  liftIO $ execute c "insert into user_login(id, hash) values (?, ?)" (userId, hash)
-  pure user
+  eUser <- liftIO $ withTransaction c $ do
+    eUser <- query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group)
+        >>= ensureSingleInsert
+    case eUser of
+      (Right _user) -> eUser <$ do
+        hash <- hashPassword $ mkPassword password
+        execute c "insert into user_login(id, hash) values (?, ?)" (userId, hash)
+      _ -> pure eUser
+  either throwError_ pure eUser
 
 getUserHashIO :: Connection -> UserKey -> IO (Either Err (PasswordHash Argon2))
 getUserHashIO c uid =
@@ -197,8 +199,8 @@ deleteUser key = do
   liftIO $
     withTransaction c $
       do
-        execute c "delete from user where id = ?" (Only key)
         execute c "delete from user_login where id = ?" (Only key)
+        execute c "delete from user where id = ?" (Only key)
 
 getUsers :: CanAppM c e m => m [User]
 getUsers = do

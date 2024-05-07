@@ -36,6 +36,7 @@ startServer'
   -> IO ()
 startServer' onStartup api serverM dbPath port = do
   putStrLn "Starting server"
+  forkServer "localhost" 8000
   currentDirectory <- getCurrentDirectory
   conf <-
     Env

@@ -13,7 +13,7 @@ import Website.Data.Error (DbErr(NotFound), Err (DbError), throwError_)
 
 -- Create a table for tracking the schema version
 createVersion :: Query
-createVersion = "create table if not exists schema_version (version integer not null)"
+createVersion = "create table if not exists schema_version (version integer primary key not null)"
 
 getSchemaVersion :: Query
 getSchemaVersion = "select version from schema_version"
@@ -97,7 +97,7 @@ migrateSchemaV0 =
 
 migrateSchemaV1 :: [Query]
 migrateSchemaV1 =
-  [ "create table if not exists entry (key integer primary key, created datetime not null, title text not null, value text not null)"
+  [ "create table if not exists entry (key integer primary key not null, created datetime not null, title text not null, value text not null)"
   ]
 
 migrateSchemaV2 :: [Query]
@@ -108,7 +108,7 @@ migrateSchemaV2 =
 migrateSchemaV3 :: [Query]
 migrateSchemaV3 =
   [ "create table if not exists user(id text not null primary key, email text not null unique, group_name text not null)",
-    "create table if not exists user_login(id text not null primary key, hash text not null)"
+    "create table if not exists user_login(id text not null primary key, hash text not null, foreign key (id) references user(id))"
   ]
 
 migrateSchemaV4 :: [Query]

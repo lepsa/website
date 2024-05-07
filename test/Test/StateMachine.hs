@@ -1,4 +1,3 @@
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE QuasiQuotes #-}
 -- This helps us make sure that our commands are all added to the state machine
 {-# OPTIONS_GHC -Wunused-top-binds #-}
