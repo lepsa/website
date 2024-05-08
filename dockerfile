@@ -1,4 +1,5 @@
-FROM haskell:9 as build
+# Get all the deps built for both the exe and tests
+FROM haskell:9 as build_base
 
 WORKDIR /opt/website
 
@@ -12,8 +13,13 @@ COPY ./test /opt/website/test
 COPY ./CHANGELOG.md /opt/website/CHANGELOG.md
 COPY ./LICENSE /opt/website/LICENSE
 
+# Actually build the main binary
+FROM build_base as build
+
+WORKDIR /opt/website
 RUN cabal install --installdir=. --install-method=copy exe:Website
 
+# What actually runs, no haskell compiler stuff
 FROM debian:buster as run
 
 COPY ./static /opt/website/static
@@ -24,3 +30,10 @@ WORKDIR /opt/website
 EXPOSE 8080
 
 CMD ["/opt/website/Website"]
+
+# Run tests
+FROM build_base as test
+
+WORKDIR /opt/website
+
+CMD ["cabal", "run", "Website-test"]

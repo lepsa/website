@@ -7,3 +7,8 @@ services:
     volumes:
       - ./certificates:/opt/website/certificates
       - ./db:/opt/website/db
+  test:
+    build: .
+    volumes:
+      - ./certificates:/opt/website/certificates
+      - ./db:/opt/website/db

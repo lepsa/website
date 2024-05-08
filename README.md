@@ -35,5 +35,11 @@ Do this `cabal run Website` from the project root, or `docker-compose up`
 
 Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy the `static`, `db`, and `certificates` directories to wherever you are running the server.
 
+#### First Admin Setup
+
+The website has an _unprotected_ route for setting up an initial user. It will accept any new user registration until an Admin user is created.
+The following curl command is an example for setting up an Admin user for a local running server.
+`curl -k -v -X POST -d "group=Admin&email=foo&password=bar" -H "Content-Type: application/x-www-form-urlencoded" "https://localhost:8080/register"`
+
 #### Tests
-Run this `cabal run Website-test`. It will create a new testing database and stomp all over that as it throws requests left, right, and all over the place.
+Run this `cabal run Website-test`, or `docker-compose up test --build`. It will create a new testing database and stomp all over that as it throws requests left, right, and all over the place.
