@@ -16,9 +16,19 @@ a {
   text-decoration: none;
 }
 
+header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+#site-header {
+  grid-column: 2;
+}
+
 #greeter {
   display: flex;
-  flex-direction: row-reverse;
+  justify-content: center;
+  align-items: center;
 }
 
 h1 {

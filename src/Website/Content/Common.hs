@@ -87,6 +87,7 @@ pageHeader = do
   pure $ H.header $
     mconcat $ catMaybes
       [ pure $ H.a
+          ! HA.id "site-header"
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
