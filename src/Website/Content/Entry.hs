@@ -85,20 +85,19 @@ entryList entries = do
             entryLink tz <$> sortEntriesByDateDesc entries
       ]
   where
-    entryLink :: TimeZone -> Entry -> Html
-    entryLink tz entry =
-      H.li $
-        mconcat
-          [ H.a
-              ! hxBoost
-              ! hxOn "::config-request" "setXsrfHeader(event)"
-              ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
-              $ toHtml entry.title,
-            toHtml $ " " <> entryTimeFormat tz entry.created
-          ]
     newEntry :: Html
     newEntry =
       H.a 
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
         ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
+
+entryLink :: TimeZone -> Entry -> Html
+entryLink tz entry = mconcat
+  [ H.a
+    ! hxBoost
+    ! hxOn "::config-request" "setXsrfHeader(event)"
+    ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
+    $ toHtml entry.title,
+    toHtml $ " " <> entryTimeFormat tz entry.created
+  ]

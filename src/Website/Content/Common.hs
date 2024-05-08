@@ -16,10 +16,6 @@ import Servant.Auth.Server (AuthResult)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Website.Content.Htmx
-import Website.Data.Entry
-import Website.Types
-import Website.Data.Env
-import Website.Network.API.CRUD
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -158,33 +154,6 @@ basicPage content = do
             pageFooter
           ]
     ]
-
--- | Initial landing page.
-index :: (OptionalUser c, CanAppM c e m) => m Html
-index = do
-  tz <- asks timeZone
-  posts <- sortEntriesByDateDesc <$> getRecentEntries recentPostCount
-  basicPage $
-    mconcat $
-      [ H.p "Welcome to my website.",
-        H.p "I use this as a test bed for various ways of deploying code and working with server-driven client interactions.",
-        H.p "The current version of the site uses a REST architecture where the server sends pre-rendered HTML with expected state interactions.",
-        H.p "HTMX is used to help with server interactions, mainly extending HTTP verb support in forms and allowing a small amount of client side updating for user interactions.",
-        H.h2 "Recent Entries"
-      ] <>
-      [ H.ul $ mconcat
-        (entryLink tz <$> posts)
-      ]
-  where
-    recentPostCount = 5
-    entryLink tz entry = H.li $ mconcat
-      [ H.a
-          ! hxBoost
-          ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
-          $ toHtml entry.title,
-        toHtml $ " " <> entryTimeFormat tz entry.created
-      ]
 
 staticField :: String -> String -> Maybe String -> Html
 staticField fieldName fieldLabel value =

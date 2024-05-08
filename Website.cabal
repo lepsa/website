@@ -66,6 +66,7 @@ library
                     , Website.Content.Entry
                     , Website.Content.User
                     , Website.Content.Htmx
+                    , Website.Content.Index
                     , Website.Types
                     , Website.Data.Util
                     , Website.Data.Env

@@ -20,6 +20,7 @@ import Website.Data.Permission (checkPermission)
 import Website.Auth.Authorisation (Access(Read, Write))
 import Website.Data.Env (auth)
 import Control.Monad.Reader
+import Website.Content.Index
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = index
