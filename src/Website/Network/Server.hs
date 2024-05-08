@@ -21,6 +21,7 @@ import Website.Network.API
 import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
+import System.FilePath
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -34,7 +35,7 @@ server cookieSettings jwtSettings currentDirectory = api
         :<|> protected a getUsers
         :<|> crudEntry a
         :<|> unprotected a getEntries
-        :<|> serveDirectoryWebApp currentDirectory
+        :<|> serveDirectoryWebApp (currentDirectory </> "static")
 
     getLogin :: (OptionalUser c, CanAppM c e m) => m Html
     getLogin = loginForm

@@ -29,10 +29,11 @@ Things I want to add over time:
 
 #### Running The Server
 
-Create, link, or copy a TLS certificate and key file into the project root with the name `certificate.pem` and `key.pem`. These files aren't automatically reloaded if they change while the server is runnning.
-Do this `cabal run Website` from the project root.
+Create, link, or copy a TLS certificate and key file into the project `certificates` directory with the name `certificate.pem` and `key.pem`. These files aren't automatically reloaded if they change while the server is runnning.
 
-Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy `favicon.ico`, `htmx.min.js`, `main.js`, `certificate.pem`, `key.pem` and `main.css` to wherever you are running the server.
+Do this `cabal run Website` from the project root, or `docker-compose up`
+
+Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy the `static`, `db`, and `certificates` directories to wherever you are running the server.
 
 #### Tests
 Run this `cabal run Website-test`. It will create a new testing database and stomp all over that as it throws requests left, right, and all over the place.

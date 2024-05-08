@@ -22,7 +22,7 @@ main = do
 
   ready <- newEmptyMVar
   let onStart = putMVar ready ()
-  serverThread <- forkIO $ startServer' onStart testTopAPI testTopServer "test_db.sqlite" port
+  serverThread <- forkIO $ startServer' onStart testTopAPI testTopServer "./db/test_db.sqlite" port
   
   -- Wait for the server to start
   takeMVar ready

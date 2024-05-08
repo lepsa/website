@@ -21,6 +21,7 @@ import Website.Data.Env
 import Website.Auth.Authentication
 import Website.Data.Error
 import Website.Content.Error
+import System.FilePath
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -65,7 +66,9 @@ startServer' onStartup api serverM dbPath port = do
         setBeforeMainLoop onStartup
           $ setHost "*6"
           $ setPort port defaultSettings
-  let tls = defaultTlsSettings
+  let tls = tlsSettings
+              (currentDirectory </> "certificates" </> "certificate.pem")
+              (currentDirectory </> "certificates" </> "key.pem")
   runTLS tls warpSettings $
     serveWithContext api cfg $
       hoistServerWithContext api

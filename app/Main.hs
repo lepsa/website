@@ -3,4 +3,4 @@ module Main where
 import Website
 
 main :: IO ()
-main = startServer "db.sqlite" 8080
+main = startServer "./db/db.sqlite" 8080
