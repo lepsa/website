@@ -130,11 +130,17 @@ migrateSchemaV4 =
     "insert into permission(name, group_name, access) values ('GET users', 'Admin', 'Read')"
   ]
 
+migrateSchemaV5 :: [Query]
+migrateSchemaV5 =
+  [ "alter table entry add column updated datetime"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
     (1, migrateSchemaV1),
     (2, migrateSchemaV2),
     (3, migrateSchemaV3),
-    (4, migrateSchemaV4)
+    (4, migrateSchemaV4),
+    (5, migrateSchemaV5)
   ]

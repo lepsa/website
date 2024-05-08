@@ -52,7 +52,8 @@ data Entry = Entry
   { key :: EntryKey,
     created :: UTCTime,
     title :: String,
-    value :: Text
+    value :: Text,
+    updated :: Maybe UTCTime
   }
   deriving (Eq, Ord, Show, Generic)
 
@@ -70,11 +71,12 @@ instance FromRow Entry where
       <*> field
       <*> field
       <*> field
+      <*> field
 
 createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
 createEntry (EntryCreate title value) = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value) values (datetime(), ?, ?) returning key, created, title, value" (title, value)
+  entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value, updated) values (datetime(), ?, ?, null) returning key, created, title, value, updated" (title, value)
   case entries of
     [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
@@ -83,7 +85,7 @@ createEntry (EntryCreate title value) = do
 getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "select key, created, title, value from entry where key = ?" (Only key)
+  entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where key = ?" (Only key)
   case entries of
     [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
@@ -92,7 +94,7 @@ getEntry key = do
 updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ? where key = ? returning key, created, title, value" (title, value, key)
+  entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ?, updated = datetime() where key = ? returning key, created, title, value, updated" (title, value, key)
   case entries of
     [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
@@ -106,12 +108,12 @@ deleteEntry key = do
 getEntries :: (CanAppM c e m) => m [Entry]
 getEntries = do
   c <- asks conn
-  liftIO $ withTransaction c $ query_ c "select key, created, title, value from entry"
+  liftIO $ withTransaction c $ query_ c "select key, created, title, value, updated from entry"
 
 getRecentEntries :: CanAppM c e m => Int -> m [Entry]
 getRecentEntries num = do
   c <- asks conn
-  liftIO $ withTransaction c $ query c "select key, created, title, value from entry order by created desc limit ?" (Only num)
+  liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry order by created desc limit ?" (Only num)
 
 sortEntriesByDateAsc :: [Entry] -> [Entry]
 sortEntriesByDateAsc = sortBy $ \a b ->

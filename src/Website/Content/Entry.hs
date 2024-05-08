@@ -34,6 +34,7 @@ entryDisplay entry = do
     $ mconcat $ catMaybes
       [ pure $ H.h3 $ toHtml entry.title,
         pure $ H.p $ toHtml $ "Created " <> entryTimeFormat tz entry.created,
+        H.p . toHtml . mappend "Updated " . entryTimeFormat tz <$> entry.updated,
         -- This isn't great, but it is the easiest way to do what I want. 
         -- We store the markdown in the DB for easy editing, but we display
         -- HTML when looking at the entry.
@@ -82,7 +83,7 @@ entryList entries = do
         mNewEntry,
         pure $ H.ul $
           mconcat $
-            entryLink tz <$> sortEntriesByDateDesc entries
+            H.li . entryLink tz <$> sortEntriesByDateDesc entries
       ]
   where
     newEntry :: Html

@@ -102,6 +102,11 @@ instance GenerateForm Entry () where
                   staticName = "created",
                   staticValue = pure $ entryTimeFormat tz entry.created
                 },
+              StaticData
+                { staticLabel = "Last Updated",
+                  staticName = "created",
+                  staticValue = pure $ maybe "Never" (entryTimeFormat tz) entry.updated
+                },
               FieldData
                 { fieldLabel = "Value",
                   fieldName = "value",
@@ -141,7 +146,7 @@ instance GenerateForm User Group where
   updateForm user = do
     pure $
       FormData
-        { title = "Update Entry",
+        { title = "Update User",
           createUrl = Nothing,
           updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
           fields =
