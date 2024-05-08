@@ -1,6 +1,7 @@
 module Website.Content.User where
 
 import Text.Blaze.Html
+import Control.Monad
 import Control.Monad.Reader
 import Website.Data.User
 import Website.Content.Common

@@ -13,7 +13,6 @@ import Servant.Auth
 import Website.Auth.Authentication
 import Data.Maybe (catMaybes)
 import Servant.Auth.Server (AuthResult)
-import Control.Monad.Except
 import Control.Monad.Reader
 import Website.Content.Htmx
 import Website.Auth.Authorisation
@@ -27,13 +26,6 @@ type AuthUser a = AuthLogin :> "user" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
-
--- tryError and withError are copied from mtl-2.3.1
-tryError :: MonadError e m => m a -> m (Either e a)
-tryError action = (Right <$> action) `catchError` (pure . Left)
-
-withError :: MonadError e m => (e -> e) -> m a -> m a
-withError f action = tryError action >>= either (throwError . f) pure
 
 whenAdmin :: (RequiredUser c, CanAppM c e m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
 whenAdmin f = do

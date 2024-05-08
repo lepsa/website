@@ -1,7 +1,6 @@
 module Website.Data.Schema where
 
 import Control.Monad
-import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Foldable
 import Data.List

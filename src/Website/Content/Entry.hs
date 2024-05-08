@@ -1,5 +1,6 @@
 module Website.Content.Entry where
 
+import Control.Monad
 import Control.Monad.Reader
 import Data.Text
 import Data.Time

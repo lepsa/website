@@ -6,7 +6,7 @@
 module Website.Data.User where
 
 import Control.Monad
-import Control.Monad.Except
+import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
 import Data.Text hiding (group)

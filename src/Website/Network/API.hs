@@ -14,6 +14,7 @@ import Website.Network.API.Types
 import Website.Data.Error
 import Website.Content.User (userDisplayFullPage, userDisplay, userList)
 import Website.Data.User
+import Control.Monad
 import Control.Monad.IO.Class
 import Servant.Auth.Server
 import Website.Data.Permission (checkPermission)

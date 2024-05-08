@@ -6,6 +6,7 @@ import Website.Data.User
 import Control.Monad.Reader
 import Website.Auth.Authorisation
 import Database.SQLite.Simple
+import Control.Monad
 import Control.Monad.Except
 
 checkPermission :: CanAppM c e m => UserLogin -> String -> Access -> m ()
