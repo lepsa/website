@@ -36,7 +36,6 @@ startServer'
   -> IO ()
 startServer' onStartup api serverM dbPath port = do
   putStrLn "Starting server"
-  forkServer "localhost" 8000
   currentDirectory <- getCurrentDirectory
   conf <-
     Env
@@ -63,7 +62,9 @@ startServer' onStartup api serverM dbPath port = do
       -- handles a user being deleted between user requests.
       cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
       warpSettings =
-        setBeforeMainLoop onStartup $ setPort port defaultSettings
+        setBeforeMainLoop onStartup
+          $ setHost "*6"
+          $ setPort port defaultSettings
   let tls = defaultTlsSettings
   runTLS tls warpSettings $
     serveWithContext api cfg $

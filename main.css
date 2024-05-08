@@ -1,5 +1,6 @@
 html {
   font-size: 100%;
+  font-family: sans;
 }
 
 select, textarea, input, button {
@@ -7,11 +8,17 @@ select, textarea, input, button {
 }
 
 body {
-  background-color: #D3D3D3;
+  background-color: #F0F0F0;
 }
 
 a {
   color: blue;
+  text-decoration: none;
+}
+
+#greeter {
+  display: flex;
+  flex-direction: row-reverse;
 }
 
 h1 {

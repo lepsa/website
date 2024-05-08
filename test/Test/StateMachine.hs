@@ -305,15 +305,11 @@ cGetEntries env =
           none
             (\u -> u ^. tuEmail == user ^. tuEmail && u ^. tuPassword == user ^. tuPassword)
             $ state ^. users,
-      Ensure $ \_oldState newState input output -> do
-        case input ^. auth of
-          Normal _ -> do
-            output.responseStatus === status200
-            -- Commit the great sin of "parsing" html with regex
-            let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
-            length newState._entries === length matches
-          Bad _ -> do
-            output.responseStatus === status401
+      Ensure $ \_oldState newState _input output -> do
+        output.responseStatus === status200
+        -- Commit the great sin of "parsing" html with regex
+        let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
+        length newState._entries === length matches
     ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
@@ -343,7 +339,7 @@ cGetEntriesBadAuth env = Command gen execute []
       req <- H.parseRequest $ env.baseUrl <> "/entries"
       let req' = mkReq methodGet (mkAuthHeader getEntries) req
       res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status401
+      res.responseStatus === status200
 
 cGetEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetEntry env =
@@ -361,7 +357,7 @@ cGetEntry env =
               user === u
               output.responseStatus === status200
           Bad _ -> do
-            output.responseStatus === status401
+            output.responseStatus === status200
     ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))

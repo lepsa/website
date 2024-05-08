@@ -12,6 +12,8 @@ import Web.FormUrlEncoded
 import Website.Types
 import Website.Data.Env
 import Website.Data.Error
+import Data.Text
+import Data.List (sortBy)
 
 --
 -- What an Entry is, and the various derived types that
@@ -27,7 +29,7 @@ instance FromRow EntryKey
 
 data EntryCreate = EntryCreate
   { title :: String,
-    value :: String
+    value :: Text
   }
   deriving (Eq, Ord, Show, Generic)
 instance FromForm EntryCreate where
@@ -37,7 +39,7 @@ instance FromForm EntryCreate where
 
 data EntryUpdate = EntryUpdate
   { title :: String,
-    value :: String
+    value :: Text
   }
   deriving (Eq, Ord, Show, Generic)
 
@@ -50,7 +52,7 @@ data Entry = Entry
   { key :: EntryKey,
     created :: UTCTime,
     title :: String,
-    value :: String
+    value :: Text
   }
   deriving (Eq, Ord, Show, Generic)
 
@@ -105,3 +107,16 @@ getEntries :: (CanAppM c e m) => m [Entry]
 getEntries = do
   c <- asks conn
   liftIO $ withTransaction c $ query_ c "select key, created, title, value from entry"
+
+getRecentEntries :: CanAppM c e m => Int -> m [Entry]
+getRecentEntries num = do
+  c <- asks conn
+  liftIO $ withTransaction c $ query c "select key, created, title, value from entry order by created desc limit ?" (Only num)
+
+sortEntriesByDateAsc :: [Entry] -> [Entry]
+sortEntriesByDateAsc = sortBy $ \a b ->
+  compare a.created b.created
+
+sortEntriesByDateDesc :: [Entry] -> [Entry]
+sortEntriesByDateDesc = sortBy $ \a b ->
+  compare b.created a.created

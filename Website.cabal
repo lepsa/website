@@ -42,6 +42,7 @@ common warnings
                   , servant-auth-server
                   , jose
                   , password
+                  , cmark
 
     default-extensions: DataKinds
                       , OverloadedRecordDot
@@ -64,6 +65,7 @@ library
                     , Website.Content.Error
                     , Website.Content.Entry
                     , Website.Content.User
+                    , Website.Content.Htmx
                     , Website.Types
                     , Website.Data.Util
                     , Website.Data.Env

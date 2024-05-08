@@ -14,6 +14,7 @@ import Data.Data
 import Servant
 import Website.Network.API.Types
 import Website.Types
+import Website.Content.Htmx
 
 userDisplay :: (HasEnv c, MonadReader c m) => User -> m Html
 userDisplay user = pure $ H.div ! HA.id "user"
@@ -28,23 +29,23 @@ userDisplay user = pure $ H.div ! HA.id "user"
     edit :: Html
     edit =
       H.button
-        ! dataAttribute "hx-trigger" "click"
-        ! dataAttribute "hx-swap" "outerHTML"
-        ! dataAttribute "hx-target" "#user"
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-        ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget "#user"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxGet (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
         $ "Edit"
     delete :: Html
     delete =
       H.button
-        ! dataAttribute "hx-trigger" "click"
-        ! dataAttribute "hx-swap" "outerHTML"
-        ! dataAttribute "hx-target" "#edit-delete-buttons"
-        ! dataAttribute "hx-confirm" "Confirm deletion"
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-        ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget "#edit-delete-buttons"
+        ! hxConfirm "Confirm deletion"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
         $ "Delete"
 
 userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
@@ -64,16 +65,16 @@ userList users =
       H.li $
         mconcat
           [ H.a
-              ! dataAttribute "hx-boost" "true"
-              ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+              ! hxBoost
+              ! hxOn "::config-request" "setXsrfHeader(event)"
               ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid))
               $ toHtml user.email
           ]
     newUser :: Html
     newUser =
       H.a 
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
         ! htmlLink (Proxy @(AuthUser (CRUDCreate UserCreate))) $ "Create User"
     sortUsers = sortBy $ \a b ->
       compare a.email b.email

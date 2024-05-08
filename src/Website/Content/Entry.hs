@@ -1,7 +1,6 @@
 module Website.Content.Entry where
 
 import Control.Monad.Reader
-import Data.List (sortBy)
 import Data.Text
 import Data.Time
 import Servant
@@ -15,46 +14,57 @@ import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Data.Env
 import Website.Data.User (OptionalUser)
+import Website.Content.Htmx
+import CMark (commonmarkToHtml)
+import Data.Maybe (catMaybes)
 
 -- | Display an entry, with edit and delete buttons
-entryDisplay :: (HasEnv c, MonadReader c m) => Entry -> m Html
+entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c) => Entry -> m Html
 entryDisplay entry = do
   tz <- asks timeZone
+  editDelete <- whenLoggedIn $ \_ -> H.div
+    ! HA.id "edit-delete-buttons"
+    $ mconcat
+      [ edit,
+        delete
+      ]
   pure
     $ H.div
       ! HA.id "entry"
-    $ mconcat
-      [ H.h3 $ toHtml entry.title,
-        H.p $ toHtml $ "Created " <> entryTimeFormat tz entry.created,
-        mconcat $ H.p . toHtml <$> Prelude.lines entry.value,
-        H.div
-          ! HA.id "edit-delete-buttons"
-          $ mconcat
-            [ edit,
-              delete
-            ]
+    $ mconcat $ catMaybes
+      [ pure $ H.h3 $ toHtml entry.title,
+        pure $ H.p $ toHtml $ "Created " <> entryTimeFormat tz entry.created,
+        -- This isn't great, but it is the easiest way to do what I want. 
+        -- We store the markdown in the DB for easy editing, but we display
+        -- HTML when looking at the entry.
+        -- TODO: Test this for XSS and related issues.
+        --       Especially around JS.
+        -- TODO: Maybe we can pre-render the HTML in the DB so we aren't
+        --       processing it every time.
+        pure $ preEscapedToHtml $ commonmarkToHtml [] entry.value,
+        editDelete
       ]
   where
     edit :: Html
     edit =
       H.button
-        ! dataAttribute "hx-trigger" "click"
-        ! dataAttribute "hx-swap" "outerHTML"
-        ! dataAttribute "hx-target" "#entry"
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-        ! dataAttribute "hx-get" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget "#entry"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxGet (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
         $ "Edit"
     delete :: Html
     delete =
       H.button
-        ! dataAttribute "hx-trigger" "click"
-        ! dataAttribute "hx-swap" "outerHTML"
-        ! dataAttribute "hx-target" "#edit-delete-buttons"
-        ! dataAttribute "hx-confirm" "Confirm deletion"
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-        ! dataAttribute "hx-delete" (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget "#edit-delete-buttons"
+        ! hxConfirm "Confirm deletion"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
         $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
@@ -65,13 +75,14 @@ entryDisplayFullPage = basicPage <=< entryDisplay
 entryList :: (OptionalUser c, HasEnv c, MonadReader c m) => [Entry] -> m Html
 entryList entries = do
   tz <- asks timeZone
+  mNewEntry <- whenLoggedIn $ const newEntry
   basicPage $
-    mconcat
-      [ H.h2 "Entries",
-        newEntry,
-        H.ul $
+    mconcat $ catMaybes
+      [ pure $ H.h2 "Entries",
+        mNewEntry,
+        pure $ H.ul $
           mconcat $
-            entryLink tz <$> sortEntries entries
+            entryLink tz <$> sortEntriesByDateDesc entries
       ]
   where
     entryLink :: TimeZone -> Entry -> Html
@@ -79,8 +90,8 @@ entryList entries = do
       H.li $
         mconcat
           [ H.a
-              ! dataAttribute "hx-boost" "true"
-              ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+              ! hxBoost
+              ! hxOn "::config-request" "setXsrfHeader(event)"
               ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
               $ toHtml entry.title,
             toHtml $ " " <> entryTimeFormat tz entry.created
@@ -88,8 +99,6 @@ entryList entries = do
     newEntry :: Html
     newEntry =
       H.a 
-        ! dataAttribute "hx-boost" "true"
-        ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
         ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
-    sortEntries = sortBy $ \a b ->
-      compare a.created b.created

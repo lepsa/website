@@ -18,6 +18,7 @@ import Website.Network.API.Types
 import Website.Types
 import Website.Auth.Authorisation (Access(Read, Write), Group)
 import Website.Data.Permission
+import Website.Content.Htmx
 
 -- | Values for a given form field
 data FieldData a
@@ -105,7 +106,7 @@ instance GenerateForm Entry () where
                 { fieldLabel = "Value",
                   fieldName = "value",
                   fieldType = "textarea",
-                  fieldValue = pure entry.value
+                  fieldValue = pure $ T.unpack entry.value
                 }
             ]
         }
@@ -173,11 +174,12 @@ instance GenerateForm User Group where
 generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a b) => Proxy a -> m Html
 generateNewForm p = do
   fd <- newForm p
-  pure
-    $ H.form
+  pure $ mconcat
+    [ H.h2 $ H.toHtml fd.title
+    , H.form
       ! HA.class_ "contentform"
-      ! dataAttribute "hx-boost" "true"
-      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
       ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
     $ mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
@@ -187,18 +189,20 @@ generateNewForm p = do
           ! HA.type_ "submit"
           ! HA.value "Create"
       ]
+    ]
 
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
 generateUpdateForm :: (HasEnv c, MonadReader c m, GenerateForm a b) => a -> m Html
 generateUpdateForm a = do
   fd <- updateForm a
-  pure
-    $ H.form
+  pure $ mconcat
+    [ H.h2 $ H.toHtml fd.title
+    , H.form
       ! HA.class_ "contentform"
-      ! dataAttribute "hx-swap" "outerHTML"
-      ! dataAttribute "hx-boost" "true"
-      ! dataAttribute "hx-on::config-request" "setXsrfHeader(event)"
-      ! maybe mempty (dataAttribute "hx-put" . stringValue) fd.updateUrl
+      ! hxSwap "outerHTML"
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! maybe mempty (hxPut . stringValue) fd.updateUrl
     $ mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
         H.br,
@@ -207,6 +211,7 @@ generateUpdateForm a = do
           ! HA.class_ "formbutton"
           ! HA.value "Update"
       ]
+    ]
 
 -- User forms
 userUpdateForm :: (HasEnv c, MonadReader c m) => User -> m Html

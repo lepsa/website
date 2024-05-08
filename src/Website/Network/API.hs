@@ -21,7 +21,7 @@ import Website.Auth.Authorisation (Access(Read, Write))
 import Website.Data.Env (auth)
 import Control.Monad.Reader
 
-getIndex :: (OptionalUser c, MonadReader c m) => m H.Html
+getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = index
 
 --
@@ -38,10 +38,11 @@ postEntry create = do
   pure $ addHeader link mempty
 
 -- Get a given Entry
-getEntry :: (CanAppM c e m, RequiredUser c) => EntryKey -> m H.Html
+getEntry :: (CanAppM c e m, OptionalUser c) => EntryKey -> m H.Html
 getEntry key = do
-  user <- asks auth
-  checkPermission user "GET entry" Read
+  -- TODO: extend permission checks for unauthed users
+  -- user <- asks auth
+  -- checkPermission user "GET entry" Read
   e <- Website.Data.Entry.getEntry key
   entryDisplayFullPage e
 
@@ -61,10 +62,11 @@ deleteEntry key = do
   pure $ H.toHtml @String "Deleted"
 
 -- Get all of the Entries as a list
-getEntries :: (RequiredUser c, CanAppM c e m) => m H.Html
+getEntries :: (OptionalUser c, CanAppM c e m) => m H.Html
 getEntries = do
-  user <- asks auth
-  checkPermission user "GET entries" Read
+  -- TODO: extend permission checks for unauthed users
+  -- user <- asks auth
+  -- checkPermission user "GET entries" Read
   entryList =<< Website.Data.Entry.getEntries
 
 --

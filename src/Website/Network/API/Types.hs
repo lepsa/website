@@ -22,18 +22,16 @@ topAPI = Proxy
 type Auths = '[BasicAuth, Cookie, JWT]
 
 type TopAPI = TopAPI' Auths
-type TopAPI' auths = Auth auths UserKey :> (Protected :<|> Unprotected)
+type TopAPI' auths = Auth auths UserKey :> API
 
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a
-type Unprotected =
+type API =
   Get '[HTML] Html
     :<|> "login" :> Get '[HTML] Html
     :<|> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent)
     :<|> "register" :> ReqBody '[FormUrlEncoded] UserCreate :> Verb 'POST 204 '[HTML] (SetLoginCookies NoContent)
-    :<|> Raw
-
-type Protected =
-  "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
-    :<|> "entries" :> Get '[HTML] Html
     :<|> "user" :> CRUDForm UserCreate UserUpdate UserKey
     :<|> "users" :> Get '[HTML] Html
+    :<|> "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
+    :<|> "entries" :> Get '[HTML] Html
+    :<|> Raw
