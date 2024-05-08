@@ -1,14 +1,17 @@
 services:
   web:
-    build: .
-    network_mode: host
+    build:
+      context: ./
+      target: web
     ports:
       - "8080:8080"
     volumes:
       - ./certificates:/opt/website/certificates
       - ./db:/opt/website/db
   test:
-    build: .
+    build:
+      context: ./
+      target: test
     volumes:
       - ./certificates:/opt/website/certificates
       - ./db:/opt/website/db

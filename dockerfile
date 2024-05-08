@@ -20,7 +20,7 @@ WORKDIR /opt/website
 RUN cabal install --installdir=. --install-method=copy exe:Website
 
 # What actually runs, no haskell compiler stuff
-FROM debian:buster as run
+FROM debian:buster as web
 
 COPY ./static /opt/website/static
 COPY --from=build /opt/website/Website /opt/website/Website
