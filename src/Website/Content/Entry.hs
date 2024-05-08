@@ -18,6 +18,7 @@ import Website.Data.User (OptionalUser)
 import Website.Content.Htmx
 import CMark (commonmarkToHtml)
 import Data.Maybe (catMaybes)
+import Website.Data.Util
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c) => Entry -> m Html
@@ -34,8 +35,8 @@ entryDisplay entry = do
       ! HA.id "entry"
     $ mconcat $ catMaybes
       [ pure $ H.h3 $ toHtml entry.title,
-        pure $ H.p $ toHtml $ "Created " <> entryTimeFormat tz entry.created,
-        H.p . toHtml . mappend "Updated " . entryTimeFormat tz <$> entry.updated,
+        pure $ H.p $ toHtml $ "Created " <> timeFormat tz entry.created,
+        H.p . toHtml . mappend "Updated " . timeFormat tz <$> entry.updated,
         -- This isn't great, but it is the easiest way to do what I want. 
         -- We store the markdown in the DB for easy editing, but we display
         -- HTML when looking at the entry.
@@ -101,5 +102,5 @@ entryLink tz entry = mconcat
     ! hxOn "::config-request" "setXsrfHeader(event)"
     ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
     $ toHtml entry.title,
-    toHtml $ " " <> entryTimeFormat tz entry.created
+    toHtml $ " " <> timeFormat tz entry.created
   ]

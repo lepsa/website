@@ -57,9 +57,6 @@ data Entry = Entry
   }
   deriving (Eq, Ord, Show, Generic)
 
-entryTimeFormat :: TimeZone -> UTCTime -> String
-entryTimeFormat tz = formatTime defaultTimeLocale "%e %B, %Y" . utcToZonedTime tz
-
 --
 -- SQL for managing entries in the DB
 --

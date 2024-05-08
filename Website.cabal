@@ -40,6 +40,7 @@ common warnings
                   , bytestring
                   , servant-auth
                   , servant-auth-server
+                  , servant-multipart
                   , jose
                   , password
                   , cmark
@@ -68,9 +69,11 @@ library
                     , Website.Content.User
                     , Website.Content.Htmx
                     , Website.Content.Index
+                    , Website.Content.File
                     , Website.Types
                     , Website.Data.Util
                     , Website.Data.Env
+                    , Website.Data.File
                     , Website.Data.Error
                     , Website.Data.Entry
                     , Website.Data.Permission

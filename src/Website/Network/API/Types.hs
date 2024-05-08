@@ -11,6 +11,8 @@ import Website.Auth.Authentication
 import Servant.Auth.Server
 import Servant.API hiding (BasicAuth)
 import Data.Text (Text)
+import Servant.Multipart
+import Website.Data.File
 
 --
 -- Top level API. The type is used when writing servers, and the value is used to generate API type safe links.
@@ -24,6 +26,8 @@ type Auths = '[BasicAuth, Cookie, JWT]
 type TopAPI = TopAPI' Auths
 type TopAPI' auths = Auth auths UserKey :> API
 
+type FileUpload = MultipartForm Tmp (MultipartData Tmp)
+
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a
 type API =
   Get '[HTML] Html
@@ -34,4 +38,6 @@ type API =
     :<|> "users" :> Get '[HTML] Html
     :<|> "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
     :<|> "entries" :> Get '[HTML] Html
+    :<|> "file" :> CRUDForm' FileUpload FileUpload FileId
+    :<|> "files" :> Get '[HTML] Html
     :<|> Raw

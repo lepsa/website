@@ -18,9 +18,9 @@ unauthorised = do
   h <- basicPage $ H.p "Unauthorised"
   pure $ err403 { errBody = H.renderHtml h }
 
-internalServerError :: (OptionalUser c, MonadReader c m) => m ServerError
-internalServerError = do
-  h <- basicPage $ H.p "Internal Server Error"
+internalServerError :: (OptionalUser c, MonadReader c m) => String -> m ServerError
+internalServerError msg = do
+  h <- basicPage $ H.p $ H.toHtml $ "Internal Server Error" <> msg
   pure $ err500 { errBody = H.renderHtml h }
 
 notFound :: (OptionalUser c, MonadReader c m) => m ServerError
@@ -33,10 +33,10 @@ errToServerError e = case e of
   DbError e' -> dbErrToServerError e'
   Unauthenticated -> unauthenticated
   Unauthorised -> unauthorised
-  Other _ -> internalServerError
+  Other msg -> internalServerError msg
 
 dbErrToServerError :: (OptionalUser c, MonadReader c m) => DbErr -> m ServerError
 dbErrToServerError e = case e of
   NotFound -> notFound
   TooManyResults -> notFound
-  FailedToInsertRecord -> internalServerError
+  FailedToInsertRecord -> internalServerError "Failed to Insert Record"

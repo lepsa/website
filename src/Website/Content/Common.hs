@@ -23,6 +23,7 @@ type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
 type AuthEntry a = AuthLogin :> "entry" :> a
 type AuthUser a = AuthLogin :> "user" :> a
+type AuthFile a = AuthLogin :> "file" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
@@ -34,7 +35,7 @@ whenAdmin f = do
     Admin -> pure $ pure $ f user
     _ -> pure Nothing
 
-whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
+whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> a) -> m (Maybe a)
 whenLoggedIn f = do
   mUser <- asks mAuth
   case mUser of
@@ -124,6 +125,10 @@ sideNav = do
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          pure $ H.li $ H.a
+          ! hxBoost
+          ! hxOn "::config-request" "setXsrfHeader(event)"
+          ! htmlLink (Proxy @(AuthLogin :> "files" :> Get '[HTML] H.Html)) $ "Files",
           mUsers,
           pure H.hr,
           pure $ H.li $ H.a

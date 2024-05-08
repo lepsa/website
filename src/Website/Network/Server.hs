@@ -22,6 +22,8 @@ import Website.Network.API.CRUD
 import Website.Network.API.Types
 import Website.Types
 import System.FilePath
+import Website.Data.File (FileId)
+import Website.Content.File
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -35,6 +37,8 @@ server cookieSettings jwtSettings currentDirectory = api
         :<|> protected a getUsers
         :<|> crudEntry a
         :<|> unprotected a getEntries
+        :<|> crudFile a
+        :<|> unprotected a getFiles
         :<|> serveDirectoryWebApp (currentDirectory </> "static")
 
     getLogin :: (OptionalUser c, CanAppM c e m) => m Html
@@ -71,6 +75,13 @@ server cookieSettings jwtSettings currentDirectory = api
           :<|> putUser
           :<|> getUserForUpdate
           :<|> deleteUser
+
+    crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
+    crudFile a = 
+      protected a . uploadFile
+        :<|> protected a uploadFileForm
+        :<|> unprotected a . getFile
+        :<|> protected a . deleteFile
 
     -- When using a user token do a couple of things.
     -- 1) Ensure that the user actually exists in the database.

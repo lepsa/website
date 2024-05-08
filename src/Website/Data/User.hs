@@ -1,11 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
--- FromField for UUIDs is an instance we need to write ourselves
--- so that we aren't explicitly wrapping and unwrapping everywhere.
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Website.Data.User where
 
-import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Reader.Class
 import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
@@ -14,10 +11,8 @@ import Data.UUID
 import Data.UUID.V4
 import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.FromRow
 import Database.SQLite.Simple.ToField
 import GHC.Generics
-import Servant.Auth.JWT
 import Web.FormUrlEncoded
 import Website.Auth.Authorisation (Group (Admin))
 import Website.Data.Env
@@ -28,17 +23,6 @@ import Website.Types
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
 type UserKey = UUID
-instance ToJWT UserKey
-instance FromJWT UserKey
-instance FromField UUID where
-  fromField :: FieldParser UUID
-  fromField = fromField @String >=> maybe (fail "Could not parse UUID") pure . fromString
-
-instance ToField UUID where
-  toField = toField @String . toString
-
-instance FromRow UUID where
-  fromRow = fieldWith fromField
 
 newtype UserLogin = UserLogin { unUserLogin :: User }
   deriving (Eq, Show, Generic)
@@ -124,8 +108,7 @@ createUser (UserCreate group email password) = do
   c <- asks conn
   userId <- liftIO nextRandom
   eUser <- liftIO $ withTransaction c $ do
-    eUser <- query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group)
-        >>= ensureSingleInsert
+    eUser <- ensureSingleInsert <$> query c "insert into user(id, email, group_name) values (?, ?, ?) returning id, email, group_name" (userId, email, group)
     case eUser of
       (Right _user) -> eUser <$ do
         hash <- hashPassword $ mkPassword password
@@ -135,32 +118,28 @@ createUser (UserCreate group email password) = do
 
 getUserHashIO :: Connection -> UserKey -> IO (Either Err (PasswordHash Argon2))
 getUserHashIO c uid =
-  query c "select hash from user_login where id = ?" (Only uid)
-    >>= ensureSingleResult
+  ensureSingleResult <$> query c "select hash from user_login where id = ?" (Only uid)
 
 getUserHash :: (CanAppM c e m) => UserKey -> m (PasswordHash Argon2)
 getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither_
 
 getUserIO :: Connection -> UserKey -> IO (Either Err User)
 getUserIO c uid =
-  query c "select id, email, group_name from user where id = ?" (Only uid)
-    >>= ensureSingleResult
+  ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only uid)
 
 getUser :: (CanAppM c e m) => UserKey -> m User
 getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither_
 
 getUserIdIO :: Connection -> Text -> IO (Either Err UserKey)
 getUserIdIO c email =
-  query c "select id from user where email = ?" (Only email)
-    >>= ensureSingleResult
+  ensureSingleResult <$> query c "select id from user where email = ?" (Only email)
 
 getUserId :: (CanAppM c e m) => Text -> m UserKey
 getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
 
 getUserLoginIO :: Connection -> UserKey -> IO (Either Err UserLogin)
 getUserLoginIO c k =
-  query c "select id, email, group_name from user where id = ?" (Only k)
-    >>= ensureSingleResult
+  ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only k)
 
 getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
 getUserLogin k =

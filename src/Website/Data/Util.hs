@@ -1,12 +1,45 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Website.Data.Util where
+
 import Website.Data.Error
+import Data.UUID
+import Control.Monad
+import Database.SQLite.Simple.FromField
+import Database.SQLite.Simple.ToField
+import Servant.Auth.JWT
+import Database.SQLite.Simple
+import Database.SQLite.Simple.FromRow
+import Control.Monad.Except
+import Data.Time
 
-ensureSingleResult :: (Applicative m) => [a] -> m (Either Err a)
-ensureSingleResult [] = pure $ Left $ DbError NotFound
-ensureSingleResult [a] = pure $ pure a
-ensureSingleResult _ = pure $ Left $ DbError TooManyResults
+-- FromField for UUIDs is an instance we need to write ourselves
+-- so that we aren't explicitly wrapping and unwrapping everywhere.
+instance FromField UUID where
+  fromField :: FieldParser UUID
+  fromField = fromField @String >=> maybe (fail "Could not parse UUID") pure . fromString
+instance FromRow UUID where
+  fromRow = fieldWith fromField
+instance ToField UUID where
+  toField = toField @String . toString
+instance ToJWT UUID
+instance FromJWT UUID
 
-ensureSingleInsert :: (Applicative m) => [a] -> m (Either Err a)
-ensureSingleInsert [] = pure $ Left $ DbError FailedToInsertRecord
-ensureSingleInsert [a] = pure $ pure a
-ensureSingleInsert _ = pure $ Left $ Other "insert query returned multiple rows"
+timeFormat :: TimeZone -> UTCTime -> String
+timeFormat tz = formatTime defaultTimeLocale "%e %B, %Y" . utcToZonedTime tz
+
+ensureSingleInsert :: (AsErr e, MonadError e m) => [a] -> m a
+ensureSingleInsert = either (throwError . fromErr) pure . ensureSingleInsert'
+
+ensureSingleResult :: (AsErr e, MonadError e m) => [a] -> m a
+ensureSingleResult = either (throwError . fromErr) pure . ensureSingleResult'
+
+ensureSingleResult' :: [a] -> Either Err a
+ensureSingleResult' [] = Left $ DbError NotFound
+ensureSingleResult' [a] = pure a
+ensureSingleResult' _ = Left $ DbError TooManyResults
+
+ensureSingleInsert' :: [a] -> Either Err a
+ensureSingleInsert' [] = Left $ DbError FailedToInsertRecord
+ensureSingleInsert' [a] = pure a
+ensureSingleInsert' _ = Left $ Other "insert query returned multiple rows"

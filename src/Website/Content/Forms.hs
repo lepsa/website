@@ -19,6 +19,7 @@ import Website.Types
 import Website.Auth.Authorisation (Access(Read, Write), Group)
 import Website.Data.Permission
 import Website.Content.Htmx
+import Website.Data.Util
 
 -- | Values for a given form field
 data FieldData a
@@ -100,12 +101,12 @@ instance GenerateForm Entry () where
               StaticData
                 { staticLabel = "Created",
                   staticName = "created",
-                  staticValue = pure $ entryTimeFormat tz entry.created
+                  staticValue = pure $ timeFormat tz entry.created
                 },
               StaticData
                 { staticLabel = "Last Updated",
                   staticName = "created",
-                  staticValue = pure $ maybe "Never" (entryTimeFormat tz) entry.updated
+                  staticValue = pure $ maybe "Never" (timeFormat tz) entry.updated
                 },
               FieldData
                 { fieldLabel = "Value",

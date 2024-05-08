@@ -134,6 +134,11 @@ migrateSchemaV5 =
   [ "alter table entry add column updated datetime"
   ]
 
+migrateSchemaV6 :: [Query]
+migrateSchemaV6 =
+  [ "create table if not exists file(id text primary key not null, name text not null, data blob not null, type text not null, created datetime not null, updated datetime)"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
@@ -141,5 +146,6 @@ migrations =
     (2, migrateSchemaV2),
     (3, migrateSchemaV3),
     (4, migrateSchemaV4),
-    (5, migrateSchemaV5)
+    (5, migrateSchemaV5),
+    (6, migrateSchemaV6)
   ]
