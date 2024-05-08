@@ -14,7 +14,7 @@ checkPermission userLogin name requested = do
   -- into the JWT or initial checkup, as we want to have the
   -- most up to date information when we are doing the check
   -- even if it does hit the database more.
-  user <- getUser userLogin.uuid
+  user <- getUser userLogin.unUserLogin.uuid
   permissions <- getPermissions name
   let check permission =
         -- Admins inherit all user permissions.

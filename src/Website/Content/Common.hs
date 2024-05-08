@@ -16,6 +16,9 @@ import Servant.Auth.Server (AuthResult)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Website.Content.Htmx
+import Website.Auth.Authorisation
+import Website.Data.Env
+import Website.Types
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -32,6 +35,13 @@ tryError action = (Right <$> action) `catchError` (pure . Left)
 withError :: MonadError e m => (e -> e) -> m a -> m a
 withError f action = tryError action >>= either (throwError . f) pure
 
+whenAdmin :: (RequiredUser c, CanAppM c e m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
+whenAdmin f = do
+  user <- asks auth
+  case user.unUserLogin.group of
+    Admin -> pure $ pure $ f user
+    _ -> pure Nothing
+
 whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
 whenLoggedIn f = do
   mUser <- asks mAuth
@@ -40,12 +50,12 @@ whenLoggedIn f = do
     Just user -> pure $ pure $ f user
 
 greetUser :: UserLogin -> H.Html
-greetUser (UserLogin _ e) = H.p
+greetUser (UserLogin u) = H.p
   ! HA.id "greeter"
   $ mconcat
   [ "Welcome back,"
   , H.br
-  , H.toHtml e
+  , H.toHtml u.email
   ]
 
 -- | Helper function for generating typesafe internal API links for use in HTML attributes

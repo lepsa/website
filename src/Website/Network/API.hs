@@ -108,6 +108,7 @@ getUsers = do
 
 register :: CanAppM c e m => CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register cookieSettings jwtSettings cUser = do
+  adminExists >>= flip when (throwError_ Unauthorised)
   user <- createUser cUser
   mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid

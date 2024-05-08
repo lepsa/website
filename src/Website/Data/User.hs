@@ -8,7 +8,6 @@ module Website.Data.User where
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader.Class
-import Data.Aeson (FromJSON, ToJSON)
 import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
 import Data.Text hiding (group)
 import Data.UUID
@@ -20,7 +19,7 @@ import Database.SQLite.Simple.ToField
 import GHC.Generics
 import Servant.Auth.JWT
 import Web.FormUrlEncoded
-import Website.Auth.Authorisation (Group)
+import Website.Auth.Authorisation (Group (Admin))
 import Website.Data.Env
 import Website.Data.Error
 import Website.Data.Util
@@ -41,14 +40,10 @@ instance ToField UUID where
 instance FromRow UUID where
   fromRow = fieldWith fromField
 
-data UserLogin = UserLogin
-  { uuid :: UserKey
-  , email :: Text
-  } deriving (Eq, Show, Generic)
-instance ToJSON UserLogin
-instance FromJSON UserLogin
+newtype UserLogin = UserLogin { unUserLogin :: User }
+  deriving (Eq, Show, Generic)
 instance FromRow UserLogin where
-  fromRow = UserLogin <$> field <*> field
+  fromRow = UserLogin <$> fromRow
 
 class (HasEnv c, HasAuth c UserLogin, OptionalUser c) => RequiredUser c
 instance RequiredUser (EnvAuthed UserLogin)
@@ -164,7 +159,7 @@ getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
 
 getUserLoginIO :: Connection -> UserKey -> IO (Either Err UserLogin)
 getUserLoginIO c k =
-  query c "select id, email from user where id = ?" (Only k)
+  query c "select id, email, group_name from user where id = ?" (Only k)
     >>= ensureSingleResult
 
 getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
@@ -206,3 +201,12 @@ getUsers :: CanAppM c e m => m [User]
 getUsers = do
   c <- asks conn
   liftIO $ withTransaction c $ query_ c "select id, email, group_name from user"
+
+adminExists :: CanAppM c e m => m Bool
+adminExists = do
+  c <- asks conn
+  liftIO $ do
+    l :: [User] <- query c "select id, email, group_name from user where group_name = ? limit 1" (Only Admin)
+    case l of
+      [] -> pure False
+      _ -> pure True

@@ -218,6 +218,7 @@ cRegister env =
     gen
     execute
     [ Require $ \state input -> not $ any (\u -> u ^. email == input ^. email) state._users,
+      Require $ \state _input -> not $ any (\u -> u ^. tuGroup == Admin) state._users,
       Update $ \state (RegisterUser e p g) output ->
         state & users .~ M.insert output (TestUser e p g Nothing) state._users,
       Ensure $ \oldState newState input _output -> do
