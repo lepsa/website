@@ -22,12 +22,18 @@ import Data.Map qualified as M
 import Control.Lens
 import Data.Kind
 import Data.Maybe (catMaybes)
+import qualified Data.ByteString as BS
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
 -- we want to track the same information, to ensure that the server
 -- is doing what we expect.
-type Key = Var String
+data Key v
+  = GoodKey (Var String v)
+  | BadKey String
+  deriving (Generic, Eq, Ord, Show)
+instance FunctorB Key
+instance TraversableB Key
 
 class HasEmail t where
   email :: Lens' t Text
@@ -59,11 +65,12 @@ instance TraversableB TestUser
 
 data ApiState v = ApiState
   { _users   :: Map (Key v) (TestUser v),
-    _entries :: Map (Key v) (TestEntry v)
+    _entries :: Map (Key v) (TestEntry v),
+    _files   :: Map (Key v) (TestFile v)
   } deriving (Generic)
 
 initialState :: ApiState v
-initialState = ApiState M.empty M.empty
+initialState = ApiState M.empty M.empty M.empty
 
 data TestEnv = TestEnv
   { manager :: H.Manager,
@@ -82,7 +89,8 @@ instance FunctorB AuthKey
 instance TraversableB AuthKey
 
 data Auth v
-  = Normal (AuthKey v)
+  = None
+  | Normal (AuthKey v)
   | Bad (Maybe (AuthKey v))
   deriving (Eq, Generic, Show)
 instance FunctorB Auth
@@ -126,6 +134,13 @@ data GetEntry v = GetEntry
   } deriving (Show, Generic)
 instance FunctorB GetEntry
 instance TraversableB GetEntry
+
+data DeleteEntry v = DeleteEntry
+  { _deKey :: Key v
+  , _deAuth :: Auth v
+  } deriving (Show, Generic)
+instance FunctorB DeleteEntry
+instance TraversableB DeleteEntry
 
 data GetEntryMissing v = GetEntryMissing
   { _gemKey :: String
@@ -204,6 +219,37 @@ data UpdateUser v = UpdateUser
 instance FunctorB UpdateUser
 instance TraversableB UpdateUser
 
+data TestFile v = TestFile
+  { _tfName :: String
+  , _tfType :: String
+  , _tfData :: BS.ByteString
+  } deriving (Show, Generic)
+instance FunctorB TestFile
+instance TraversableB TestFile
+
+data CreateFile v = CreateFile
+  { _cfAuth :: Auth v
+  , _cfName :: String
+  , _cfType :: String
+  , _cfData :: BS.ByteString
+  } deriving (Show, Generic)
+instance FunctorB CreateFile
+instance TraversableB CreateFile
+
+data GetFile v = GetFile
+  { _gfKey :: Key v
+  , _gfAuth :: Auth v
+  } deriving (Show, Generic)
+instance FunctorB GetFile
+instance TraversableB GetFile
+
+data DeleteFile v = DeleteFile
+  { _dfKey :: Key v
+  , _dfAuth :: Auth v
+  } deriving (Show, Generic)
+instance FunctorB DeleteFile
+instance TraversableB DeleteFile
+
 --
 -- Side channel commands
 --
@@ -237,6 +283,7 @@ makeLenses ''TestLogin
 makeWrapped ''GetEntries
 makeLenses ''GetEntry
 makeLenses ''GetEntryMissing
+makeLenses ''DeleteEntry
 makeLenses ''CreateEntry
 makeLenses ''UpdateEntry
 makeLenses ''RegisterUser
@@ -245,6 +292,9 @@ makeLenses ''DeleteUser
 makeLenses ''GetUser
 makeLenses ''PasswordUpdate
 makeLenses ''UpdateUser
+makeLenses ''CreateFile
+makeLenses ''GetFile
+makeLenses ''DeleteFile
 
 instance HasEmail (TestUser v) where
   email = tuEmail
@@ -261,11 +311,29 @@ instance HasEmail (TestLogin v) where
 instance HasPassword (TestLogin v) where
   password = tlPass
 
+instance HasAuth CreateFile where
+  auth = cfAuth
+
+instance HasAuth GetFile where
+  auth = gfAuth
+
+instance HasKey GetFile where
+  key = gfKey
+
+instance HasAuth DeleteFile where
+  auth = dfAuth
+
+instance HasKey DeleteFile where
+  key = dfKey
+
 instance HasAuth GetEntries where
   auth = _Wrapped
 
 instance HasAuth GetEntry where
   auth = geAuth
+
+instance HasAuth DeleteEntry where
+  auth = deAuth
 
 instance HasAuth GetEntryMissing where
   auth = gemAuth
@@ -292,6 +360,9 @@ instance HasAuth UpdateUser where
 
 instance HasKey GetEntry where
   key = geKey
+
+instance HasKey DeleteEntry where
+  key = deKey
 
 instance HasKey UpdateEntry where
   key = ueKey

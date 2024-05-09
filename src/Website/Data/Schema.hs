@@ -96,7 +96,7 @@ migrateSchemaV0 =
 
 migrateSchemaV1 :: [Query]
 migrateSchemaV1 =
-  [ "create table if not exists entry (key integer primary key not null, created datetime not null, title text not null, value text not null)"
+  [ "create table if not exists entry (key text primary key not null, created datetime not null, title text not null, value text not null)"
   ]
 
 migrateSchemaV2 :: [Query]

@@ -9,4 +9,5 @@ resetDb c = NoContent <$ withTransaction c (
     execute_ c "delete from user_login"
     execute_ c "delete from user"
     execute_ c "delete from entry"
+    execute_ c "delete from file"
   )

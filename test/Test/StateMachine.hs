@@ -16,7 +16,7 @@ import Data.CaseInsensitive (mk)
 import Data.Char
 import Data.List (find, isPrefixOf, sort)
 import Data.Map qualified as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
@@ -35,6 +35,10 @@ import Website.Auth.Authorisation (Group (..))
 import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User (User)
 import Website.Data.User qualified (User (..))
+import Network.HTTP.Client.MultipartFormData
+import Network.HTTP.Client (RequestBody(RequestBodyBS))
+import qualified Data.ByteString.Lazy as BSL
+import Data.Bool
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -90,13 +94,16 @@ genPasswordUpdate user = do
 -- Helper functions
 --
 
-mkReq :: Method -> [Header] -> H.Request -> H.Request
-mkReq method headers req =
+mkReq' :: Method -> Header -> [Header] -> H.Request -> H.Request
+mkReq' method accept headers req =
   req
     { H.method = method,
       H.redirectCount = 0,
-      H.requestHeaders = acceptHtml : headers <> H.requestHeaders req
+      H.requestHeaders = accept : headers <> H.requestHeaders req
     }
+
+mkReq :: Method -> [Header] -> H.Request -> H.Request
+mkReq method = mkReq' method acceptHtml
 
 emailExists :: (HasEmail r) => ApiState v -> r -> Bool
 emailExists state command = any (\u -> u ^. email == command ^. email) state._users
@@ -109,6 +116,7 @@ userExists state command = case command ^. auth of
               u ^. tuGroup == user ^. akUser . tuGroup
     Nothing -> False
   Bad _ -> True
+  None -> True
 
 userGroupAdmin :: (HasAuth r) => a -> r v -> Bool
 userGroupAdmin _ = userGroup Auth.Admin
@@ -120,8 +128,8 @@ userGroup :: (HasAuth r) => Auth.Group -> r v -> Bool
 userGroup group command =
   case command ^. auth of
     Normal user -> user ^. akUser . tuGroup == group
-    Bad Nothing -> False
-    Bad (Just user) -> user ^. akUser . tuGroup == group
+    Bad _ -> True
+    None -> True
 
 entryExists :: (HasKey r, Ord1 v) => ApiState v -> r v -> Bool
 entryExists state command = M.member (command ^. key) state._entries
@@ -142,6 +150,7 @@ mkAuthHeader :: (HasAuth command) => command Concrete -> [Header]
 mkAuthHeader command = case command ^. auth of
   Normal (AuthKey _ u) -> pure $ maybe (mkBasicAuthHeader u) (mkBearerAuthHeader . concrete) $ u ^. tuJwt
   Bad user -> badHeader $ view akUser <$> user
+  None -> []
   where
     badHeader :: Maybe (TestUser Concrete) -> [Header]
     badHeader = maybe [] (pure . mkBasicAuthHeader)
@@ -156,13 +165,38 @@ mkAuthHeader command = case command ^. auth of
         "Basic " <> encodeUtf8 (extractBase64 @_ @T.Text $ B64.encodeBase64 (user ^. email <> ":" <> user ^. password))
       )
 
+mkGoodAuth :: (MonadGen m) => ApiState v -> m (Auth v)
+mkGoodAuth state = Normal . uncurry AuthKey <$> Gen.element (M.toList state._users)
+
 mkAuth :: (MonadGen m) => ApiState v -> m (Auth v)
-mkAuth state = Normal . uncurry AuthKey <$> Gen.element (M.toList state._users)
+mkAuth state = Gen.choice
+  [ mkGoodAuth state
+  , mkBadAuth state
+  ]
+
+mkKey :: MonadGen m => String -> [Key v] -> m (Key v)
+mkKey base keys = Gen.choice
+  [ Gen.element keys
+  , mkBadKey base
+  ]
+
+genUuid :: MonadGen m => m String
+genUuid = do
+  a <- Gen.string (Range.singleton 8) Gen.hexit
+  b <- Gen.string (Range.singleton 4) Gen.hexit
+  c <- Gen.string (Range.singleton 4) Gen.hexit
+  d <- Gen.string (Range.singleton 4) Gen.hexit
+  e <- Gen.string (Range.singleton 12) Gen.hexit
+  pure $ a <> "-" <> b <> "-" <> c <> "-" <> d <> "-" <> e
+
+mkBadKey :: MonadGen m => String -> m (Key v)
+mkBadKey base = BadKey . (base <>) <$> genUuid
 
 mkBadAuth :: (MonadGen m) => ApiState v -> m (Auth v)
 mkBadAuth state =
   Gen.choice
-    [ pure $ Bad Nothing,
+    [ pure None
+    , pure $ Bad Nothing,
       if M.null state._users
         then pure $ Bad Nothing
         else do
@@ -206,6 +240,10 @@ extractKey =
     . find (\(h, _) -> h == "Location")
     . H.responseHeaders
 
+keyString :: Key Concrete -> String
+keyString (GoodKey s) = concrete s
+keyString (BadKey s) = s
+
 --
 -- Main api commands
 --
@@ -220,7 +258,7 @@ cRegister env =
     [ Require $ \state input -> not $ any (\u -> u ^. email == input ^. email) state._users,
       Require $ \state _input -> not $ any (\u -> u ^. tuGroup == Admin) state._users,
       Update $ \state (RegisterUser e p g) output ->
-        state & users .~ M.insert output (TestUser e p g Nothing) state._users,
+        state & users %~ M.insert (GoodKey output) (TestUser e p g Nothing),
       Ensure $ \oldState newState input _output -> do
         assert $ not $ any (\u -> u ^. email == input ^. email) oldState._users
         assert $ any (\u -> u ^. email == input ^. email) newState._users
@@ -299,99 +337,53 @@ cGetEntries env =
   Command
     gen
     execute
-    [ Require $ \state input -> case input ^. auth of
-        Normal _ -> userExists state input
-        Bad Nothing -> True
-        Bad (Just (AuthKey _ user)) ->
-          none
-            (\u -> u ^. tuEmail == user ^. tuEmail && u ^. tuPassword == user ^. tuPassword)
-            $ state ^. users,
+    [ Require userExists,
       Ensure $ \_oldState newState _input output -> do
         output.responseStatus === status200
         -- Commit the great sin of "parsing" html with regex
-        let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:digit:]]+"|] :: String))
+        let matches :: [BSL8.ByteString] = getAllTextMatches (output.responseBody =~ ([r|"/entry/[[:alnum:]]{8}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{4}-[[:alnum:]]{12}"|] :: String))
         length newState._entries === length matches
     ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
     gen state =
       if M.null state._users
-        then Nothing
-        else
-          Just $
-            GetEntries
-              <$> Gen.choice
-                [ Normal . uncurry AuthKey <$> Gen.element (M.toList state._users),
-                  mkBadAuth state
-                ]
+        then Just $ pure $ GetEntries None
+        else Just $ GetEntries <$> mkAuth state
     execute :: GetEntries Concrete -> m (H.Response BSL8.ByteString)
     execute getEntries = do
       req <- H.parseRequest $ env.baseUrl <> "/entries"
       let req' = mkReq methodGet (mkAuthHeader getEntries) req
       liftIO $ H.httpLbs req' env.manager
 
-cGetEntriesBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntriesBadAuth env = Command gen execute []
-  where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntries Symbolic))
-    gen state = pure $ GetEntries <$> mkBadAuth state
-    execute :: GetEntries Concrete -> m ()
-    execute getEntries = do
-      req <- H.parseRequest $ env.baseUrl <> "/entries"
-      let req' = mkReq methodGet (mkAuthHeader getEntries) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status200
-
 cGetEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntry env =
-  Command
-    gen
-    execute
-    [ Require $ \state input -> case input ^. auth of
-        Normal (AuthKey k u) -> (Just u ==) $ M.lookup k $ state ^. users
-        Bad _ -> True,
-      Ensure $ \old _new input output -> do
-        case input ^. geAuth of
-          Normal (AuthKey k u) -> case old ^? users . ix k of
-            Nothing -> fail "User key doesn't exist in old state"
-            Just user -> do
-              user === u
-              output.responseStatus === status200
-          Bad _ -> do
-            output.responseStatus === status200
-    ]
+cGetEntry env = Command gen execute
+  [ Require userExists,
+    Require $ \state input -> case input ^. key of
+      k@(GoodKey _) -> M.member k $ state ^. files
+      BadKey _ -> True,
+    Ensure $ \old _new input output -> do
+      let keyStatus = case input ^. key of
+            GoodKey _ -> output.responseStatus === status200
+            BadKey _ -> output.responseStatus === status404
+      case input ^. auth of
+        Normal (AuthKey k u) -> case old ^? users . ix k of
+          Nothing -> fail "User key doesn't exist in old state"
+          Just user -> do
+            user === u
+            keyStatus
+        _ -> keyStatus
+  ]
   where
     gen :: ApiState Symbolic -> Maybe (gen (GetEntry Symbolic))
-    gen state =
-      if M.null state._users || M.null state._entries
-        then Nothing
-        else
-          pure $
-            GetEntry
-              <$> Gen.element (M.keys state._entries)
-              <*> Gen.choice [mkAuth state, mkBadAuth state]
+    gen state = pure $ GetEntry
+      <$> bool (mkKey "/entry/" $ M.keys state._entries) (mkBadKey "/entry/") (M.null state._entries)
+      <*> bool (mkAuth state) (mkBadAuth state) (M.null state._users)
     execute :: GetEntry Concrete -> m (H.Response BSL8.ByteString)
     execute getEntry = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (getEntry ^. key)
+      req <- H.parseRequest $ env.baseUrl <> keyString (getEntry ^. key)
       let req' = mkReq methodGet (mkAuthHeader getEntry) req
       liftIO $ H.httpLbs req' env.manager
-
-cGetEntryBadKey :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cGetEntryBadKey env = Command gen execute []
-  where
-    gen :: ApiState Symbolic -> Maybe (gen (GetEntryMissing Symbolic))
-    gen state =
-      if M.null state._users
-        then Nothing
-        else pure $ do
-          k <- ("/entry/" <>) <$> Gen.string (Range.linear 1 10) Gen.alpha
-          GetEntryMissing k <$> mkAuth state
-    execute :: GetEntryMissing Concrete -> m ()
-    execute getEntry = do
-      req <- H.parseRequest $ env.baseUrl <> getEntry ^. gemKey
-      let req' = mkReq methodGet (mkAuthHeader getEntry) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status404
 
 cCreateEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cCreateEntry env =
@@ -401,7 +393,7 @@ cCreateEntry env =
     [ Require userExists
     , Update $ \state input output ->
         state
-          & entries %~ M.insert output (TestEntry (input ^. ceTitle) (input ^. ceValue)),
+          & entries %~ M.insert (GoodKey output) (TestEntry (input ^. ceTitle) (input ^. ceValue)),
       Ensure $ \_old _new _input output -> do
         assert $ isPrefixOf "/entry/" output
         assert $ length output > length ("/entry/" :: String)
@@ -411,7 +403,7 @@ cCreateEntry env =
     gen state =
       if M.null state._users
         then Nothing
-        else pure $ CreateEntry <$> mkAuth state <*> genText <*> genText
+        else pure $ CreateEntry <$> mkGoodAuth state <*> genText <*> genText
     execute :: CreateEntry Concrete -> m String
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
@@ -436,7 +428,7 @@ cCreateEntryBadAuth env = Command gen execute []
         else pure $ CreateEntry <$> mkBadAuth state <*> genText <*> genText
     execute :: CreateEntry Concrete -> m ()
     execute createEntry = do
-      req <- H.parseRequest (env.baseUrl <> "/entry")
+      req <- H.parseRequest $ env.baseUrl <> "/entry"
       let req' =
             mkReq
               methodPost
@@ -452,43 +444,40 @@ cDeleteEntry env =
   Command
     gen
     execute
-    [ Update $ \state input _output ->
-        state
-          & entries %~ M.delete (input ^. key)
+    [ Require userExists,
+      Require userGroupAdmin,
+      Update $ \state input _output ->
+        case input ^. auth of
+          Normal _ -> case input ^. key of
+            GoodKey _ -> state & entries %~ M.delete (input ^. key)
+            _ -> state
+          _ -> state,
+      Ensure $ \old new input output -> do
+        annotate $ show input
+        annotate $ show output
+        case input ^. auth of
+          Normal _ -> do
+            case input ^. key of
+              GoodKey _ -> do
+                output.responseStatus === status200
+                length (old ^. entries) === length (new ^. entries) + 1
+              _ -> do
+                output.responseStatus === status200
+                length (old ^. entries) === length (new ^. entries)
+          _ -> do
+            output.responseStatus === status401
+            length (old ^. entries) === length (new ^. entries)
     ]
   where
-    gen :: (Ord1 v) => ApiState v -> Maybe (gen (GetEntry v))
-    gen state =
-      if not (M.null state._users) && not (M.null state._entries)
-        then Just $ do
-          GetEntry
-            <$> Gen.element (M.keys state._entries)
-            <*> mkAuth state
-        else Nothing
-    execute :: GetEntry Concrete -> m ()
+    gen :: (Ord1 v) => ApiState v -> Maybe (gen (DeleteEntry v))
+    gen state = pure $ DeleteEntry
+      <$> bool (mkKey "/entry/" $ M.keys state._entries) (mkBadKey "/entry/") (M.null state._entries)
+      <*> bool (mkAuth state) (mkBadAuth state) (M.null state._users)
+    execute :: DeleteEntry Concrete -> m (H.Response BSL.ByteString)
     execute deleteEntry = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (deleteEntry ^. key) <> "/delete"
+      req <- H.parseRequest $ env.baseUrl <> keyString (deleteEntry ^. key) <> "/delete"
       let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status200
-
-cDeleteEntryBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cDeleteEntryBadAuth env = Command gen execute []
-  where
-    gen :: (Ord1 v) => ApiState v -> Maybe (gen (GetEntry v))
-    gen state =
-      if not (M.null state._users) && not (M.null state._entries)
-        then Just $ do
-          GetEntry
-            <$> Gen.element (M.keys state._entries)
-            <*> mkBadAuth state
-        else Nothing
-    execute :: GetEntry Concrete -> m ()
-    execute deleteEntry = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (deleteEntry ^. key) <> "/delete"
-      let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status401
+      liftIO $ H.httpLbs req' env.manager      
 
 cUpdateEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cUpdateEntry env =
@@ -511,14 +500,14 @@ cUpdateEntry env =
         then
           Just $
             UpdateEntry
-              <$> mkAuth state
+              <$> mkGoodAuth state
               <*> Gen.element (M.keys state._entries)
               <*> genText
               <*> genText
         else Nothing
     execute :: UpdateEntry Concrete -> m ()
     execute input = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (input ^. key) <> "/update"
+      req <- H.parseRequest $ env.baseUrl <> keyString (input ^. key) <> "/update"
       let req' =
             mkReq
               methodPut
@@ -545,7 +534,7 @@ cUpdateEntryBadAuth env = Command gen execute []
         else Nothing
     execute :: UpdateEntry Concrete -> m ()
     execute updateEntry = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (updateEntry ^. key) <> "/update"
+      req <- H.parseRequest $ env.baseUrl <> keyString (updateEntry ^. key) <> "/update"
       let req' =
             mkReq
               methodPut
@@ -566,7 +555,7 @@ cCreateUser env =
       Require $ \state input -> all (\u -> u ^. tuEmail /= input ^. cuEmail) (state ^. users),
       Update $ \state input output ->
         state
-          & users %~ M.insert output (TestUser (input ^. email) (input ^. password) (input ^. cuGroup) Nothing),
+          & users %~ M.insert (GoodKey output) (TestUser (input ^. email) (input ^. password) (input ^. cuGroup) Nothing),
       Ensure $ \old new input _output -> do
         length old._users + 1 === length new._users
         assert $ any (\u -> u ^. email == input ^. email) new._users
@@ -578,7 +567,7 @@ cCreateUser env =
         then Nothing
         else Just $ do
           CreateUser
-            <$> mkAuth state
+            <$> mkGoodAuth state
             <*> genGroup
             <*> Gen.filterT (\e -> not $ any (\u -> u ^. email == e) state._users) genEmail
             <*> genPassword
@@ -646,10 +635,10 @@ cUpdateUser env =
           UpdateUser k
             <$> genPasswordUpdate u
             <*> fmap pure genGroup
-            <*> mkAuth state
+            <*> mkGoodAuth state
     execute :: UpdateUser Concrete -> m ()
     execute update = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (update ^. key) <> "/update"
+      req <- H.parseRequest $ env.baseUrl <> keyString (update ^. key) <> "/update"
       let req' =
             mkReq
               methodPut
@@ -676,7 +665,7 @@ cUpdateUserBadAuth env = Command gen execute []
             <*> mkBadAuth state
     execute :: UpdateUser Concrete -> m ()
     execute update = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (update ^. key) <> "/update"
+      req <- H.parseRequest $ env.baseUrl <> keyString (update ^. key) <> "/update"
       let req' =
             mkReq
               methodPut
@@ -696,11 +685,17 @@ cDeleteUser env =
     [ Require userExists,
       Require userGroupAdmin,
       Update $ \state input _output ->
-        state & users %~ M.delete (input ^. key),
-      Ensure $ \old new input _output -> do
-        length old._users === length new._users + 1
-        assert $ not $ M.member (input ^. key) new._users
-        assert $ M.member (input ^. key) old._users
+        case input ^. auth of
+          Normal _ -> state & users %~ M.delete (input ^. key)
+          _ -> state,
+      Ensure $ \old new input output -> do
+        case input ^. auth of
+          Normal _ -> do
+            length old._users === length new._users + 1
+            assert $ not $ M.member (input ^. key) new._users
+            assert $ M.member (input ^. key) old._users
+          _ -> do
+            output.responseStatus === status401
     ]
   where
     gen :: ApiState v -> Maybe (gen (DeleteUser v))
@@ -708,35 +703,15 @@ cDeleteUser env =
       if M.null state._users
         then Nothing
         else Just $ do
-          (k, u) <- Gen.element $ M.toList state._users
           k' <- Gen.element (M.keys state._users)
-          pure $ DeleteUser (Normal $ AuthKey k u) k'
-    execute :: DeleteUser Concrete -> m ()
+          DeleteUser <$> mkAuth state <*> pure k'
+    execute :: DeleteUser Concrete -> m (H.Response BSL.ByteString)
     execute update = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (update ^. key) <> "/delete"
+      req <- H.parseRequest $ env.baseUrl <> keyString (update ^. key) <> "/delete"
       let req' = mkReq methodDelete (formHeader : mkAuthHeader update) req
       res <- liftIO $ H.httpLbs req' env.manager
       annotate $ show res
-      res.responseStatus === status200
-
-cDeleteUserBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
-cDeleteUserBadAuth env = Command gen execute []
-  where
-    gen :: ApiState v -> Maybe (gen (DeleteUser v))
-    gen state =
-      if M.null state._users
-        then Nothing
-        else Just $ do
-          a <- mkBadAuth state
-          k <- Gen.element $ M.keys state._users
-          pure $ DeleteUser a k
-    execute :: DeleteUser Concrete -> m ()
-    execute update = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (update ^. key) <> "/delete"
-      let req' = mkReq methodDelete (formHeader : mkAuthHeader update) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
-      res.responseStatus === status401
+      pure res
 
 cGetUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetUser env =
@@ -748,6 +723,7 @@ cGetUser env =
           Normal _ ->
             userExists state input
               && userGroupAdmin state input
+          None -> True
           Bad Nothing -> True
           Bad (Just (AuthKey _ u)) ->
             all (\u' -> u ^. tuEmail == u' ^. tuEmail && u ^. tuPassword == u' ^. tuPassword) $
@@ -758,6 +734,8 @@ cGetUser env =
             output.responseStatus === status200
             output.responseBody /== mempty
           Bad _ -> do
+            output.responseStatus === status401
+          None -> do
             output.responseStatus === status401
     ]
   where
@@ -776,8 +754,168 @@ cGetUser env =
             ]
     execute :: GetUser Concrete -> m (H.Response BSL8.ByteString)
     execute getUser = do
-      req <- H.parseRequest $ env.baseUrl <> concrete (getUser ^. key)
+      req <- H.parseRequest $ env.baseUrl <> keyString (getUser ^. key)
       let req' = mkReq methodGet (mkAuthHeader getUser) req
+      liftIO $ H.httpLbs req' env.manager
+
+cCreateFile :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cCreateFile env =
+  Command
+    gen
+    execute
+    [ Require userExists,
+      Require userGroupAdmin,
+      Update $ \state input output ->
+        state
+          & files %~ M.insert (GoodKey output)
+            ( TestFile (input ^. cfName) (input ^. cfName) (input ^. cfData)
+            ),
+      Ensure $ \old new input output -> do
+        annotate $ show input
+        annotate $ show output
+        assert $ isPrefixOf "/file/" output
+        assert $ length output > length ("/entry/" :: String)
+        length old._files + 1 === length new._files
+    ]
+  where
+    gen :: ApiState v -> Maybe (gen (CreateFile v))
+    gen state =
+      if M.null state._users
+        then Nothing
+        else Just $ do
+          CreateFile
+            <$> mkGoodAuth state
+            <*> Gen.string textLength chars
+            <*> Gen.string textLength chars
+            <*> Gen.bytes textLength
+    execute :: CreateFile Concrete -> m String
+    execute tfUpload = do
+      req <- H.parseRequest $ env.baseUrl <> "/file"
+      req' <- formDataBody
+        [ partFileRequestBody "file" (tfUpload ^. cfName) $ RequestBodyBS $ tfUpload ^. cfData
+        ] $ mkReq
+        methodPost
+        (formHeader : mkAuthHeader tfUpload)
+        req
+      res <- liftIO $ H.httpLbs req' env.manager
+      res.responseStatus === status303
+      k <- extractKey res
+      annotate $ show k
+      pure k
+
+cCreateFileBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cCreateFileBadAuth env = Command gen execute []
+  where
+    gen :: ApiState v -> Maybe (gen (CreateFile v))
+    gen state =
+      if M.null state._users
+        then Just $ CreateFile None
+          <$> Gen.string textLength chars
+          <*> Gen.string textLength chars
+          <*> Gen.bytes textLength
+        else Just $ do
+          CreateFile
+            <$> mkBadAuth state
+            <*> Gen.string textLength chars
+            <*> Gen.string textLength chars
+            <*> Gen.bytes textLength
+    execute :: CreateFile Concrete -> m ()
+    execute tfUpload = do
+      req <- H.parseRequest $ env.baseUrl <> "/file"
+      req' <- formDataBody
+        [ partFileRequestBody "file" (tfUpload ^. cfName) $ RequestBodyBS $ tfUpload ^. cfData
+        ] $ mkReq
+        methodPost
+        (formHeader : mkAuthHeader tfUpload)
+        req
+      res <- liftIO $ H.httpLbs req' env.manager
+      res.responseStatus === status401
+
+cGetFile :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cGetFile env =
+  Command
+    gen
+    execute
+    [ Require $ \state input -> case input ^. auth of
+        Normal (AuthKey k u) -> (Just u ==) $ M.lookup k $ state ^. users
+        Bad _ -> True
+        None -> True,
+      Require $ \state (GetFile k _) -> isJust $ M.lookup k $ state ^. files,
+      Ensure $ \old _new input output -> do
+        annotate $ show input
+        annotate $ show output
+        case input ^. gfAuth of
+          Normal (AuthKey k u) -> case old ^? users . ix k of
+            Nothing -> fail "User key doesn't exist in old state"
+            Just user -> do
+              user === u
+              output.responseStatus === status200
+          Bad _ -> do
+            output.responseStatus === status200
+          None -> do
+            output.responseStatus === status200
+    ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetFile Symbolic))
+    gen state =
+      if M.null state._users || M.null state._files
+        then Nothing
+        else
+          pure $
+            GetFile
+              <$> Gen.element (M.keys state._files)
+              <*> Gen.choice [mkGoodAuth state, mkBadAuth state]
+    execute :: GetFile Concrete -> m (H.Response BSL8.ByteString)
+    execute getFile = do
+      annotate $ show getFile
+      req <- H.parseRequest $ env.baseUrl <> keyString (getFile ^. key)
+      let req' = mkReq' methodGet ("Accept", "*/*") (mkAuthHeader getFile) req
+      liftIO $ H.httpLbs req' env.manager
+
+cDeleteFile :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cDeleteFile env =
+  Command
+    gen
+    execute
+    [ Require userExists,
+      Require userGroupAdmin,
+      Require $ \state (DeleteFile k _) -> isJust $ M.lookup k $ state ^. files,
+      Update $ \state input _output -> 
+        case input ^. auth of
+          Normal _ -> state & files %~ M.delete (input ^. dfKey)
+          _ -> state,
+      Ensure $ \old new input output -> do
+        annotate $ show input
+        annotate $ show output
+        case input ^. dfAuth of
+          Normal (AuthKey k u) -> case old ^? users . ix k of
+            Nothing -> fail "User key doesn't exist in old state"
+            Just user -> do
+              user === u
+              output.responseStatus === status200
+              length (old ^. files) === length (new ^. files) + 1
+          Bad _ -> do
+            output.responseStatus === status401
+            length (old ^. files) === length (new ^. files)
+          None -> do
+            output.responseStatus === status401
+            length (old ^. files) === length (new ^. files)
+    ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (DeleteFile Symbolic))
+    gen state =
+      if M.null state._users || M.null state._files
+        then Nothing
+        else
+          pure $
+            DeleteFile
+              <$> Gen.element (M.keys state._files)
+              <*> mkAuth state
+    execute :: DeleteFile Concrete -> m (H.Response BSL8.ByteString)
+    execute getFile = do
+      annotate $ show getFile
+      req <- H.parseRequest $ env.baseUrl <> keyString (getFile ^. key) <> "/delete"
+      let req' = mkReq methodDelete (mkAuthHeader getFile) req
       liftIO $ H.httpLbs req' env.manager
 
 --
@@ -845,13 +983,10 @@ propApiTests env reset = withTests 100 . property $ do
               cTestGetUsers,
               -- Entry commands
               cGetEntry,
-              cGetEntryBadKey,
               cGetEntries,
-              cGetEntriesBadAuth,
               cCreateEntry,
               cCreateEntryBadAuth,
               cDeleteEntry,
-              cDeleteEntryBadAuth,
               cUpdateEntry,
               cUpdateEntryBadAuth,
               -- User commands
@@ -860,6 +995,10 @@ propApiTests env reset = withTests 100 . property $ do
               cUpdateUser,
               cUpdateUserBadAuth,
               cDeleteUser,
-              cDeleteUserBadAuth,
-              cGetUser
+              cGetUser,
+              -- File commands
+              cCreateFile,
+              cCreateFileBadAuth,
+              cGetFile,
+              cDeleteFile
             ]

@@ -14,6 +14,9 @@ import Website.Data.Env
 import Website.Data.Error
 import Data.Text
 import Data.List (sortBy)
+import Data.UUID (UUID)
+import Website.Data.Util ()
+import Data.UUID.V4 (nextRandom)
 
 --
 -- What an Entry is, and the various derived types that
@@ -21,7 +24,7 @@ import Data.List (sortBy)
 --
 
 newtype EntryKey = EntryKey
-  { key :: Int
+  { key :: UUID
   }
   deriving (Eq, Ord, Show, Generic, FromField, ToField, ToHttpApiData, FromHttpApiData)
 
@@ -73,7 +76,8 @@ instance FromRow Entry where
 createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
 createEntry (EntryCreate title value) = do
   c <- asks conn
-  entries <- liftIO $ withTransaction c $ query c "insert into entry(created, title, value, updated) values (datetime(), ?, ?, null) returning key, created, title, value, updated" (title, value)
+  uuid <- liftIO nextRandom
+  entries <- liftIO $ withTransaction c $ query c "insert into entry(key, created, title, value, updated) values (?, datetime(), ?, ?, null) returning key, created, title, value, updated" (uuid, title, value)
   case entries of
     [] -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
