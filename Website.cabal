@@ -18,34 +18,33 @@ common threads
                  -rtsopts
                  -with-rtsopts=-N
 
-common warnings
-    ghc-options: -Wall
+common depends
     build-depends:  base
-                  , servant
-                  , servant-server
-                  , warp
-                  , warp-tls
                   , aeson
                   , blaze-html
                   , blaze-markup
-                  , servant-blaze
-                  , text
-                  , directory
-                  , http-api-data
-                  , transformers
-                  , mtl
-                  , time
-                  , sqlite-simple
-                  , uuid
                   , bytestring
+                  , cmark
+                  , directory
+                  , filepath
+                  , http-api-data
+                  , jose
+                  , mtl
+                  , password
+                  , servant
                   , servant-auth
                   , servant-auth-server
+                  , servant-blaze
                   , servant-multipart
-                  , jose
-                  , password
-                  , cmark
-                  , filepath
+                  , servant-server
+                  , sqlite-simple
+                  , text
+                  , time
+                  , uuid
+                  , warp
+                  , warp-tls
 
+common extensions
     default-extensions: DataKinds
                       , OverloadedRecordDot
                       , OverloadedStrings
@@ -54,8 +53,14 @@ common warnings
                       , ScopedTypeVariables
                       , ConstraintKinds
 
+common warnings
+    ghc-options: -Wall
+                 -Wunused-packages
+
 library
     import:           warnings
+    import:           extensions
+    import:           depends
     import:           threads
     exposed-modules:  Website
                     , Website.Network.API
@@ -89,16 +94,19 @@ library
 
 executable Website
     import:           warnings
+    import:           extensions
     import:           threads
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
-    build-depends:    Website
+    build-depends:    base
+                    , Website
     hs-source-dirs:   app
     default-language: GHC2021
 
 test-suite Website-test
     import:           warnings
+    import:           extensions
     import:           threads
     default-language: GHC2021
     -- other-modules:
@@ -112,18 +120,25 @@ test-suite Website-test
                     , Test.Db.Entry
                     , Test.Db.User
                     , Test.Db.File
-    build-depends:
-        base,
-        Website,
-        hedgehog,
-        http-client,
-        http-client-tls,
-        http-types,
-        crypton-connection,
-        case-insensitive,
-        exceptions,
-        regex-tdfa,
-        raw-strings-qq,
-        base64,
-        containers,
-        lens
+    build-depends:  base
+                  , Website
+                  , aeson
+                  , base64
+                  , bytestring
+                  , case-insensitive
+                  , containers
+                  , crypton-connection
+                  , exceptions
+                  , hedgehog
+                  , http-api-data
+                  , http-client
+                  , http-client-tls
+                  , http-types
+                  , lens
+                  , mtl
+                  , raw-strings-qq
+                  , regex-tdfa
+                  , servant-auth-server
+                  , servant-server
+                  , sqlite-simple
+                  , text

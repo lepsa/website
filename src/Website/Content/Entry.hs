@@ -10,7 +10,6 @@ import           Servant
 import           Text.Blaze.Html
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Text.Blaze.Internal         as H
 import           Website.Content.Common
 import           Website.Content.Htmx
 import           Website.Data.Entry
