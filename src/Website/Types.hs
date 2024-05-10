@@ -1,10 +1,10 @@
 module Website.Types where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Servant
-import Website.Data.Env
-import Website.Data.Error
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Servant
+import           Website.Data.Env
+import           Website.Data.Error
 
 --
 -- Application monad stack and type constraints.

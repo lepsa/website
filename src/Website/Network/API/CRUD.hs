@@ -1,13 +1,13 @@
 module Website.Network.API.CRUD where
 
-import Data.ByteString.Lazy qualified as BSL
-import Data.Text
-import Servant
-import Servant.HTML.Blaze
-import Text.Blaze.Html
-import Servant.API.ContentTypes
-import Data.Data
-import Data.Int (Int64)
+import qualified Data.ByteString.Lazy     as BSL
+import           Data.Data
+import           Data.Int                 (Int64)
+import           Data.Text
+import           Servant
+import           Servant.API.ContentTypes
+import           Servant.HTML.Blaze
+import           Text.Blaze.Html
 
 data WithCT = WithCT {header :: BSL.ByteString, content :: BSL.ByteString}
 

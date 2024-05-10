@@ -1,35 +1,33 @@
 module Website.Content.Entry where
 
-import Control.Monad
-import Control.Monad.Reader
-import Data.Text
-import Data.Time
-import Servant
-import Text.Blaze.Html
-import Text.Blaze.Html5 qualified as H
-import Text.Blaze.Html5.Attributes qualified as HA
-import Text.Blaze.Internal as H
-import Website.Content.Common
-import Website.Data.Entry
-import Website.Network.API.CRUD
-import Website.Network.API.Types
-import Website.Data.Env
-import Website.Data.User (OptionalUser)
-import Website.Content.Htmx
-import CMark (commonmarkToHtml)
-import Data.Maybe (catMaybes)
-import Website.Data.Util
+import           CMark                       (commonmarkToHtml)
+import           Control.Monad
+import           Control.Monad.Reader
+import           Data.Maybe                  (catMaybes)
+import           Data.Text
+import           Data.Time
+import           Servant
+import           Text.Blaze.Html
+import qualified Text.Blaze.Html5            as H
+import qualified Text.Blaze.Html5.Attributes as HA
+import           Text.Blaze.Internal         as H
+import           Website.Content.Common
+import           Website.Content.Htmx
+import           Website.Data.Entry
+import           Website.Data.Env
+import           Website.Data.User           (OptionalUser)
+import           Website.Data.Util
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c) => Entry -> m Html
 entryDisplay entry = do
   tz <- asks timeZone
-  editDelete <- whenLoggedIn $ \_ -> H.div
-    ! HA.id "edit-delete-buttons"
-    $ mconcat
-      [ edit,
-        delete
-      ]
+  editDelete <- whenLoggedIn $ \_ -> editDeleteButtons
+    "#entry"
+    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
+    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
   pure
     $ H.div
       ! HA.id "entry"
@@ -37,7 +35,7 @@ entryDisplay entry = do
       [ pure $ H.h3 $ toHtml entry.title,
         pure $ H.p $ toHtml $ "Created " <> timeFormat tz entry.created,
         H.p . toHtml . mappend "Updated " . timeFormat tz <$> entry.updated,
-        -- This isn't great, but it is the easiest way to do what I want. 
+        -- This isn't great, but it is the easiest way to do what I want.
         -- We store the markdown in the DB for easy editing, but we display
         -- HTML when looking at the entry.
         -- TODO: Test this for XSS and related issues.
@@ -47,28 +45,6 @@ entryDisplay entry = do
         pure $ preEscapedToHtml $ commonmarkToHtml [] entry.value,
         editDelete
       ]
-  where
-    edit :: Html
-    edit =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget "#entry"
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxGet (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
-        $ "Edit"
-    delete :: Html
-    delete =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget "#edit-delete-buttons"
-        ! hxConfirm "Confirm deletion"
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
-        $ "Delete"
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
 entryDisplayFullPage :: (HasEnv c, OptionalUser c) => MonadReader c m => Entry -> m Html
@@ -90,7 +66,7 @@ entryList entries = do
   where
     newEntry :: Html
     newEntry =
-      H.a 
+      H.a
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
         ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"

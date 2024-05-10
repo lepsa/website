@@ -1,23 +1,23 @@
 module Website.Content.Common where
 
-import Data.Text (Text, pack)
-import Servant hiding (BasicAuth)
-import Servant.HTML.Blaze
-import Text.Blaze.Html
-import Text.Blaze.Html qualified as H
-import Text.Blaze.Html5 qualified as H
-import Text.Blaze.Html5.Attributes qualified as HA
-import Website.Network.API.Types
-import Website.Data.User
-import Servant.Auth
-import Website.Auth.Authentication
-import Data.Maybe (catMaybes)
-import Servant.Auth.Server (AuthResult)
-import Control.Monad.Reader
-import Website.Content.Htmx
-import Website.Auth.Authorisation
-import Website.Data.Env
-import Website.Types
+import           Control.Monad.Reader
+import           Data.Maybe                  (catMaybes)
+import           Data.Text                   (Text, pack)
+import           Servant                     hiding (BasicAuth)
+import           Servant.Auth
+import           Servant.Auth.Server         (AuthResult)
+import           Servant.HTML.Blaze
+import           Text.Blaze.Html
+import qualified Text.Blaze.Html             as H
+import qualified Text.Blaze.Html5            as H
+import qualified Text.Blaze.Html5.Attributes as HA
+import           Website.Auth.Authentication
+import           Website.Auth.Authorisation
+import           Website.Content.Htmx
+import           Website.Data.Env
+import           Website.Data.User
+import           Website.Network.API.Types
+import           Website.Types
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -33,13 +33,13 @@ whenAdmin f = do
   user <- asks auth
   case user.unUserLogin.group of
     Admin -> pure $ pure $ f user
-    _ -> pure Nothing
+    _     -> pure Nothing
 
 whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> a) -> m (Maybe a)
 whenLoggedIn f = do
   mUser <- asks mAuth
   case mUser of
-    Nothing -> pure Nothing
+    Nothing   -> pure Nothing
     Just user -> pure $ pure $ f user
 
 greetUser :: UserLogin -> H.Html
@@ -229,3 +229,34 @@ loginForm = basicPage $
           ! hxBoost
           ! HA.value "Login"
       ]
+
+editDeleteButtons :: AttributeValue -> Text -> Text -> Html
+editDeleteButtons editTarget editLink deleteLink =
+  H.div
+    ! HA.id "edit-delete-buttons"
+    $ mconcat
+      [ edit,
+        delete
+      ]
+  where
+    edit :: Html
+    edit =
+      H.button
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget editTarget
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxGet (H.textValue editLink)
+        $ "Edit"
+    delete :: Html
+    delete =
+      H.button
+        ! hxTrigger "click"
+        ! hxSwap "outerHTML"
+        ! hxTarget "#edit-delete-buttons"
+        ! hxConfirm "Confirm deletion"
+        ! hxBoost
+        ! hxOn "::config-request" "setXsrfHeader(event)"
+        ! hxDelete (H.textValue deleteLink)
+        $ "Delete"

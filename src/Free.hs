@@ -16,7 +16,7 @@ instance (Functor f) => Applicative (Free f) where
   pure = Pure
   (Pure f) <*> (Pure a) = Pure $ f a
   (Pure f) <*> (Free a) = Free $ fmap f <$> a
-  (Free f) <*> a = Free $ (<*> a) <$> f
+  (Free f) <*> a        = Free $ (<*> a) <$> f
 
 instance (Functor f) => Monad (Free f) where
   (Pure a) >>= f = f a
@@ -30,11 +30,11 @@ data Ast a where
   Print :: String -> a -> Ast a
 
 instance Functor Ast where
-  fmap f (Void a) = Void (f a)
-  fmap f (Math m) = Math $ f <$> m
+  fmap f (Void a)      = Void (f a)
+  fmap f (Math m)      = Math $ f <$> m
   fmap f (Literal t a) = Literal t (f . a)
-  fmap f (Show_ t a) = Show_ t (f . a)
-  fmap f (Print t a) = Print t (f a)
+  fmap f (Show_ t a)   = Show_ t (f . a)
+  fmap f (Print t a)   = Print t (f a)
 
 data Math a where
   Add :: (Num t) => t -> t -> (t -> a) -> Math a
@@ -69,7 +69,7 @@ interpretAst f = case f of
   Show_ t next -> pure . next $ show t
 
 freeFold :: (Monad m) => (forall x. f x -> m x) -> Free f a -> m a
-freeFold _ (Pure a) = pure a
+freeFold _ (Pure a)   = pure a
 freeFold nat (Free f) = nat f >>= freeFold nat
 
 interpret :: Free Ast a -> IO a

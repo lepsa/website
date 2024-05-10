@@ -1,8 +1,8 @@
 module Website.Content.Htmx where
 
-import Text.Blaze.Internal qualified as HI
-import Text.Blaze.Html5 qualified as H
-import qualified Text.Blaze as HA
+import qualified Text.Blaze          as HA
+import qualified Text.Blaze.Html5    as H
+import qualified Text.Blaze.Internal as HI
 
 hxBoost :: H.Attribute
 hxBoost = HI.customAttribute "hx-boost" "true"

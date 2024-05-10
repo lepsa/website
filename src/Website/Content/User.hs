@@ -1,53 +1,32 @@
 module Website.Content.User where
 
-import Text.Blaze.Html
-import Control.Monad
-import Control.Monad.Reader
-import Website.Data.User
-import Website.Content.Common
-import Website.Data.Env
-import Website.Network.API.CRUD
-import qualified Text.Blaze.Html5 as H
+import           Control.Monad
+import           Control.Monad.Reader
+import           Data.Data
+import           Data.List                   (sortBy)
+import           Data.Text
+import           Servant
+import           Text.Blaze.Html
+import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import Data.Text
-import Data.List (sortBy)
-import Data.Data
-import Servant
-import Website.Network.API.Types
-import Website.Types
-import Website.Content.Htmx
+import           Website.Content.Common
+import           Website.Content.Htmx
+import           Website.Data.Env
+import           Website.Data.User
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
+import           Website.Types
 
 userDisplay :: (HasEnv c, MonadReader c m) => User -> m Html
 userDisplay user = pure $ H.div ! HA.id "user"
   $ mconcat
     [ H.h3 $ toHtml user.email
     , H.p $ toHtml $ "Group " <> show user.group
-    , H.div
-      ! HA.id "edit-delete-buttons"
-      $ mconcat [edit, delete]
+    , editDeleteButtons
+        "#user"
+        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
+        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
     ]
-  where
-    edit :: Html
-    edit =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget "#user"
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxGet (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
-        $ "Edit"
-    delete :: Html
-    delete =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget "#edit-delete-buttons"
-        ! hxConfirm "Confirm deletion"
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
-        $ "Delete"
 
 userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
 userDisplayFullPage = basicPage <=< userDisplay
@@ -73,7 +52,7 @@ userList users =
           ]
     newUser :: Html
     newUser =
-      H.a 
+      H.a
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
         ! htmlLink (Proxy @(AuthUser (CRUDCreate UserCreate))) $ "Create User"

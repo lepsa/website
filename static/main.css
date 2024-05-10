@@ -79,3 +79,8 @@ label {
 .formbutton {
   grid-column: 1 / -1;
 }
+
+#edit-delete-buttons button {
+   margin-left: 0.5rem;
+   margin-right: 0.5rem;
+}

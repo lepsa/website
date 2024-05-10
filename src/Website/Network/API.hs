@@ -2,26 +2,27 @@
 
 module Website.Network.API where
 
-import Text.Blaze.Html qualified as H
-import Website.Content.Common
-import Website.Content.Entry
-import Website.Data.Entry
-import Website.Types
-import Servant
-import Website.Network.API.CRUD
-import Data.Text (Text)
-import Website.Network.API.Types
-import Website.Data.Error
-import Website.Content.User (userDisplayFullPage, userDisplay, userList)
-import Website.Data.User
-import Control.Monad
-import Control.Monad.IO.Class
-import Servant.Auth.Server
-import Website.Data.Permission (checkPermission)
-import Website.Auth.Authorisation (Access(Read, Write))
-import Website.Data.Env (auth)
-import Control.Monad.Reader
-import Website.Content.Index
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import           Data.Text                  (Text)
+import           Servant
+import           Servant.Auth.Server
+import qualified Text.Blaze.Html            as H
+import           Website.Auth.Authorisation (Access (Read, Write))
+import           Website.Content.Common
+import           Website.Content.Entry
+import           Website.Content.Index
+import           Website.Content.User       (userDisplay, userDisplayFullPage,
+                                             userList)
+import           Website.Data.Entry
+import           Website.Data.Env           (auth)
+import           Website.Data.Error
+import           Website.Data.Permission    (checkPermission)
+import           Website.Data.User
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
+import           Website.Types
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = index
@@ -114,5 +115,5 @@ register cookieSettings jwtSettings cUser = do
   mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
   case mApplyCookies of
-    Nothing -> throwError_ $ Other "Could not build login cookies"
+    Nothing      -> throwError_ $ Other "Could not build login cookies"
     Just cookies -> pure $ cookies $ addHeader link NoContent

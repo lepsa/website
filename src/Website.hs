@@ -1,27 +1,27 @@
 module Website where
 
-import Control.Monad
-import Crypto.JOSE (JWK)
-import Data.Aeson (eitherDecode, encode)
-import Data.ByteString.Lazy.Char8 qualified as BSL8
-import Data.Proxy
-import Data.Time
-import Database.SQLite.Simple hiding ((:.))
-import Network.Wai.Handler.Warp
-import Network.Wai.Handler.WarpTLS
-import Servant.Auth.Server
-import Servant.Server
-import System.Directory
-import Website.Data.Schema
-import Website.Network.API.Types
-import Website.Network.Server
-import Website.Types
-import Data.Kind
-import Website.Data.Env
-import Website.Auth.Authentication
-import Website.Data.Error
-import Website.Content.Error
-import System.FilePath
+import           Control.Monad
+import           Crypto.JOSE                 (JWK)
+import           Data.Aeson                  (eitherDecode, encode)
+import qualified Data.ByteString.Lazy.Char8  as BSL8
+import           Data.Kind
+import           Data.Proxy
+import           Data.Time
+import           Database.SQLite.Simple      hiding ((:.))
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Handler.WarpTLS
+import           Servant.Auth.Server
+import           Servant.Server
+import           System.Directory
+import           System.FilePath
+import           Website.Auth.Authentication
+import           Website.Content.Error
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.Schema
+import           Website.Network.API.Types
+import           Website.Network.Server
+import           Website.Types
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -93,7 +93,7 @@ getJwtKey conf = do
         putStrLn "Found a JWK entry, decoding"
         case eitherDecode $ BSL8.pack json of
           Right jwk -> pure jwk
-          Left s -> error s
+          Left s    -> error s
       _ -> error "Too many JWKs in the database"
   where
     c = conn conf

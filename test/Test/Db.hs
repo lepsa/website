@@ -1,13 +1,15 @@
 module Test.Db where
 
-import Database.SQLite.Simple
-import Servant
+import           Data.Foldable
+import           Database.SQLite.Simple
+import           Servant
 
 resetDb :: Connection -> IO NoContent
-resetDb c = NoContent <$ withTransaction c (
-  do
-    execute_ c "delete from user_login"
-    execute_ c "delete from user"
-    execute_ c "delete from entry"
-    execute_ c "delete from file"
-  )
+resetDb c = NoContent <$ withTransaction c go
+  where
+    go = traverse_ (execute_ c)
+      [ "delete from user_login"
+      , "delete from user"
+      , "delete from entry"
+      , "delete from file"
+      ]

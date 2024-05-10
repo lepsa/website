@@ -1,28 +1,28 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeFamilies           #-}
 
 module Test.Types where
 
-import Data.Text
-import GHC.Generics
-import Hedgehog hiding (Group)
-import Network.HTTP.Client qualified as H
-import Website.Auth.Authentication ()
-import Test.Db.Entry ()
-import Test.Db.User ()
-import Website.Auth.Authorisation qualified as Auth
-import Website.Data.User (UserCreate(UserCreate))
-import Web.FormUrlEncoded
-import Servant
-import GHC.Exts
-import Website.Auth.Authorisation (Group)
-import Data.Map (Map)
-import Data.Map qualified as M
-import Control.Lens
-import Data.Kind
-import Data.Maybe (catMaybes)
-import qualified Data.ByteString.Lazy as BSL
+import           Control.Lens
+import qualified Data.ByteString.Lazy        as BSL
+import           Data.Kind
+import           Data.Map                    (Map)
+import qualified Data.Map                    as M
+import           Data.Maybe                  (catMaybes)
+import           Data.Text
+import           GHC.Exts
+import           GHC.Generics
+import           Hedgehog                    hiding (Group)
+import qualified Network.HTTP.Client         as H
+import           Servant
+import           Test.Db.Entry               ()
+import           Test.Db.User                ()
+import           Web.FormUrlEncoded
+import           Website.Auth.Authentication ()
+import           Website.Auth.Authorisation  (Group)
+import qualified Website.Auth.Authorisation  as Auth
+import           Website.Data.User           (UserCreate (UserCreate))
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -45,8 +45,8 @@ class HasAuth (t :: (Type -> Type) -> Type) where
   auth :: Lens' (t v) (Auth v)
 
 data TestEntry v = TestEntry
-  { _teTitle   :: Text,
-    _teValue   :: Text
+  { _teTitle :: Text,
+    _teValue :: Text
   }
   deriving (Generic)
 instance FunctorB TestEntry
@@ -81,7 +81,7 @@ data TestEnv = TestEnv
 --
 
 data AuthKey v = AuthKey
-  { _akKey :: Key v
+  { _akKey  :: Key v
   , _akUser :: TestUser v
   } deriving (Eq, Generic, Show)
 instance FunctorB AuthKey
@@ -100,7 +100,7 @@ data LoginType = Good | BadUser | BadPassword
   deriving (Eq, Ord, Show)
 
 data TestLogin v = TestLogin
-  { _tlKey  :: Key v 
+  { _tlKey  :: Key v
   , _tlType :: LoginType
   , _tlUser :: Text
   , _tlPass :: Text
@@ -128,28 +128,28 @@ instance FunctorB GetEntries
 instance TraversableB GetEntries
 
 data GetEntry v = GetEntry
-  { _geKey :: Key v
+  { _geKey  :: Key v
   , _geAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB GetEntry
 instance TraversableB GetEntry
 
 data DeleteEntry v = DeleteEntry
-  { _deKey :: Key v
+  { _deKey  :: Key v
   , _deAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB DeleteEntry
 instance TraversableB DeleteEntry
 
 data GetEntryMissing v = GetEntryMissing
-  { _gemKey :: String
+  { _gemKey  :: String
   , _gemAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB GetEntryMissing
 instance TraversableB GetEntryMissing
 
 data CreateEntry v = CreateEntry
-  { _ceAuth :: Auth v
+  { _ceAuth  :: Auth v
   , _ceTitle :: Text
   , _ceValue :: Text
   } deriving (Eq, Show, Generic)
@@ -163,8 +163,8 @@ instance ToForm (CreateEntry v) where
     ]
 
 data UpdateEntry v = UpdateEntry
-  { _ueAuth :: Auth v
-  , _ueKey :: Key v
+  { _ueAuth  :: Auth v
+  , _ueKey   :: Key v
   , _ueTitle :: Text
   , _ueValue :: Text
   } deriving (Show, Generic)
@@ -172,17 +172,17 @@ instance FunctorB UpdateEntry
 instance TraversableB UpdateEntry
 
 data RegisterUser v = RegisterUser
-  { _ruEmail :: Text
+  { _ruEmail    :: Text
   , _ruPassword :: Text
-  , _ruGroup :: Group
+  , _ruGroup    :: Group
   } deriving (Show, Generic)
 instance FunctorB RegisterUser
 instance TraversableB RegisterUser
 
 data CreateUser v = CreateUser
-  { _cuAuth :: Auth v
-  , _cuGroup :: Group
-  , _cuEmail :: Text
+  { _cuAuth     :: Auth v
+  , _cuGroup    :: Group
+  , _cuEmail    :: Text
   , _cuPassword :: Text
   } deriving (Show, Generic)
 instance FunctorB CreateUser
@@ -190,14 +190,14 @@ instance TraversableB CreateUser
 
 data DeleteUser v = DeleteUser
   { _duAuth :: Auth v
-  , _duKey :: Key v
+  , _duKey  :: Key v
   } deriving (Show, Generic)
 instance FunctorB DeleteUser
 instance TraversableB DeleteUser
 
 data GetUser v = GetUser
   { _guAuth :: Auth v
-  , _guKey :: Key v
+  , _guKey  :: Key v
   } deriving (Show, Generic)
 instance FunctorB GetUser
 instance TraversableB GetUser
@@ -210,10 +210,10 @@ instance FunctorB PasswordUpdate
 instance TraversableB PasswordUpdate
 
 data UpdateUser v = UpdateUser
-  { _uuKey :: Key v
+  { _uuKey      :: Key v
   , _uuPassword :: Maybe (PasswordUpdate v)
-  , _uuGroup :: Maybe Group
-  , _uuAuth :: Auth v
+  , _uuGroup    :: Maybe Group
+  , _uuAuth     :: Auth v
   } deriving (Show, Generic)
 instance FunctorB UpdateUser
 instance TraversableB UpdateUser
@@ -236,14 +236,14 @@ instance FunctorB CreateFile
 instance TraversableB CreateFile
 
 data GetFile v = GetFile
-  { _gfKey :: Key v
+  { _gfKey  :: Key v
   , _gfAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB GetFile
 instance TraversableB GetFile
 
 data DeleteFile v = DeleteFile
-  { _dfKey :: Key v
+  { _dfKey  :: Key v
   , _dfAuth :: Auth v
   } deriving (Show, Generic)
 instance FunctorB DeleteFile

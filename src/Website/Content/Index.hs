@@ -1,14 +1,14 @@
 module Website.Content.Index where
 
-import Control.Monad.Reader
-import Text.Blaze.Html
-import Text.Blaze.Html5 qualified as H
-import Website.Content.Common
-import Website.Data.Entry
-import Website.Data.User
-import Website.Types
-import Website.Data.Env
-import Website.Content.Entry
+import           Control.Monad.Reader
+import           Text.Blaze.Html
+import qualified Text.Blaze.Html5       as H
+import           Website.Content.Common
+import           Website.Content.Entry
+import           Website.Data.Entry
+import           Website.Data.Env
+import           Website.Data.User
+import           Website.Types
 
 -- | Initial landing page.
 index :: (OptionalUser c, CanAppM c e m) => m Html

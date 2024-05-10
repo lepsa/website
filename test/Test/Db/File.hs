@@ -2,15 +2,15 @@
 
 module Test.Db.File where
 
-import Database.SQLite.Simple
-import Data.Aeson
-import Website.Data.File
-import qualified Data.ByteString.Lazy as BSL
-import Data.ByteString.Lazy.Base64.URL qualified as BL64U
-import Data.ByteString.Base64.URL qualified as B64U
-import Data.Base64.Types
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import           Data.Aeson
+import           Data.Base64.Types
+import qualified Data.ByteString.Base64.URL      as B64U
+import qualified Data.ByteString.Lazy            as BSL
+import qualified Data.ByteString.Lazy.Base64.URL as BL64U
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as T
+import           Database.SQLite.Simple
+import           Website.Data.File
 
 instance ToJSON FileId
 instance FromJSON FileId

@@ -2,16 +2,16 @@
 
 module Website.Data.Util where
 
-import Website.Data.Error
-import Data.UUID
-import Control.Monad
-import Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.ToField
-import Servant.Auth.JWT
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromRow
-import Control.Monad.Except
-import Data.Time
+import           Control.Monad
+import           Control.Monad.Except
+import           Data.Time
+import           Data.UUID
+import           Database.SQLite.Simple
+import           Database.SQLite.Simple.FromField
+import           Database.SQLite.Simple.FromRow
+import           Database.SQLite.Simple.ToField
+import           Servant.Auth.JWT
+import           Website.Data.Error
 
 -- FromField for UUIDs is an instance we need to write ourselves
 -- so that we aren't explicitly wrapping and unwrapping everywhere.
@@ -35,11 +35,11 @@ ensureSingleResult :: (AsErr e, MonadError e m) => [a] -> m a
 ensureSingleResult = either (throwError . fromErr) pure . ensureSingleResult'
 
 ensureSingleResult' :: [a] -> Either Err a
-ensureSingleResult' [] = Left $ DbError NotFound
+ensureSingleResult' []  = Left $ DbError NotFound
 ensureSingleResult' [a] = pure a
-ensureSingleResult' _ = Left $ DbError TooManyResults
+ensureSingleResult' _   = Left $ DbError TooManyResults
 
 ensureSingleInsert' :: [a] -> Either Err a
-ensureSingleInsert' [] = Left $ DbError FailedToInsertRecord
+ensureSingleInsert' []  = Left $ DbError FailedToInsertRecord
 ensureSingleInsert' [a] = pure a
-ensureSingleInsert' _ = Left $ Other "insert query returned multiple rows"
+ensureSingleInsert' _   = Left $ Other "insert query returned multiple rows"

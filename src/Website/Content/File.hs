@@ -1,37 +1,37 @@
 module Website.Content.File where
 
-import Website.Data.File
-import Website.Data.User
-import Website.Types
-import Servant.Multipart
-import Servant
-import Website.Network.API.CRUD
-import Website.Content.Common
-import qualified Text.Blaze.Html as H
-import Data.Text
-import Website.Data.Error
-import Control.Monad
-import Control.Monad.IO.Class
-import Website.Network.API.Types
-import Text.Blaze.Html (Html, (!))
-import qualified Text.Blaze.Html5 as H
-import Website.Content.Htmx
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader
+import qualified Data.ByteString.Lazy        as BSL
+import           Data.Functor
+import           Data.Int
+import           Data.List
+import           Data.Maybe
+import           Data.Text
+import           Data.Text.Encoding
+import           Servant
+import           Servant.Multipart
+import qualified Text.Blaze.Html             as H
+import           Text.Blaze.Html             (Html, (!))
+import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import qualified Data.ByteString.Lazy as BSL
-import Data.Maybe
-import Control.Monad.Reader
-import Website.Data.Env
-import Data.List
-import Website.Data.Util
-import Data.Text.Encoding
-import Data.Int
-import Data.Functor
+import           Website.Content.Common
+import           Website.Content.Htmx
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.File
+import           Website.Data.User
+import           Website.Data.Util
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
+import           Website.Types
 
 uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
 uploadFile formData = do
   files <- traverse (createFile <=< mkFile) $ files formData
   file <- case files of
-    [] -> throwError $ fromErr $ Other "No files uploaded"
+    []    -> throwError $ fromErr $ Other "No files uploaded"
     (f:_) -> pure f
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) file.fileId
   pure $ addHeader link mempty
@@ -96,7 +96,7 @@ getFiles = do
                   pure H.br,
                   ($ fm) <$> mDeleteFile
                 ]
-              )     
+              )
       ]
   where
     newFile =

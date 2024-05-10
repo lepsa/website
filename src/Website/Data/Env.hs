@@ -1,13 +1,13 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Website.Data.Env where
-import Database.SQLite.Simple
-import Data.Time
+import           Data.Time
+import           Database.SQLite.Simple
 
 --
 -- Server configration values
 --
 data Env = Env
-  { _envConn :: Connection
+  { _envConn     :: Connection
   , _envTimeZone :: TimeZone
   }
 
@@ -26,9 +26,9 @@ class HasAuth c a | c -> a where
   auth :: c -> a
 
 data EnvAuthed a = EnvAuthed
-  { _envAuthConn :: Connection
+  { _envAuthConn     :: Connection
   , _envAuthTimeZone :: TimeZone
-  , _envAuthAuthed :: a
+  , _envAuthAuthed   :: a
   } deriving Functor
 
 instance HasEnv (EnvAuthed a) where

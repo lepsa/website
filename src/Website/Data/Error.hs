@@ -1,5 +1,5 @@
 module Website.Data.Error where
-import Control.Monad.Except
+import           Control.Monad.Except
 
 --
 -- Mapping application errors to servant errors

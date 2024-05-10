@@ -1,27 +1,27 @@
 module Website.Data.File where
-import Data.Time
-import Data.UUID
-import GHC.Generics
-import Database.SQLite.Simple
-import Website.Data.Util
-import Website.Types (CanAppM)
-import Data.UUID.V4 (nextRandom)
-import Control.Monad.Reader
-import Website.Data.Env
-import Database.SQLite.Simple.ToField (ToField)
-import Database.SQLite.Simple.FromField (FromField)
-import Data.Text
-import Servant
-import qualified Data.ByteString.Lazy as BSL
+import           Control.Monad.Reader
+import qualified Data.ByteString.Lazy             as BSL
+import           Data.Text
+import           Data.Time
+import           Data.UUID
+import           Data.UUID.V4                     (nextRandom)
+import           Database.SQLite.Simple
+import           Database.SQLite.Simple.FromField (FromField)
+import           Database.SQLite.Simple.ToField   (ToField)
+import           GHC.Generics
+import           Servant
+import           Website.Data.Env
+import           Website.Data.Util
+import           Website.Types                    (CanAppM)
 
 newtype FileId = FileId UUID
   deriving (Eq, Show, Ord, Generic, ToField, FromField, ToHttpApiData, FromHttpApiData)
 
 data File = File
-  { fileId :: FileId
-  , fileName :: Text
-  , fileData :: BSL.ByteString
-  , fileType :: Text
+  { fileId      :: FileId
+  , fileName    :: Text
+  , fileData    :: BSL.ByteString
+  , fileType    :: Text
   , fileCreated :: UTCTime
   , fileUpdated :: Maybe UTCTime
   } deriving (Eq, Show, Generic)
@@ -30,8 +30,8 @@ instance FromRow File where
   fromRow = File <$> field <*> field <*> field <*> field <*> field <*> field
 
 data FileMeta = FileMeta
-  { fileMetaId :: FileId
-  , fileMetaName :: Text
+  { fileMetaId      :: FileId
+  , fileMetaName    :: Text
   , fileMetaCreated :: UTCTime
   , fileMetaUpdated :: Maybe UTCTime
   } deriving (Eq, Show, Generic)
@@ -46,7 +46,7 @@ data CreateFile = CreateFile
   } deriving (Eq, Show, Generic)
 
 data UpdateFile = UpdateFile
-  { updateFileId :: FileId
+  { updateFileId   :: FileId
   , updateFileName :: Text
   , updateFileData :: BSL.ByteString
   , updateFileType :: Text

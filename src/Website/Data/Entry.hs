@@ -1,22 +1,22 @@
 module Website.Data.Entry where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.Time
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.ToField
-import GHC.Generics
-import Servant
-import Web.FormUrlEncoded
-import Website.Types
-import Website.Data.Env
-import Website.Data.Error
-import Data.Text
-import Data.List (sortBy)
-import Data.UUID (UUID)
-import Website.Data.Util ()
-import Data.UUID.V4 (nextRandom)
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Data.List                        (sortBy)
+import           Data.Text
+import           Data.Time
+import           Data.UUID                        (UUID)
+import           Data.UUID.V4                     (nextRandom)
+import           Database.SQLite.Simple
+import           Database.SQLite.Simple.FromField
+import           Database.SQLite.Simple.ToField
+import           GHC.Generics
+import           Servant
+import           Web.FormUrlEncoded
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.Util                ()
+import           Website.Types
 
 --
 -- What an Entry is, and the various derived types that
@@ -52,10 +52,10 @@ instance FromForm EntryUpdate where
     <*> parseUnique "value" f
 
 data Entry = Entry
-  { key :: EntryKey,
+  { key     :: EntryKey,
     created :: UTCTime,
-    title :: Text,
-    value :: Text,
+    title   :: Text,
+    value   :: Text,
     updated :: Maybe UTCTime
   }
   deriving (Eq, Ord, Show, Generic)
@@ -79,27 +79,27 @@ createEntry (EntryCreate title value) = do
   uuid <- liftIO nextRandom
   entries <- liftIO $ withTransaction c $ query c "insert into entry(key, created, title, value, updated) values (?, datetime(), ?, ?, null) returning key, created, title, value, updated" (uuid, title, value)
   case entries of
-    [] -> throwError $ fromErr $ DbError NotFound
+    []      -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ fromErr $ DbError TooManyResults
+    _       -> throwError $ fromErr $ DbError TooManyResults
 
 getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where key = ?" (Only key)
   case entries of
-    [] -> throwError $ fromErr $ DbError NotFound
+    []      -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ fromErr $ DbError TooManyResults
+    _       -> throwError $ fromErr $ DbError TooManyResults
 
 updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key (EntryUpdate title value) = do
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ?, updated = datetime() where key = ? returning key, created, title, value, updated" (title, value, key)
   case entries of
-    [] -> throwError $ fromErr $ DbError NotFound
+    []      -> throwError $ fromErr $ DbError NotFound
     [entry] -> pure entry
-    _ -> throwError $ fromErr $ DbError TooManyResults
+    _       -> throwError $ fromErr $ DbError TooManyResults
 
 deleteEntry :: (CanAppM c e m) => EntryKey -> m ()
 deleteEntry key = do

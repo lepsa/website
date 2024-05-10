@@ -2,13 +2,13 @@
 
 module Test.Db.User where
 
-import Website.Data.User
-import Database.SQLite.Simple
-import Data.Aeson
-import Website.Auth.Authorisation (Group)
-import Web.HttpApiData
-import Web.FormUrlEncoded
-import GHC.Exts (fromList)
+import           Data.Aeson
+import           Database.SQLite.Simple
+import           GHC.Exts                   (fromList)
+import           Web.FormUrlEncoded
+import           Web.HttpApiData
+import           Website.Auth.Authorisation (Group)
+import           Website.Data.User
 
 -- Orphan instances are here as we don't want nor need them in the main server
 instance ToJSON Group

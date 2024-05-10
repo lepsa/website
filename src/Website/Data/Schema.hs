@@ -1,14 +1,15 @@
 module Website.Data.Schema where
 
-import Control.Monad
-import Control.Monad.Reader
-import Data.Foldable
-import Data.List
-import Database.SQLite.Simple
-import Database.SQLite.Simple.ToField
-import Website.Types
-import Website.Data.Env
-import Website.Data.Error (DbErr(NotFound), Err (DbError), throwError_)
+import           Control.Monad
+import           Control.Monad.Reader
+import           Data.Foldable
+import           Data.List
+import           Database.SQLite.Simple
+import           Database.SQLite.Simple.ToField
+import           Website.Data.Env
+import           Website.Data.Error             (DbErr (NotFound),
+                                                 Err (DbError), throwError_)
+import           Website.Types
 
 -- Create a table for tracking the schema version
 createVersion :: Query
@@ -58,9 +59,9 @@ runMigrations = do
   c <- asks conn
   versions <- liftIO $ withTransaction c $ query_ c getSchemaVersion
   currentVersion <- case versions of
-    [] -> pure 0 -- When there is no result from the schema_version table set a minimum value to start the process
+    []        -> pure 0 -- When there is no result from the schema_version table set a minimum value to start the process
     [version] -> pure version
-    _ -> throwError_ $ DbError NotFound
+    _         -> throwError_ $ DbError NotFound
   liftIO $ putStrLn $ "Schema: " <> show currentVersion
   let migrationsToRun =
         filter (\(v, _) -> v >= currentVersion) $

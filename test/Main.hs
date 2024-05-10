@@ -1,15 +1,15 @@
 module Main (main) where
 
-import Control.Concurrent
-import Hedgehog
-import Network.HTTP.Client qualified as H
-import Network.HTTP.Client.TLS qualified as H
-import Network.HTTP.Types qualified as H
-import Test.Api (testTopAPI, testTopServer)
-import Test.StateMachine
-import Test.Types
-import Website
-import Network.Connection (TLSSettings(..))
+import           Control.Concurrent
+import           Hedgehog
+import           Network.Connection      (TLSSettings (..))
+import qualified Network.HTTP.Client     as H
+import qualified Network.HTTP.Client.TLS as H
+import qualified Network.HTTP.Types      as H
+import           Test.Api                (testTopAPI, testTopServer)
+import           Test.StateMachine
+import           Test.Types
+import           Website
 
 main :: IO Bool
 main = do
@@ -23,7 +23,7 @@ main = do
   ready <- newEmptyMVar
   let onStart = putMVar ready ()
   serverThread <- forkIO $ startServer' onStart testTopAPI testTopServer "./db/test_db.sqlite" port
-  
+
   -- Wait for the server to start
   takeMVar ready
 

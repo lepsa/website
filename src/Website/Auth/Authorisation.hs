@@ -1,13 +1,13 @@
 module Website.Auth.Authorisation where
 
-import GHC.Generics
-import Database.SQLite.Simple.FromField
-import Text.Read (readMaybe)
-import Control.Monad
-import Database.SQLite.Simple.ToField
-import Servant (FromHttpApiData)
-import Servant.API (parseQueryParam)
-import qualified Data.Text as T
+import           Control.Monad
+import qualified Data.Text                        as T
+import           Database.SQLite.Simple.FromField
+import           Database.SQLite.Simple.ToField
+import           GHC.Generics
+import           Servant                          (FromHttpApiData)
+import           Servant.API                      (parseQueryParam)
+import           Text.Read                        (readMaybe)
 
 --
 -- Authorisation based on Unix style permissions.

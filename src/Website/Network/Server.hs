@@ -2,28 +2,31 @@
 
 module Website.Network.Server where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.Text qualified as T
-import Data.UUID ()
-import Servant
-import Servant.Auth.Server
-import Servant.HTML.Blaze
-import Text.Blaze.Html
-import Website.Auth.Authentication
-import Website.Content.Common
-import Website.Content.Forms
-import Website.Data.Entry (EntryCreate, EntryKey, EntryUpdate)
-import Website.Data.Env
-import Website.Data.Error
-import Website.Data.User (OptionalUser, UserCreate, UserKey, UserLogin, UserUpdate, getUserLogin)
-import Website.Network.API
-import Website.Network.API.CRUD
-import Website.Network.API.Types
-import Website.Types
-import System.FilePath
-import Website.Data.File (FileId)
-import Website.Content.File
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import qualified Data.Text                   as T
+import           Data.UUID                   ()
+import           Servant
+import           Servant.Auth.Server
+import           Servant.HTML.Blaze
+import           System.FilePath
+import           Text.Blaze.Html
+import           Website.Auth.Authentication
+import           Website.Content.Common
+import           Website.Content.File
+import           Website.Content.Forms
+import           Website.Data.Entry          (EntryCreate, EntryKey,
+                                              EntryUpdate)
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.File           (FileId)
+import           Website.Data.User           (OptionalUser, UserCreate, UserKey,
+                                              UserLogin, UserUpdate,
+                                              getUserLogin)
+import           Website.Network.API
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
+import           Website.Types
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -51,7 +54,7 @@ server cookieSettings jwtSettings currentDirectory = api
       userId <- either (const $ throwError_ Unauthenticated) pure eUserId
       mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings userId
       case mApplyCookies of
-        Nothing -> throwError_ Unauthenticated
+        Nothing      -> throwError_ Unauthenticated
         Just cookies -> pure $ cookies $ addHeader root NoContent
       where
         root = linkText (Proxy @(AuthLogin :> Get '[HTML] Html))
@@ -77,7 +80,7 @@ server cookieSettings jwtSettings currentDirectory = api
           :<|> deleteUser
 
     crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
-    crudFile a = 
+    crudFile a =
       protected a . uploadFile
         :<|> protected a uploadFileForm
         :<|> unprotected a . getFile
@@ -96,7 +99,7 @@ server cookieSettings jwtSettings currentDirectory = api
       AppM Env Err m b
     protected a m = case a of
       Authenticated user -> go user
-      _ -> throwError_ Unauthenticated
+      _                  -> throwError_ Unauthenticated
       where
         go key = do
           l <- withError userLookupErrors $ getUserLogin key
@@ -121,6 +124,6 @@ server cookieSettings jwtSettings currentDirectory = api
     -- token was valid as far as the crypto was concerned
     -- but the ID it encoded no longer exists, so the
     -- user shouldn't be authenticated any more.
-    userLookupErrors (DbError NotFound) = Unauthenticated
+    userLookupErrors (DbError NotFound)       = Unauthenticated
     userLookupErrors (DbError TooManyResults) = Unauthenticated
-    userLookupErrors e = e
+    userLookupErrors e                        = e

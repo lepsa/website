@@ -4,44 +4,49 @@
 
 module Test.StateMachine where
 
-import Control.Lens
-import Control.Monad.Catch
-import Control.Monad.IO.Class
-import Data.Aeson (eitherDecode)
-import Data.Base64.Types
-import Data.ByteString qualified as BS
-import Data.ByteString.Char8 qualified as BS8
-import Data.ByteString.Lazy.Char8 qualified as BSL8
-import Data.CaseInsensitive (mk)
-import Data.Char
-import Data.List (find, isPrefixOf, sort)
-import Data.Map qualified as M
-import Data.Maybe (fromMaybe, isJust)
-import Data.Text (Text)
-import Data.Text qualified as T
-import Data.Text.Encoding (encodeUtf8)
-import Data.Text.Encoding.Base64 qualified as B64
-import GHC.Records
-import Hedgehog hiding (Group)
-import Hedgehog.Gen qualified as Gen
-import Hedgehog.Range qualified as Range
-import Network.HTTP.Client qualified as H
-import Network.HTTP.Types (Header, Method, Status, methodDelete, methodGet, methodPost, methodPut, status200, status204, status303, status401, status404)
-import Test.Types
-import Text.RawString.QQ
-import Text.Regex.TDFA
-import Web.FormUrlEncoded
-import Website.Auth.Authorisation (Group (..))
-import Website.Auth.Authorisation qualified as Auth
-import Website.Data.User (User)
-import Website.Data.User qualified (User (..))
-import Network.HTTP.Client.MultipartFormData
-import qualified Data.ByteString.Lazy as BSL
-import Data.Bool
-import Website.Data.Entry (Entry(title, value))
-import Website.Data.File (File (fileName, fileData, fileType))
-import Test.Db.File ()
-import qualified Data.Text.Encoding as T
+import           Control.Lens
+import           Control.Monad.Catch
+import           Control.Monad.IO.Class
+import           Data.Aeson                            (eitherDecode)
+import           Data.Base64.Types
+import           Data.Bool
+import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Char8                 as BS8
+import qualified Data.ByteString.Lazy                  as BSL
+import qualified Data.ByteString.Lazy.Char8            as BSL8
+import           Data.CaseInsensitive                  (mk)
+import           Data.Char
+import           Data.List                             (find, isPrefixOf, sort)
+import qualified Data.Map                              as M
+import           Data.Maybe                            (fromMaybe, isJust)
+import           Data.Text                             (Text)
+import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (encodeUtf8)
+import qualified Data.Text.Encoding                    as T
+import qualified Data.Text.Encoding.Base64             as B64
+import           GHC.Records
+import           Hedgehog                              hiding (Group)
+import qualified Hedgehog.Gen                          as Gen
+import qualified Hedgehog.Range                        as Range
+import qualified Network.HTTP.Client                   as H
+import           Network.HTTP.Client.MultipartFormData
+import           Network.HTTP.Types                    (Header, Method, Status,
+                                                        methodDelete, methodGet,
+                                                        methodPost, methodPut,
+                                                        status200, status204,
+                                                        status303, status401,
+                                                        status404)
+import           Test.Db.File                          ()
+import           Test.Types
+import           Text.RawString.QQ
+import           Text.Regex.TDFA
+import           Web.FormUrlEncoded
+import           Website.Auth.Authorisation            (Group (..))
+import qualified Website.Auth.Authorisation            as Auth
+import           Website.Data.Entry                    (Entry (title, value))
+import           Website.Data.File                     (File (fileData, fileName, fileType))
+import           Website.Data.User                     (User)
+import qualified Website.Data.User                     (User (..))
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -131,8 +136,8 @@ userGroup :: (HasAuth r) => Auth.Group -> r v -> Bool
 userGroup group command =
   case command ^. auth of
     Normal user -> user ^. akUser . tuGroup == group
-    Bad _ -> True
-    None -> True
+    Bad _       -> True
+    None        -> True
 
 entryExists :: (HasKey r, Ord1 v) => ApiState v -> r v -> Bool
 entryExists state command = M.member (command ^. key) state._entries
@@ -254,7 +259,7 @@ extractKey =
 
 keyString :: Key Concrete -> String
 keyString (GoodKey s) = concrete s
-keyString (BadKey s) = s
+keyString (BadKey s)  = s
 
 --
 -- Main api commands
@@ -373,11 +378,11 @@ cGetEntry env = Command gen execute
   [ Require userExists,
     Require $ \state input -> case input ^. key of
       k@(GoodKey _) -> M.member k $ state ^. files
-      BadKey _ -> True,
+      BadKey _      -> True,
     Ensure $ \old _new input output -> do
       let keyStatus = case input ^. key of
             GoodKey _ -> output.responseStatus === status200
-            BadKey _ -> output.responseStatus === status404
+            BadKey _  -> output.responseStatus === status404
       case input ^. auth of
         Normal (AuthKey k u) -> case old ^? users . ix k of
           Nothing -> fail "User key doesn't exist in old state"
@@ -462,7 +467,7 @@ cDeleteEntry env =
         case input ^. auth of
           Normal _ -> case input ^. key of
             GoodKey _ -> state & entries %~ M.delete (input ^. key)
-            _ -> state
+            _         -> state
           _ -> state,
       Ensure $ \old new input output -> do
         case input ^. auth of
@@ -487,7 +492,7 @@ cDeleteEntry env =
     execute deleteEntry = do
       req <- H.parseRequest $ env.baseUrl <> keyString (deleteEntry ^. key) <> "/delete"
       let req' = mkReq methodDelete (mkAuthHeader deleteEntry) req
-      liftIO $ H.httpLbs req' env.manager      
+      liftIO $ H.httpLbs req' env.manager
 
 cUpdateEntry :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cUpdateEntry env =
@@ -695,7 +700,7 @@ cDeleteUser env =
       Update $ \state input _output ->
         case input ^. auth of
           Normal _ -> state & users %~ M.delete (input ^. key)
-          _ -> state,
+          _        -> state,
       Ensure $ \old new input output -> do
         case input ^. auth of
           Normal _ -> do
@@ -844,8 +849,8 @@ cGetFile env =
     execute
     [ Require $ \state input -> case input ^. auth of
         Normal (AuthKey k u) -> (Just u ==) $ M.lookup k $ state ^. users
-        Bad _ -> True
-        None -> True,
+        Bad _                -> True
+        None                 -> True,
       Require $ \state (GetFile k _) -> isJust $ M.lookup k $ state ^. files,
       Ensure $ \old _new input output -> do
         case input ^. auth of
@@ -856,7 +861,7 @@ cGetFile env =
               output.responseStatus === status200
               case M.lookup (input ^. key) old._files of
                 Nothing -> fail "File doesn't exist in local state"
-                Just f -> f ^. tfData === output.responseBody
+                Just f  -> f ^. tfData === output.responseBody
           Bad _ -> do
             output.responseStatus === status200
           None -> do
@@ -886,10 +891,10 @@ cDeleteFile env =
     [ Require userExists,
       Require userGroupAdmin,
       Require $ \state (DeleteFile k _) -> isJust $ M.lookup k $ state ^. files,
-      Update $ \state input _output -> 
+      Update $ \state input _output ->
         case input ^. auth of
           Normal _ -> state & files %~ M.delete (input ^. dfKey)
-          _ -> state,
+          _        -> state,
       Ensure $ \old new input output -> do
         case input ^. dfAuth of
           Normal (AuthKey k u) -> case old ^? users . ix k of

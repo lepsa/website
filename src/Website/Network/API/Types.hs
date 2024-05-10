@@ -1,18 +1,18 @@
 module Website.Network.API.Types where
 
-import Servant (Proxy (..))
-import Servant.HTML.Blaze
-import Text.Blaze.Html
-import Website.Data.Entry
-import Website.Data.User
-import Website.Network.API.CRUD
-import Servant.Auth
-import Website.Auth.Authentication
-import Servant.Auth.Server
-import Servant.API hiding (BasicAuth)
-import Data.Text (Text)
-import Servant.Multipart
-import Website.Data.File
+import           Data.Text                   (Text)
+import           Servant                     (Proxy (..))
+import           Servant.API                 hiding (BasicAuth)
+import           Servant.Auth
+import           Servant.Auth.Server
+import           Servant.HTML.Blaze
+import           Servant.Multipart
+import           Text.Blaze.Html
+import           Website.Auth.Authentication
+import           Website.Data.Entry
+import           Website.Data.File
+import           Website.Data.User
+import           Website.Network.API.CRUD
 
 --
 -- Top level API. The type is used when writing servers, and the value is used to generate API type safe links.

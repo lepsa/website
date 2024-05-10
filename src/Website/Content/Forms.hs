@@ -1,51 +1,51 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Website.Content.Forms where
 
-import Control.Monad.Reader
-import Data.Data
-import Data.List
-import Data.Text qualified as T
-import Servant
-import Text.Blaze.Html
-import Text.Blaze.Html5 qualified as H
-import Text.Blaze.Html5.Attributes qualified as HA
-import Website.Content.Common
-import Website.Data.Entry
-import Website.Data.Env
-import Website.Data.User
-import Website.Network.API.CRUD
-import Website.Network.API.Types
-import Website.Types
-import Website.Auth.Authorisation (Access(Read, Write), Group)
-import Website.Data.Permission
-import Website.Content.Htmx
-import Website.Data.Util
+import           Control.Monad.Reader
+import           Data.Data
+import           Data.List
+import qualified Data.Text                   as T
+import           Servant
+import           Text.Blaze.Html
+import qualified Text.Blaze.Html5            as H
+import qualified Text.Blaze.Html5.Attributes as HA
+import           Website.Auth.Authorisation  (Access (Read, Write), Group)
+import           Website.Content.Common
+import           Website.Content.Htmx
+import           Website.Data.Entry
+import           Website.Data.Env
+import           Website.Data.Permission
+import           Website.Data.User
+import           Website.Data.Util
+import           Website.Network.API.CRUD
+import           Website.Network.API.Types
+import           Website.Types
 
 -- | Values for a given form field
 data FieldData a
   = FieldData
       { fieldLabel :: String,
-        fieldName :: String,
-        fieldType :: String,
+        fieldName  :: String,
+        fieldType  :: String,
         fieldValue :: Maybe String
       }
   | StaticData
       { staticLabel :: String,
-        staticName :: String,
+        staticName  :: String,
         staticValue :: Maybe String
       }
   | SelectData
       { selectLabel :: String
-      , selectName :: String
+      , selectName  :: String
       , selectValue :: Maybe a
       }
 
 -- | Overall data for creation and update forms.
 data FormData a = FormData
-  { title :: String,
+  { title     :: String,
     createUrl :: Maybe String,
     updateUrl :: Maybe String,
-    fields :: [FieldData a]
+    fields    :: [FieldData a]
   }
 
 -- | Helper function for generating forms

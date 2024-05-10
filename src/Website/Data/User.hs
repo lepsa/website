@@ -3,22 +3,25 @@
 
 module Website.Data.User where
 
-import Control.Monad.IO.Class
-import Control.Monad.Reader.Class
-import Data.Password.Argon2 (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword, hashPassword, mkPassword, unPasswordHash)
-import Data.Text hiding (group)
-import Data.UUID
-import Data.UUID.V4
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.ToField
-import GHC.Generics
-import Web.FormUrlEncoded
-import Website.Auth.Authorisation (Group (Admin))
-import Website.Data.Env
-import Website.Data.Error
-import Website.Data.Util
-import Website.Types
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader.Class
+import           Data.Password.Argon2             (Argon2, PasswordCheck (..),
+                                                   PasswordHash (..),
+                                                   checkPassword, hashPassword,
+                                                   mkPassword, unPasswordHash)
+import           Data.Text                        hiding (group)
+import           Data.UUID
+import           Data.UUID.V4
+import           Database.SQLite.Simple
+import           Database.SQLite.Simple.FromField
+import           Database.SQLite.Simple.ToField
+import           GHC.Generics
+import           Web.FormUrlEncoded
+import           Website.Auth.Authorisation       (Group (Admin))
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.Util
+import           Website.Types
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
@@ -44,7 +47,7 @@ instance OptionalUser (EnvAuthed (Maybe UserLogin)) where
   mAuth = auth
 
 data User = User
-  { uuid :: UserKey,
+  { uuid  :: UserKey,
     email :: Text,
     group :: Group
   }
@@ -68,7 +71,7 @@ instance FromForm UpdatePassword where
 
 data UserUpdate = UserUpdate
   { password :: Maybe UpdatePassword,
-    group :: Maybe Group
+    group    :: Maybe Group
   }
   deriving (Generic, Show)
 
@@ -81,8 +84,8 @@ instance FromForm UserUpdate where
     pure $ UserUpdate password group
 
 data UserCreate = UserCreate
-  { group :: Group,
-    email :: Text,
+  { group    :: Group,
+    email    :: Text,
     password :: Text
   }
   deriving (Generic)
@@ -188,4 +191,4 @@ adminExists = do
     l :: [User] <- query c "select id, email, group_name from user where group_name = ? limit 1" (Only Admin)
     case l of
       [] -> pure False
-      _ -> pure True
+      _  -> pure True

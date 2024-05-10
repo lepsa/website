@@ -3,21 +3,21 @@
 
 module Website.Auth.Authentication where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Except
-import Data.Bifunctor
-import Data.Password.Argon2
-import Data.Text
-import Data.Text.Encoding
-import Database.SQLite.Simple
-import GHC.Generics
-import Servant.Auth.Server
-import Web.FormUrlEncoded
-import Website.Data.User
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.IO.Class
+import           Data.Bifunctor
+import           Data.Password.Argon2
+import           Data.Text
+import           Data.Text.Encoding
+import           Database.SQLite.Simple
+import           GHC.Generics
+import           Servant.Auth.Server
+import           Web.FormUrlEncoded
+import           Website.Data.User
 
 data Login = Login
-  { email :: String,
+  { email    :: String,
     password :: String
   }
   deriving (Generic)
@@ -55,6 +55,6 @@ checkUserPassword conn email pass = do
   hash <- liftIO (getUserHashIO conn uid) >>= liftEither . first (const BadPassword)
   -- Run the password check
   case checkPassword (mkPassword pass) hash of
-    PasswordCheckFail -> throwError BadPassword
+    PasswordCheckFail    -> throwError BadPassword
     -- If the password was correct, fetch the user
     PasswordCheckSuccess -> pure uid

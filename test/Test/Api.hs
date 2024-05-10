@@ -1,21 +1,21 @@
 module Test.Api where
 
-import Website.Network.API.Types (TopAPI)
-import Data.Data
-import Website.Network.Server
-import Servant.Auth.Server
-import Servant
-import Website.Types
-import Test.Db.Entry (getAllEntries)
-import Test.Db.User (getAllUsers)
-import Test.Db.File (getAllFiles)
-import Website.Data.User (User)
-import Website.Data.Entry (Entry)
-import Control.Monad.Reader
-import Test.Db
-import Website.Data.Env
-import Website.Data.Error
-import Website.Data.File
+import           Control.Monad.Reader
+import           Data.Data
+import           Servant
+import           Servant.Auth.Server
+import           Test.Db
+import           Test.Db.Entry             (getAllEntries)
+import           Test.Db.File              (getAllFiles)
+import           Test.Db.User              (getAllUsers)
+import           Website.Data.Entry        (Entry)
+import           Website.Data.Env
+import           Website.Data.Error
+import           Website.Data.File
+import           Website.Data.User         (User)
+import           Website.Network.API.Types (TopAPI)
+import           Website.Network.Server
+import           Website.Types
 
 -- Top level API for testing. This is the main api with a set of test specific routes bolted onto the side.
 -- These test APIs only exist in the test suite.
