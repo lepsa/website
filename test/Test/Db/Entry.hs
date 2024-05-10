@@ -12,4 +12,4 @@ instance ToJSON EntryKey
 instance FromJSON EntryKey
 
 getAllEntries :: Connection -> IO [Entry]
-getAllEntries c = query_ c "select key, created, title, value from entry"
+getAllEntries c = query_ c "select key, created, title, value, updated from entry"

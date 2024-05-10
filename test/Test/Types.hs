@@ -22,7 +22,7 @@ import Data.Map qualified as M
 import Control.Lens
 import Data.Kind
 import Data.Maybe (catMaybes)
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as
@@ -45,8 +45,7 @@ class HasAuth (t :: (Type -> Type) -> Type) where
   auth :: Lens' (t v) (Auth v)
 
 data TestEntry v = TestEntry
-  { -- created :: UTCTime,
-    _teTitle   :: Text,
+  { _teTitle   :: Text,
     _teValue   :: Text
   }
   deriving (Generic)
@@ -220,18 +219,18 @@ instance FunctorB UpdateUser
 instance TraversableB UpdateUser
 
 data TestFile v = TestFile
-  { _tfName :: String
-  , _tfType :: String
-  , _tfData :: BS.ByteString
+  { _tfName :: Text
+  , _tfType :: Text
+  , _tfData :: BSL.ByteString
   } deriving (Show, Generic)
 instance FunctorB TestFile
 instance TraversableB TestFile
 
 data CreateFile v = CreateFile
   { _cfAuth :: Auth v
-  , _cfName :: String
-  , _cfType :: String
-  , _cfData :: BS.ByteString
+  , _cfName :: Text
+  , _cfType :: Text
+  , _cfData :: BSL.ByteString
   } deriving (Show, Generic)
 instance FunctorB CreateFile
 instance TraversableB CreateFile
@@ -272,6 +271,11 @@ data GetTestEntries v = GetTestEntries
 instance FunctorB GetTestEntries
 instance TraversableB GetTestEntries
 
+data GetTestFiles v = GetTestFiles
+  deriving (Eq, Show, Generic)
+instance FunctorB GetTestFiles
+instance TraversableB GetTestFiles
+
 makeLenses ''TestEnv
 makeLenses ''TestEntry
 makeLenses ''TestUser
@@ -295,6 +299,7 @@ makeLenses ''UpdateUser
 makeLenses ''CreateFile
 makeLenses ''GetFile
 makeLenses ''DeleteFile
+makeLenses ''TestFile
 
 instance HasEmail (TestUser v) where
   email = tuEmail

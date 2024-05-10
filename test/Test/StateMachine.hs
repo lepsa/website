@@ -36,9 +36,12 @@ import Website.Auth.Authorisation qualified as Auth
 import Website.Data.User (User)
 import Website.Data.User qualified (User (..))
 import Network.HTTP.Client.MultipartFormData
-import Network.HTTP.Client (RequestBody(RequestBodyBS))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Bool
+import Website.Data.Entry (Entry(title, value))
+import Website.Data.File (File (fileName, fileData, fileType))
+import Test.Db.File ()
+import qualified Data.Text.Encoding as T
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -179,6 +182,15 @@ mkKey base keys = Gen.choice
   [ Gen.element keys
   , mkBadKey base
   ]
+
+genFileName :: MonadGen m => m Text
+genFileName = Gen.text (Range.linear 1 10) Gen.alphaNum
+
+genFileType :: MonadGen m => m Text
+genFileType = do
+  a <- Gen.text (Range.linear 1 10) Gen.alpha
+  b <- Gen.text (Range.linear 1 10) Gen.alpha
+  pure $ a <> "/" <> b
 
 genUuid :: MonadGen m => m String
 genUuid = do
@@ -453,8 +465,6 @@ cDeleteEntry env =
             _ -> state
           _ -> state,
       Ensure $ \old new input output -> do
-        annotate $ show input
-        annotate $ show output
         case input ^. auth of
           Normal _ -> do
             case input ^. key of
@@ -647,7 +657,6 @@ cUpdateUser env =
                 { H.requestBody = H.RequestBodyLBS $ urlEncodeAsForm $ toForm update
                 }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status200
 
 cUpdateUserBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -674,7 +683,6 @@ cUpdateUserBadAuth env = Command gen execute []
                 { H.requestBody = H.RequestBodyLBS $ urlEncodeAsForm $ toForm update
                 }
       res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
       res.responseStatus === status401
 
 cDeleteUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -709,9 +717,7 @@ cDeleteUser env =
     execute update = do
       req <- H.parseRequest $ env.baseUrl <> keyString (update ^. key) <> "/delete"
       let req' = mkReq methodDelete (formHeader : mkAuthHeader update) req
-      res <- liftIO $ H.httpLbs req' env.manager
-      annotate $ show res
-      pure res
+      liftIO $ H.httpLbs req' env.manager
 
 cGetUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cGetUser env =
@@ -768,11 +774,9 @@ cCreateFile env =
       Update $ \state input output ->
         state
           & files %~ M.insert (GoodKey output)
-            ( TestFile (input ^. cfName) (input ^. cfName) (input ^. cfData)
+            ( TestFile (input ^. cfName) (input ^. cfType) (input ^. cfData)
             ),
-      Ensure $ \old new input output -> do
-        annotate $ show input
-        annotate $ show output
+      Ensure $ \old new _input output -> do
         assert $ isPrefixOf "/file/" output
         assert $ length output > length ("/entry/" :: String)
         length old._files + 1 === length new._files
@@ -785,23 +789,25 @@ cCreateFile env =
         else Just $ do
           CreateFile
             <$> mkGoodAuth state
-            <*> Gen.string textLength chars
-            <*> Gen.string textLength chars
-            <*> Gen.bytes textLength
+            <*> genFileName
+            <*> genFileType
+            <*> fmap BSL.fromStrict (Gen.bytes textLength)
     execute :: CreateFile Concrete -> m String
     execute tfUpload = do
       req <- H.parseRequest $ env.baseUrl <> "/file"
+      let body = partFileRequestBody "file" (T.unpack $ tfUpload ^. cfName) $ H.RequestBodyLBS $ tfUpload ^. cfData
+          body' = body
+            { partContentType = pure $ tfUpload ^. cfType . to T.encodeUtf8
+            }
       req' <- formDataBody
-        [ partFileRequestBody "file" (tfUpload ^. cfName) $ RequestBodyBS $ tfUpload ^. cfData
+        [ body'
         ] $ mkReq
         methodPost
         (formHeader : mkAuthHeader tfUpload)
         req
       res <- liftIO $ H.httpLbs req' env.manager
       res.responseStatus === status303
-      k <- extractKey res
-      annotate $ show k
-      pure k
+      extractKey res
 
 cCreateFileBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cCreateFileBadAuth env = Command gen execute []
@@ -810,20 +816,20 @@ cCreateFileBadAuth env = Command gen execute []
     gen state =
       if M.null state._users
         then Just $ CreateFile None
-          <$> Gen.string textLength chars
-          <*> Gen.string textLength chars
-          <*> Gen.bytes textLength
+          <$> genFileName
+          <*> genFileType
+          <*> fmap BSL.fromStrict (Gen.bytes textLength)
         else Just $ do
           CreateFile
             <$> mkBadAuth state
-            <*> Gen.string textLength chars
-            <*> Gen.string textLength chars
-            <*> Gen.bytes textLength
+            <*> genFileName
+            <*> genFileType
+            <*> fmap BSL.fromStrict (Gen.bytes textLength)
     execute :: CreateFile Concrete -> m ()
     execute tfUpload = do
       req <- H.parseRequest $ env.baseUrl <> "/file"
       req' <- formDataBody
-        [ partFileRequestBody "file" (tfUpload ^. cfName) $ RequestBodyBS $ tfUpload ^. cfData
+        [ partFileRequestBody "file" (T.unpack $ tfUpload ^. cfName) $ H.RequestBodyLBS $ tfUpload ^. cfData
         ] $ mkReq
         methodPost
         (formHeader : mkAuthHeader tfUpload)
@@ -842,14 +848,15 @@ cGetFile env =
         None -> True,
       Require $ \state (GetFile k _) -> isJust $ M.lookup k $ state ^. files,
       Ensure $ \old _new input output -> do
-        annotate $ show input
-        annotate $ show output
-        case input ^. gfAuth of
+        case input ^. auth of
           Normal (AuthKey k u) -> case old ^? users . ix k of
             Nothing -> fail "User key doesn't exist in old state"
             Just user -> do
               user === u
               output.responseStatus === status200
+              case M.lookup (input ^. key) old._files of
+                Nothing -> fail "File doesn't exist in local state"
+                Just f -> f ^. tfData === output.responseBody
           Bad _ -> do
             output.responseStatus === status200
           None -> do
@@ -867,7 +874,6 @@ cGetFile env =
               <*> Gen.choice [mkGoodAuth state, mkBadAuth state]
     execute :: GetFile Concrete -> m (H.Response BSL8.ByteString)
     execute getFile = do
-      annotate $ show getFile
       req <- H.parseRequest $ env.baseUrl <> keyString (getFile ^. key)
       let req' = mkReq' methodGet ("Accept", "*/*") (mkAuthHeader getFile) req
       liftIO $ H.httpLbs req' env.manager
@@ -885,8 +891,6 @@ cDeleteFile env =
           Normal _ -> state & files %~ M.delete (input ^. dfKey)
           _ -> state,
       Ensure $ \old new input output -> do
-        annotate $ show input
-        annotate $ show output
         case input ^. dfAuth of
           Normal (AuthKey k u) -> case old ^? users . ix k of
             Nothing -> fail "User key doesn't exist in old state"
@@ -913,7 +917,6 @@ cDeleteFile env =
               <*> mkAuth state
     execute :: DeleteFile Concrete -> m (H.Response BSL8.ByteString)
     execute getFile = do
-      annotate $ show getFile
       req <- H.parseRequest $ env.baseUrl <> keyString (getFile ^. key) <> "/delete"
       let req' = mkReq methodDelete (mkAuthHeader getFile) req
       liftIO $ H.httpLbs req' env.manager
@@ -960,6 +963,48 @@ cTestGetUsers env =
       res.responseStatus === status200
       either fail pure $ eitherDecode @[User] res.responseBody
 
+cTestGetEntries :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cTestGetEntries env =
+  Command
+    gen
+    execute
+    [ Ensure $ \_oldState newState _input output ->
+        let stateEntries = sort $ (\e -> (e ^. teTitle, e ^. teValue)) <$> (M.elems newState._entries)
+            apiEntries = sort $ (\e -> (title e, value e)) <$> output
+         in stateEntries === apiEntries
+    ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetTestEntries Symbolic))
+    gen _ = Just $ pure GetTestEntries
+    execute :: GetTestEntries Concrete -> m [Entry]
+    execute _ = do
+      req <- H.parseRequest (env.baseUrl <> "/getEntries")
+      let req' = req {H.method = methodGet}
+      res <- liftIO $ H.httpLbs req' env.manager
+      res.responseStatus === status200
+      either fail pure $ eitherDecode @[Entry] res.responseBody
+
+cTestGetFiles :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
+cTestGetFiles env =
+  Command
+    gen
+    execute
+    [ Ensure $ \_oldState newState _input output ->
+        let stateFiles = sort $ (\f -> (f ^. tfName, f ^. tfType, f ^. tfData)) <$> (M.elems newState._files)
+            apiFiles = sort $ (\f -> (fileName f, fileType f, fileData f)) <$> output
+         in stateFiles === apiFiles
+    ]
+  where
+    gen :: ApiState Symbolic -> Maybe (gen (GetTestFiles Symbolic))
+    gen _ = Just $ pure GetTestFiles
+    execute :: GetTestFiles Concrete -> m [File]
+    execute _ = do
+      req <- H.parseRequest (env.baseUrl <> "/getFiles")
+      let req' = req {H.method = methodGet}
+      res <- liftIO $ H.httpLbs req' env.manager
+      res.responseStatus === status200
+      either fail pure $ eitherDecode @[File] res.responseBody
+
 --
 -- The prop test machine
 --
@@ -980,7 +1025,10 @@ propApiTests env reset = withTests 100 . property $ do
         <$> [ cRegister,
               cLogin,
               cLoginFail,
+              -- Side channels
               cTestGetUsers,
+              cTestGetEntries,
+              cTestGetFiles,
               -- Entry commands
               cGetEntry,
               cGetEntries,

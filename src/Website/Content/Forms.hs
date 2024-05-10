@@ -96,7 +96,7 @@ instance GenerateForm Entry () where
                 { fieldLabel = "Title",
                   fieldName = "title",
                   fieldType = "text",
-                  fieldValue = pure entry.title
+                  fieldValue = pure $ T.unpack entry.title
                 },
               StaticData
                 { staticLabel = "Created",

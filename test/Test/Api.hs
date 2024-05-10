@@ -8,12 +8,14 @@ import Servant
 import Website.Types
 import Test.Db.Entry (getAllEntries)
 import Test.Db.User (getAllUsers)
+import Test.Db.File (getAllFiles)
 import Website.Data.User (User)
 import Website.Data.Entry (Entry)
 import Control.Monad.Reader
 import Test.Db
 import Website.Data.Env
 import Website.Data.Error
+import Website.Data.File
 
 -- Top level API for testing. This is the main api with a set of test specific routes bolted onto the side.
 -- These test APIs only exist in the test suite.
@@ -33,9 +35,10 @@ type TestAPI =
        "reset" :> PostNoContent
   :<|> "getUsers" :> Get '[JSON] [User]
   :<|> "getEntries" :> Get '[JSON] [Entry]
+  :<|> "getFiles" :> Get '[JSON] [File]
 
 testServer :: ServerT TestAPI (AppM Env Err IO)
-testServer = reset :<|> getUsers :<|> getEntries
+testServer = reset :<|> getUsers :<|> getEntries :<|> getFiles
 
 reset :: CanAppM c e m => m NoContent
 reset = asks conn >>= liftIO . resetDb
@@ -45,3 +48,6 @@ getUsers = asks conn >>= liftIO . getAllUsers
 
 getEntries :: CanAppM c e m => m [Entry]
 getEntries = asks conn >>= liftIO . getAllEntries
+
+getFiles :: CanAppM c e m => m [File]
+getFiles = asks conn >>= liftIO . getAllFiles

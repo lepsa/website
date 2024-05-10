@@ -31,7 +31,7 @@ newtype EntryKey = EntryKey
 instance FromRow EntryKey
 
 data EntryCreate = EntryCreate
-  { title :: String,
+  { title :: Text,
     value :: Text
   }
   deriving (Eq, Ord, Show, Generic)
@@ -41,7 +41,7 @@ instance FromForm EntryCreate where
     <*> parseUnique "value" f
 
 data EntryUpdate = EntryUpdate
-  { title :: String,
+  { title :: Text,
     value :: Text
   }
   deriving (Eq, Ord, Show, Generic)
@@ -54,7 +54,7 @@ instance FromForm EntryUpdate where
 data Entry = Entry
   { key :: EntryKey,
     created :: UTCTime,
-    title :: String,
+    title :: Text,
     value :: Text,
     updated :: Maybe UTCTime
   }
