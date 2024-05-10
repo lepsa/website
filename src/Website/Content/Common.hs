@@ -1,7 +1,7 @@
 module Website.Content.Common where
 
 import           Control.Monad.Reader
-import           Data.Maybe                  (catMaybes)
+import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack)
 import           Servant                     hiding (BasicAuth)
 import           Servant.Auth
@@ -230,8 +230,8 @@ loginForm = basicPage $
           ! HA.value "Login"
       ]
 
-editDeleteButtons :: AttributeValue -> Text -> Text -> Html
-editDeleteButtons editTarget editLink deleteLink =
+editDeleteButtons :: AttributeValue -> Maybe Text -> Text -> Text -> Html
+editDeleteButtons editTarget deleteConfirmText editLink deleteLink =
   H.div
     ! HA.id "edit-delete-buttons"
     $ mconcat
@@ -255,7 +255,7 @@ editDeleteButtons editTarget editLink deleteLink =
         ! hxTrigger "click"
         ! hxSwap "outerHTML"
         ! hxTarget "#edit-delete-buttons"
-        ! hxConfirm "Confirm deletion"
+        ! hxConfirm (H.textValue $ "Confirm deletion" <> fromMaybe mempty deleteConfirmText)
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
         ! hxDelete (H.textValue deleteLink)

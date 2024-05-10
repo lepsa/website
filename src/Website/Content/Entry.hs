@@ -26,6 +26,7 @@ entryDisplay entry = do
   tz <- asks timeZone
   editDelete <- whenLoggedIn $ \_ -> editDeleteButtons
     "#entry"
+    (pure $ ": " <> entry.title)
     (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
     (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
   pure

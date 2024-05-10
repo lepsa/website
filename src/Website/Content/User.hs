@@ -24,6 +24,7 @@ userDisplay user = pure $ H.div ! HA.id "user"
     , H.p $ toHtml $ "Group " <> show user.group
     , editDeleteButtons
         "#user"
+        (pure $ ": " <> user.email)
         (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
         (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
     ]
