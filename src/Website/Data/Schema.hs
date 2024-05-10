@@ -51,8 +51,17 @@ setupDatabase = do
   -- error so that we can try again later with changes made.
   liftIO $ do
     execute_ c "PRAGMA foreign_keys = ON"
-    [Only (enabled :: Bool)] <- query_ c "PRAGMA foreign_keys"
-    unless enabled $ error "Foreign keys aren't supported in this version of SQLite. Please use a version with foreign key support."
+    [Only (fkEnabled :: Bool)] <- query_ c "PRAGMA foreign_keys"
+    unless fkEnabled $ error "Foreign keys aren't supported in this version of SQLite. Please use a version with foreign key support."
+    
+    execute_ c "PRAGMA auto_vacuum = FULL"
+    [Only (vacEnabled :: Int)] <- query_ c "PRAGMA auto_vacuum"
+    case vacEnabled of
+      0 -> putStrLn "auto_vacuum NONE"
+      1 -> putStrLn "auto_vacuum FULL"
+      2 -> putStrLn "auto_vacuum INCREMENTAL"
+      n -> putStrLn $ "Unknown auto_vacuum value: " <> show n
+    execute_ c "vacuum"
 
 runMigrations :: (CanAppM c e m) => m ()
 runMigrations = do
@@ -140,6 +149,22 @@ migrateSchemaV6 =
   [ "create table if not exists file(id text primary key not null, name text not null, data blob not null, type text not null, created datetime not null, updated datetime)"
   ]
 
+migrateSchemaV7 :: [Query]
+migrateSchemaV7 =
+  [ "update permission set group_name = 'Anon' where name = 'GET entry'",
+    "update permission set group_name = 'Anon' where name = 'GET entries'"
+  ]
+
+migrateSchemaV8 :: [Query]
+migrateSchemaV8 =
+  [ "insert into permission(name, group_name, access) values ('POST file', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('GET file', 'Anon', 'Read')",
+    "insert into permission(name, group_name, access) values ('GET files', 'Anon', 'Read')",
+    "insert into permission(name, group_name, access) values ('GET new file', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('PUT file', 'Admin', 'Write')",
+    "insert into permission(name, group_name, access) values ('DELETE file', 'Admin', 'Write')"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
@@ -148,5 +173,7 @@ migrations =
     (3, migrateSchemaV3),
     (4, migrateSchemaV4),
     (5, migrateSchemaV5),
-    (6, migrateSchemaV6)
+    (6, migrateSchemaV6),
+    (7, migrateSchemaV7),
+    (8, migrateSchemaV8)
   ]

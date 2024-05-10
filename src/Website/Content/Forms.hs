@@ -226,14 +226,12 @@ userUpdateForm user = do
 
 userCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 userCreationForm = do
-  user <- asks auth
-  checkPermission user "GET new user" Read
+  checkPermission "GET new user" Read
   basicPage =<< generateNewForm (Proxy @User)
 
 getUserForUpdate :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 getUserForUpdate userKey = do
-  user <- asks auth
-  checkPermission user "GET update user" Read
+  checkPermission "GET update user" Read
   userUpdateForm =<< Website.Data.User.getUser userKey
 
 -- Entry forms
@@ -242,12 +240,38 @@ entryUpdateForm = generateUpdateForm
 
 entryCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 entryCreationForm = do
-  user <- asks auth
-  checkPermission user "GET new entry" Write
+  checkPermission "GET new entry" Write
   basicPage =<< generateNewForm (Proxy @Entry)
 
 getEntryForUpdate :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
 getEntryForUpdate entry = do
-  user <- asks auth
-  checkPermission user "GET update entry" Read
+  checkPermission "GET update entry" Read
   entryUpdateForm =<< Website.Data.Entry.getEntry entry
+
+-- File form
+fileCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
+fileCreationForm = do
+  checkPermission "GET new file" Write
+  basicPage $ mconcat
+    [ H.form
+      -- ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! HA.enctype "multipart/form-data"
+      ! hxPost (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDCreateFile FileUpload)))))
+      ! hxIndicator "#spinner"
+      $ mconcat
+      [ H.p $ H.label
+        ! HA.for "file"
+        $ "Choose a file for upload"
+      , H.p $ H.input
+        ! HA.type_ "file"
+        ! HA.name "file"
+      , H.p $ H.button
+        ! HA.type_ "submit"
+        $ "Upload"
+      , H.img
+        ! HA.id "spinner"
+        ! HA.class_ "htmx-indicator"
+        ! HA.src "/90-ring.svg"
+      ]
+    ]

@@ -28,5 +28,11 @@ hxDelete = HI.customAttribute "hx-delete"
 hxPut :: HA.AttributeValue -> H.Attribute
 hxPut = HI.customAttribute "hx-put"
 
+hxPost :: HA.AttributeValue -> H.Attribute
+hxPost = HI.customAttribute "hx-post"
+
+hxIndicator :: HA.AttributeValue -> H.Attribute
+hxIndicator = HI.customAttribute "hx-indicator"
+
 hxConfirm :: HA.AttributeValue -> H.Attribute
 hxConfirm = HI.customAttribute "hx-confirm"

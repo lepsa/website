@@ -4,7 +4,6 @@ module Website.Network.API where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader
 import           Data.Text                  (Text)
 import           Servant
 import           Servant.Auth.Server
@@ -13,16 +12,20 @@ import           Website.Auth.Authorisation (Access (Read, Write))
 import           Website.Content.Common
 import           Website.Content.Entry
 import           Website.Content.Index
+import           Website.Content.File
 import           Website.Content.User       (userDisplay, userDisplayFullPage,
                                              userList)
 import           Website.Data.Entry
-import           Website.Data.Env           (auth)
 import           Website.Data.Error
 import           Website.Data.Permission    (checkPermission)
 import           Website.Data.User
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
+import qualified Website.Content.File as Website.Data.File
+import Servant.Multipart
+import Data.Int
+import Website.Data.File (FileId)
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = index
@@ -34,8 +37,7 @@ getIndex = index
 -- Create an Entry and get its value back as Html
 postEntry :: (RequiredUser c, CanAppM c e m) => EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
 postEntry create = do
-  user <- asks auth
-  checkPermission user "POST entry" Write
+  checkPermission "POST entry" Write
   entry <- createEntry create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key
   pure $ addHeader link mempty
@@ -43,33 +45,27 @@ postEntry create = do
 -- Get a given Entry
 getEntry :: (CanAppM c e m, OptionalUser c) => EntryKey -> m H.Html
 getEntry key = do
-  -- TODO: extend permission checks for unauthed users
-  -- user <- asks auth
-  -- checkPermission user "GET entry" Read
+  checkPermission "GET entry" Read
   e <- Website.Data.Entry.getEntry key
   entryDisplayFullPage e
 
 -- Update a given entry and get the new value back
 putEntry :: (RequiredUser c, CanAppM c e m) => EntryKey -> EntryUpdate -> m H.Html
 putEntry key value = do
-  user <- asks auth
-  checkPermission user "PUT entry" Write
+  checkPermission "PUT entry" Write
   entryDisplay =<< updateEntry key value
 
 -- Delete a given Entry, and get a confirmation response
 deleteEntry :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
 deleteEntry key = do
-  user <- asks auth
-  checkPermission user "DELETE entry" Write
+  checkPermission "DELETE entry" Write
   Website.Data.Entry.deleteEntry key
   pure $ H.toHtml @String "Deleted"
 
 -- Get all of the Entries as a list
 getEntries :: (OptionalUser c, CanAppM c e m) => m H.Html
 getEntries = do
-  -- TODO: extend permission checks for unauthed users
-  -- user <- asks auth
-  -- checkPermission user "GET entries" Read
+  checkPermission "GET entries" Read
   entryList =<< Website.Data.Entry.getEntries
 
 --
@@ -77,36 +73,54 @@ getEntries = do
 --
 postUser :: (RequiredUser c, CanAppM c e m) => UserCreate -> m (Headers '[Header "Location" Text] H.Html)
 postUser create = do
-  user <- asks auth
-  checkPermission user "POST user" Write
+  checkPermission "POST user" Write
   newUser <- createUser create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) newUser.uuid
   pure $ addHeader link mempty
 
 getUser :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 getUser key = do
-  user <- asks auth
-  checkPermission user "GET user" Read
+  checkPermission "GET user" Read
   userDisplayFullPage =<< Website.Data.User.getUser key
 
 putUser :: (RequiredUser c, CanAppM c e m) => UserKey -> UserUpdate -> m H.Html
 putUser key update = do
-  user <- asks auth
-  checkPermission user "PUT user" Write
+  checkPermission "PUT user" Write
   userDisplay =<< updateUser key update
 
 deleteUser :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 deleteUser key = do
-  user <- asks auth
-  checkPermission user "DELETE user" Write
+  checkPermission "DELETE user" Write
   Website.Data.User.deleteUser key
   pure $ H.toHtml @String "Delete"
 
 getUsers :: (RequiredUser c, CanAppM c e m) => m H.Html
 getUsers = do
-  user <- asks auth
-  checkPermission user "GET users" Read
+  checkPermission "GET users" Read
   userList =<< Website.Data.User.getUsers
+
+--
+-- File pages
+--
+getFiles :: (OptionalUser c, CanAppM c e m) => m H.Html
+getFiles = do
+  checkPermission "GET files" Read
+  Website.Content.File.getFiles
+
+postFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m H.Html
+postFile m = do
+  checkPermission "POST file" Write
+  Website.Data.File.uploadFile m
+
+getFile :: (OptionalUser c, CanAppM c e m) => FileId -> m (Headers '[Header "Content-Length" Int64] WithCT)
+getFile k = do
+  checkPermission "GET file" Read
+  Website.Data.File.getFile k
+
+deleteFile :: (RequiredUser c, CanAppM c e m) => FileId -> m H.Html
+deleteFile k = do
+  checkPermission "DELETE file" Write
+  Website.Data.File.deleteFile k
 
 register :: CanAppM c e m => CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register cookieSettings jwtSettings cUser = do

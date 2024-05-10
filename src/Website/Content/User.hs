@@ -42,7 +42,7 @@ userList users =
   where
     userLink :: User -> Html
     userLink user =
-      H.li $
+      H.li $ H.p $
         mconcat
           [ H.a
               ! hxBoost

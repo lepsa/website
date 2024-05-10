@@ -8,20 +8,22 @@ import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.User
 import           Website.Types
+import Data.Maybe
 
-checkPermission :: CanAppM c e m => UserLogin -> String -> Access -> m ()
-checkPermission userLogin name requested = do
+checkPermission :: (OptionalUser c, CanAppM c e m) => String -> Access -> m ()
+checkPermission name requested = do
   -- Permissions are checked each time, rather than baking them
   -- into the JWT or initial checkup, as we want to have the
   -- most up to date information when we are doing the check
   -- even if it does hit the database more.
-  user <- getUser userLogin.unUserLogin.uuid
+  userLogin <- asks mAuth
+  user <- traverse (getUser . uuid . unUserLogin) userLogin
   permissions <- getPermissions name
   let check permission =
         -- Admins inherit all user permissions.
         -- This allows us to have "default" permissions
         -- while locking regular users out of some routes.
-        user.group >= permission.permissionGroup &&
+        fromMaybe Anon ((.group) <$> user) >= permission.permissionGroup &&
         -- Check that the permission is at least as powerful
         -- as what has been requested. The logic on this is
         -- that if you can write to a resource, you can basically

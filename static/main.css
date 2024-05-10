@@ -11,6 +11,11 @@ body {
   background-color: #F0F0F0;
 }
 
+p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 a {
   color: blue;
   text-decoration: none;
@@ -83,4 +88,15 @@ label {
 #edit-delete-buttons button {
    margin-left: 0.5rem;
    margin-right: 0.5rem;
+}
+
+.htmx-indicator{
+  opacity:0;
+  transition: opacity 500ms ease-in;
+}
+.htmx-request .htmx-indicator{
+  opacity:1
+}
+.htmx-request.htmx-indicator{
+  opacity:1
 }

@@ -15,7 +15,8 @@ import           Text.Read                        (readMaybe)
 
 -- Admins inherit all user permissions
 data Group
-  = User
+  = Anon
+  | User
   | Admin
   deriving (Eq, Show, Read, Ord, Generic, Bounded, Enum)
 instance FromHttpApiData Group where

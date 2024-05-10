@@ -13,7 +13,6 @@ import           System.FilePath
 import           Text.Blaze.Html
 import           Website.Auth.Authentication
 import           Website.Content.Common
-import           Website.Content.File
 import           Website.Content.Forms
 import           Website.Data.Entry          (EntryCreate, EntryKey,
                                               EntryUpdate)
@@ -81,8 +80,8 @@ server cookieSettings jwtSettings currentDirectory = api
 
     crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
     crudFile a =
-      protected a . uploadFile
-        :<|> protected a uploadFileForm
+      protected a . postFile
+        :<|> protected a fileCreationForm
         :<|> unprotected a . getFile
         :<|> protected a . deleteFile
 

@@ -61,7 +61,7 @@ entryList entries = do
         mNewEntry,
         pure $ H.ul $
           mconcat $
-            H.li . entryLink tz <$> sortEntriesByDateDesc entries
+            H.li . H.p . entryLink tz <$> sortEntriesByDateDesc entries
       ]
   where
     newEntry :: Html

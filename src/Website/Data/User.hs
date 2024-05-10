@@ -14,7 +14,7 @@ import           Data.UUID
 import           Data.UUID.V4
 import           Database.SQLite.Simple
 import           Database.SQLite.Simple.FromField
-import           Database.SQLite.Simple.ToField
+import Database.SQLite.Simple.ToField ( ToField(..) )
 import           GHC.Generics
 import           Web.FormUrlEncoded
 import           Website.Auth.Authorisation       (Group (Admin))

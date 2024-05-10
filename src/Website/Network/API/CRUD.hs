@@ -28,8 +28,8 @@ instance Accept DOWNLOAD where
 type CRUDCreateForm create = Get '[HTML] Html
 
 type CRUDCreate create = CRUDCreate' (ReqBody '[FormUrlEncoded] create)
-
 type CRUDCreate' create = create :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
+type CRUDCreateFile create = create :> Verb 'POST 201 '[HTML] Html
 
 -- Read a specific resource
 type CRUDRead key = Capture "key" key :> Get '[HTML] Html
@@ -65,7 +65,7 @@ type CRUD create update key =
     :<|> CRUDDelete key
 
 type CRUDForm' create update key =
-  CRUDCreate' create
+  CRUDCreateFile create
     :<|> CRUDCreateForm create
     :<|> CRUDRead' key
     -- :<|> CRUDUpdate' update key

@@ -75,6 +75,12 @@ updateFile fUpdate = do
   c <- asks conn
   liftIO $ execute c "update file set name = ?, data = ?, type = ?, updated = datetime() where id = ?" (fUpdate.updateFileName, fUpdate.updateFileData, fUpdate.updateFileType, fUpdate.updateFileId)
 
+getFileMeta :: CanAppM c e m => FileId -> m FileMeta
+getFileMeta fId = do
+  c <- asks conn
+  l <- liftIO $ query c "select id, name, created, updated from file where id = ?" (Only fId)
+  ensureSingleResult l
+
 getFileMetas :: CanAppM c e m => m [FileMeta]
 getFileMetas = do
   c <- asks conn

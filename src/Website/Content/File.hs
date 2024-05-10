@@ -19,22 +19,18 @@ import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Content.Common
 import           Website.Content.Htmx
 import           Website.Data.Env
-import           Website.Data.Error
 import           Website.Data.File
 import           Website.Data.User
 import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
+import Data.Foldable (traverse_)
 
-uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
+uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m Html
 uploadFile formData = do
-  files <- traverse (createFile <=< mkFile) $ files formData
-  file <- case files of
-    []    -> throwError $ fromErr $ Other "No files uploaded"
-    (f:_) -> pure f
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) file.fileId
-  pure $ addHeader link mempty
+  traverse_ (createFile <=< mkFile) $ files formData
+  pure "Uploaded"
   where
     mkFile :: FileData Tmp -> m CreateFile
     mkFile fd = do
@@ -43,30 +39,6 @@ uploadFile formData = do
         (fdFileName fd)
         data_
         (fdFileCType fd)
-
-uploadFileForm :: (RequiredUser c, CanAppM c e m) => m Html
-uploadFileForm = do
-  basicPage $ mconcat
-    [ H.form
-      -- ! hxBoost
-      ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! HA.enctype "multipart/form-data"
-      ! HA.method "POST"
-      ! HA.action (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDCreate' FileUpload)))))
-      $ mconcat
-      [ H.label
-        ! HA.for "file"
-        $ "Choose a file for upload"
-      , H.br
-      , H.input
-        ! HA.type_ "file"
-        ! HA.name "file"
-      , H.br
-      , H.button
-        ! HA.type_ "submit"
-        $ "Upload"
-      ]
-    ]
 
 getFile :: (OptionalUser c, CanAppM c e m) => FileId -> m (Headers '[Header "Content-Length" Int64] WithCT)
 getFile fId = do
@@ -78,7 +50,7 @@ getFile fId = do
       (BSL.fromStrict $ encodeUtf8 file.fileType)
       file.fileData
 
-getFiles :: (OptionalUser c, CanAppM c e m) => m Html
+getFiles :: (CanAppM c e m, OptionalUser c) => m Html
 getFiles = do
   tz <- asks timeZone
   files <- getFileMetas
@@ -89,9 +61,9 @@ getFiles = do
       [ pure $ H.h2 "Files",
         mNewFile,
         pure $ H.ul $
-          mconcat $
+          mconcat $               
             sortBy sortFileMeta files <&> \fm ->
-              H.li (mconcat $ catMaybes
+              H.li $ H.p (mconcat $ catMaybes
                 [ pure $ fileLink tz fm,
                   pure H.br,
                   ($ fm) <$> mDeleteFile
@@ -107,9 +79,9 @@ getFiles = do
     delFile m =
       H.button
         ! hxTrigger "click"
-        -- ! hxSwap "outerHTML"
-        -- ! hxTarget "#edit-delete-buttons"
-        ! hxConfirm "Confirm deletion"
+        ! hxSwap "outerHTML swap"
+        ! hxTarget "closest li"
+        ! hxConfirm (H.textValue $ "Confirm deletion: " <> m.fileMetaName)
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
         ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthFile (CRUDDelete FileId))) m.fileMetaId)
@@ -126,5 +98,6 @@ getFiles = do
 
 deleteFile :: (RequiredUser c, CanAppM c e m) => FileId -> m Html
 deleteFile fId = do
+  m <- getFileMeta fId
   Website.Data.File.deleteFile fId
-  pure $ H.toHtml @String "Deleted"
+  pure $ H.toHtml $ "Deleted " <> m.fileMetaName
