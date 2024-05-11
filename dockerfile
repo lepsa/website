@@ -3,9 +3,11 @@ FROM haskell:9 as build_base
 
 WORKDIR /opt/website
 
+ARG flags
+
 RUN cabal update
 COPY ./Website.cabal /opt/website/Website.cabal
-RUN cabal build --only-dependencies -j$(nproc)
+RUN cabal build -f "$flags" --only-dependencies -j$(nproc)
 
 COPY ./app /opt/website/app
 COPY ./src /opt/website/src
@@ -17,7 +19,10 @@ COPY ./LICENSE /opt/website/LICENSE
 FROM build_base as build
 
 WORKDIR /opt/website
-RUN cabal install --installdir=. --install-method=copy exe:Website
+
+ARG flags
+
+RUN cabal install -f "$flags" --installdir=. --install-method=copy exe:Website
 
 # What actually runs, no haskell compiler stuff
 FROM debian:buster as web
@@ -36,4 +41,6 @@ FROM build_base as test
 
 WORKDIR /opt/website
 
-CMD ["cabal", "run", "Website-test"]
+ARG flags
+
+CMD ["cabal", "-f", "$flags", "run", "Website-test"]

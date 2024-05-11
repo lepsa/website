@@ -4,7 +4,7 @@
 
 module Test.Types where
 
-import           Lens.Micro.Platform
+import           Control.Lens
 import qualified Data.ByteString.Lazy        as BSL
 import           Data.Kind
 import           Data.Map                    (Map)

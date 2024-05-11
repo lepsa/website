@@ -3,6 +3,8 @@ services:
     build:
       context: ./
       target: web
+      args:
+        FLAGS: -tls
     ports:
       - "8080:8080"
     volumes:

@@ -4,7 +4,7 @@
 
 module Test.StateMachine where
 
-import           Lens.Micro.Platform
+import           Control.Lens
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Aeson                            (eitherDecode)
