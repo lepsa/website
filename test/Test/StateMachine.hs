@@ -4,7 +4,7 @@
 
 module Test.StateMachine where
 
-import           Control.Lens
+import           Lens.Micro.Platform
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Aeson                            (eitherDecode)
@@ -57,8 +57,8 @@ import qualified Website.Data.User                     (User (..))
 -- Generators
 --
 
-chars :: (MonadGen m) => m Char
-chars = Gen.filterT predicate Gen.ascii
+genChars :: (MonadGen m) => m Char
+genChars = Gen.filterT predicate Gen.ascii
   where
     predicate c = isPrint c && c /= '\n' -- isAlpha c || isNumber c
 
@@ -70,13 +70,13 @@ textLength :: (Integral a) => Range a
 textLength = Range.linear minTextLength maxTextLength
 
 genText :: (MonadGen m) => m Text
-genText = Gen.text textLength chars
+genText = Gen.text textLength genChars
 
 genEmail :: (MonadGen m) => m Text
-genEmail = Gen.text textLength $ Gen.filterT (/= ':') $ Gen.filterT isAlpha chars
+genEmail = Gen.text textLength $ Gen.filterT (/= ':') $ Gen.filterT isAlpha genChars
 
 genPassword :: (MonadGen m) => m Text
-genPassword = Gen.text textLength $ Gen.filterT (/= ':') chars
+genPassword = Gen.text textLength $ Gen.filterT (/= ':') genChars
 
 genGroup :: (MonadGen m) => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]

@@ -134,7 +134,7 @@ test-suite Website-test
                   , http-client
                   , http-client-tls
                   , http-types
-                  , lens
+                  , microlens-platform
                   , mtl
                   , raw-strings-qq
                   , regex-tdfa

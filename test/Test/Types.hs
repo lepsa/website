@@ -4,7 +4,7 @@
 
 module Test.Types where
 
-import           Control.Lens
+import           Lens.Micro.Platform
 import qualified Data.ByteString.Lazy        as BSL
 import           Data.Kind
 import           Data.Map                    (Map)
@@ -281,10 +281,9 @@ makeLenses ''TestEntry
 makeLenses ''TestUser
 makeLenses ''ApiState
 makeLenses ''AuthKey
-makePrisms ''Auth
 makeLenses ''LoginType
 makeLenses ''TestLogin
-makeWrapped ''GetEntries
+makeLenses ''GetEntries
 makeLenses ''GetEntry
 makeLenses ''GetEntryMissing
 makeLenses ''DeleteEntry
@@ -332,7 +331,7 @@ instance HasKey DeleteFile where
   key = dfKey
 
 instance HasAuth GetEntries where
-  auth = _Wrapped
+  auth = getEntriesAuth
 
 instance HasAuth GetEntry where
   auth = geAuth
