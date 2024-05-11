@@ -43,4 +43,4 @@ WORKDIR /opt/website
 
 ARG flags
 
-CMD ["cabal", "-f", "$flags", "run", "Website-test"]
+CMD cabal -f $flags run Website-test
