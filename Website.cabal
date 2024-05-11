@@ -13,6 +13,10 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
+flag tls
+    default: False
+    manual: True
+
 common threads
     ghc-options: -threaded
                  -rtsopts
@@ -42,7 +46,9 @@ common depends
                   , time
                   , uuid
                   , warp
-                  , warp-tls
+    if flag(tls)
+        build-depends:
+            warp-tls
 
 common extensions
     default-extensions: DataKinds
@@ -52,6 +58,7 @@ common extensions
                       , GeneralisedNewtypeDeriving
                       , ScopedTypeVariables
                       , ConstraintKinds
+                      , CPP
 
 common warnings
     ghc-options: -Wall
@@ -91,6 +98,8 @@ library
     -- other-extensions:
     hs-source-dirs:   src
     default-language: GHC2021
+    if flag(tls)
+        cpp-options: -DTLS=1
 
 executable Website
     import:           warnings
@@ -127,12 +136,10 @@ test-suite Website-test
                   , bytestring
                   , case-insensitive
                   , containers
-                  , crypton-connection
                   , exceptions
                   , hedgehog
                   , http-api-data
                   , http-client
-                  , http-client-tls
                   , http-types
                   , microlens-platform
                   , mtl
@@ -142,3 +149,8 @@ test-suite Website-test
                   , servant-server
                   , sqlite-simple
                   , text
+    if flag(tls)
+        build-depends:
+            crypton-connection,
+            http-client-tls
+        cpp-options: -DTLS=1

@@ -9,11 +9,9 @@ import           Data.Proxy
 import           Data.Time
 import           Database.SQLite.Simple      hiding ((:.))
 import           Network.Wai.Handler.Warp
-import           Network.Wai.Handler.WarpTLS
 import           Servant.Auth.Server
 import           Servant.Server
 import           System.Directory
-import           System.FilePath
 import           Website.Auth.Authentication
 import           Website.Content.Error
 import           Website.Data.Env
@@ -22,6 +20,11 @@ import           Website.Data.Schema
 import           Website.Network.API.Types
 import           Website.Network.Server
 import           Website.Types
+
+#ifdef TLS
+import           Network.Wai.Handler.WarpTLS
+import           System.FilePath
+#endif
 
 -- GHC gets upset when trying to add a type signature here, even if it comes from HLS.
 -- It compiles without it, so something is clearly being infered correctly so I'm going
@@ -66,10 +69,14 @@ startServer' onStartup api serverM dbPath port = do
         setBeforeMainLoop onStartup
           $ setHost "*6"
           $ setPort port defaultSettings
+#if defined(TLS)
   let tls = tlsSettings
               (currentDirectory </> "certificates" </> "certificate.pem")
               (currentDirectory </> "certificates" </> "key.pem")
   runTLS tls warpSettings $
+#else
+  runSettings warpSettings $
+#endif
     serveWithContext api cfg $
       hoistServerWithContext api
         (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
