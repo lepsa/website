@@ -23,9 +23,12 @@ topAPI = Proxy
 
 type Auths = '[BasicAuth, Cookie, JWT]
 
-type TopAPI = TopAPI' Auths
-type TopAPI' auths = Auth auths UserKey :> API
+type TopAPI = Auth Auths UserKey :> API
 
+-- These write to a tmp file. This file _must_ be read
+-- in its entirety before the handler returns, as the
+-- tmp file will be cleaned up shortly after the handler
+-- completes.
 type FileUpload = MultipartForm Tmp (MultipartData Tmp)
 
 type SetLoginCookies a = Headers '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie, Header "Location" Text] a

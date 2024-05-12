@@ -1,6 +1,4 @@
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Test.Types where
 
@@ -19,9 +17,7 @@ import           Servant
 import           Test.Db.Entry               ()
 import           Test.Db.User                ()
 import           Web.FormUrlEncoded
-import           Website.Auth.Authentication ()
 import           Website.Auth.Authorisation  (Group)
-import qualified Website.Auth.Authorisation  as Auth
 import           Website.Data.User           (UserCreate (UserCreate))
 
 -- What we think that the state of the world should look like.
@@ -55,7 +51,7 @@ instance TraversableB TestEntry
 data TestUser v = TestUser
   { _tuEmail    :: Text
   , _tuPassword :: Text
-  , _tuGroup    :: Auth.Group
+  , _tuGroup    :: Group
   , _tuJwt      :: Maybe (Var String v)
   }
   deriving (Eq, Generic, Show)
@@ -415,3 +411,6 @@ instance ToForm (UpdateUser v) where
     , (\p -> ("newPassword", toQueryParam p)) <$> update ^? uuPassword . _Just . newPassword
     , (\g -> ("group", toQueryParam g)) <$> update ^. uuGroup
     ]
+
+fromRegisterUser :: RegisterUser v -> TestUser v
+fromRegisterUser (RegisterUser e p g) = (TestUser e p g Nothing)

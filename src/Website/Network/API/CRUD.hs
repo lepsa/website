@@ -9,27 +9,28 @@ import           Servant.API.ContentTypes
 import           Servant.HTML.Blaze
 import           Text.Blaze.Html
 
+-- A hack to return dynamic content types. This is used with `DOWNLOAD`.
+-- `WithCT` specifies the content type, `DOWNLOAD` specifies that the
+-- supplied bytes should be sent out as-is.
 data WithCT = WithCT {header :: BSL.ByteString, content :: BSL.ByteString}
 
 instance AllCTRender '[DOWNLOAD] WithCT where
   handleAcceptH _ _ (WithCT h c) = Just (h, c)
 
+-- Send out raw bytes, and have `WithCT` specify the content types.
 data DOWNLOAD deriving (Typeable)
-
 instance MimeRender DOWNLOAD BSL.ByteString where
   mimeRender _ content = content
-
 instance Accept DOWNLOAD where
   contentType _ = "*/*"
 
 -- This should always be paired with CRUDCreate so that we can get the initial form
 -- for the CRUD creation, before posting to the CRUDCreate route, and getting the
 -- response back
-type CRUDCreateForm create = Get '[HTML] Html
+type CRUDCreateForm = Get '[HTML] Html
 
-type CRUDCreate create = CRUDCreate' (ReqBody '[FormUrlEncoded] create)
-type CRUDCreate' create = create :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
-type CRUDCreateFile create = create :> Verb 'POST 201 '[HTML] (Headers '[Header "Location" Text] Html)
+type CRUDCreate     create = (ReqBody '[FormUrlEncoded] create) :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
+type CRUDCreateFile create = create                             :> Verb 'POST 201 '[HTML] (Headers '[Header "Location" Text] Html)
 
 -- Read a specific resource
 type CRUDRead key = Capture "key" key :> Get '[HTML] Html
@@ -52,7 +53,7 @@ type CRUDDelete key = Capture "key" key :> "delete" :> Delete '[HTML] Html
 -- It will ensure that pages are provided so that users can perform the required actions
 type CRUDForm create update key =
   CRUDCreate create
-    :<|> CRUDCreateForm create
+    :<|> CRUDCreateForm
     :<|> CRUDRead key
     :<|> CRUDUpdate update key
     :<|> CRUDUpdateForm key
@@ -66,7 +67,7 @@ type CRUD create update key =
 
 type CRUDForm' create update key =
   CRUDCreateFile create
-    :<|> CRUDCreateForm create
+    :<|> CRUDCreateForm
     :<|> CRUDRead' key
     -- :<|> CRUDUpdate' update key
     -- :<|> CRUDUpdateForm key

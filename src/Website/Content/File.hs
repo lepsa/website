@@ -81,7 +81,7 @@ getFiles = do
       H.a
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! htmlLink (Proxy @(AuthFile (CRUDCreateForm FileUpload))) $ "Create File"
+        ! htmlLink (Proxy @(AuthFile CRUDCreateForm)) $ "Create File"
     delFile m =
       H.button
         ! hxTrigger "click"
