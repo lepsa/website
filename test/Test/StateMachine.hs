@@ -38,8 +38,8 @@ import           Web.FormUrlEncoded
 import           Website.Auth.Authorisation            (Group (..))
 import           Website.Data.Entry                    (Entry (title, value))
 import           Website.Data.File                     (File (fileData, fileName, fileType))
-import           Website.Data.User                     (User)
 import qualified Website.Data.User                     (User (..))
+import           Website.Data.User                     (User)
 
 -- Reference the following QFPL blog posts to refresh yourself.
 -- https://qfpl.io/posts/intro-to-state-machine-testing-1/
@@ -139,8 +139,8 @@ response204 _old _new _input output = output.responseStatus === status204
 mkAuthHeader :: (HasAuth command) => command Concrete -> [Header]
 mkAuthHeader command = case command ^. auth of
   Normal (AuthKey _ u) -> pure $ maybe (mkBasicAuthHeader u) (mkBearerAuthHeader . concrete) $ u ^. tuJwt
-  Bad user -> badHeader $ view akUser <$> user
-  None -> []
+  Bad user             -> badHeader $ view akUser <$> user
+  None                 -> []
   where
     badHeader = maybe [] (pure . mkBasicAuthHeader)
     mkBearerAuthHeader token = ("Authorization", "Bearer " <> BS8.pack token)
@@ -186,25 +186,24 @@ mkBadKey :: MonadGen m => String -> m (Key v)
 mkBadKey base = BadKey . (base <>) <$> genUuid
 
 mkBadAuth :: (MonadGen m) => ApiState v -> m (Auth v)
-mkBadAuth state =
-  Gen.choice
-    [ pure None
-    , pure $ Bad Nothing
-    , if M.null state._users
-        then pure $ Bad Nothing
-        else do
-          (k, u') <- Gen.element $ M.toList state._users
-          let u = u' & tuJwt .~ Nothing
-          Bad . pure
-            <$> Gen.choice
-              [ do
-                  newPass <- Gen.filterT (/= u ^. password) genPassword
-                  pure $ AuthKey k $ u & tuPassword .~ newPass,
-                do
-                  newEmail <- Gen.filterT (/= u ^. email) genEmail
-                  pure $ AuthKey k $ u & tuEmail .~ newEmail
-              ]
-    ]
+mkBadAuth state = Gen.choice
+  [ pure None
+  , pure $ Bad Nothing
+  , if M.null state._users
+    then pure $ Bad Nothing
+    else do
+      (k, u') <- Gen.element $ M.toList state._users
+      let u = u' & tuJwt .~ Nothing
+      Bad . pure
+        <$> Gen.choice
+          [ do
+              newPass <- Gen.filterT (/= u ^. password) genPassword
+              pure $ AuthKey k $ u & tuPassword .~ newPass,
+            do
+              newEmail <- Gen.filterT (/= u ^. email) genEmail
+              pure $ AuthKey k $ u & tuEmail .~ newEmail
+          ]
+  ]
 
 formHeader :: Header
 formHeader = ("Content-Type", "application/x-www-form-urlencoded")
@@ -271,12 +270,11 @@ cLogin env = Command gen execute
   where
     -- From our state, generate a value to be used for the test.
     -- In this case, pick a user to log in from the list of users.
-    gen apiState =
-      if M.null apiState._users
-        then Nothing
-        else Just $ do
-          (k, u) <- Gen.element $ M.toList apiState._users
-          pure $ TestLogin k Good (u ^. tuEmail) (u ^. tuPassword)
+    gen apiState = if M.null apiState._users
+      then Nothing
+      else Just $ do
+        (k, u) <- Gen.element $ M.toList apiState._users
+        pure $ TestLogin k Good (u ^. tuEmail) (u ^. tuPassword)
     -- What we want to do with this value
     execute login = do
       req <- H.parseRequest $ env.baseUrl <> "/login"
@@ -367,13 +365,12 @@ cCreateEntry env = Command gen execute
       else pure $ CreateEntry <$> mkGoodAuth state <*> genText <*> genText
     execute createEntry = do
       req <- H.parseRequest (env.baseUrl <> "/entry")
-      let req' =
-            mkReq
-              methodPost
-              (formHeader : mkAuthHeader createEntry)
-              req
-                { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
-                }
+      let req' = mkReq
+            methodPost
+            (formHeader : mkAuthHeader createEntry)
+            req
+              { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
+              }
       res <- liftIO $ H.httpLbs req' env.manager
       res.responseStatus === status303
       extractKey res
@@ -386,13 +383,12 @@ cCreateEntryBadAuth env = Command gen execute []
       else pure $ CreateEntry <$> mkBadAuth state <*> genText <*> genText
     execute createEntry = do
       req <- H.parseRequest $ env.baseUrl <> "/entry"
-      let req' =
-            mkReq
-              methodPost
-              (formHeader : mkAuthHeader createEntry)
-              req
-                { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
-                }
+      let req' = mkReq
+            methodPost
+            (formHeader : mkAuthHeader createEntry)
+            req
+              { H.requestBody = H.RequestBodyLBS $ urlEncodeForm $ toForm createEntry
+              }
       res <- liftIO $ H.httpLbs req' env.manager
       res.responseStatus === status401
 
@@ -410,7 +406,7 @@ cDeleteEntry env = Command gen execute
         output.responseStatus === status200
         case input ^. key of
           GoodKey _ -> length (old ^. entries) === length (new ^. entries) + 1
-          _ -> length (old ^. entries) === length (new ^. entries)
+          _         -> length (old ^. entries) === length (new ^. entries)
       _ -> do
         output.responseStatus === status401
         length (old ^. entries) === length (new ^. entries)
@@ -655,8 +651,7 @@ cCreateFileBadAuth env = Command gen execute []
         <*> genFileType
         <*> fmap BSL.fromStrict (Gen.bytes textLength)
     execute tfUpload = do
-      req <- H.parseRequest (env.baseUrl <> "/file") >>=
-        formDataBody
+      req <- H.parseRequest (env.baseUrl <> "/file") >>= formDataBody
           [ partFileRequestBody "file" (unpack $ tfUpload ^. cfName) $ H.RequestBodyLBS $ tfUpload ^. cfData
           ] . mkReq
           methodPost

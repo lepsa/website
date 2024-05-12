@@ -65,18 +65,18 @@ startServer' onStartup api serverM dbPath port = do
       -- Basic auth checks the user/password each time, so it already
       -- handles a user being deleted between user requests.
       cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
-      warpSettings =
-        setBeforeMainLoop onStartup
-          $ setHost "*6"
-          $ setPort port defaultSettings
+      warpSettings = setBeforeMainLoop onStartup
+        $ setHost "*6"
+        $ setPort port defaultSettings
 #if defined(TLS)
   let tls = tlsSettings
               (currentDirectory </> "certificates" </> "certificate.pem")
               (currentDirectory </> "certificates" </> "key.pem")
-  runTLS tls warpSettings $
+  runTLS tls
 #else
-  runSettings warpSettings $
+  runSettings
 #endif
+    warpSettings $
     serveWithContext api cfg $
       hoistServerWithContext api
         (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])

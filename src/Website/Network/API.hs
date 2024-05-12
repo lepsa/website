@@ -4,28 +4,27 @@ module Website.Network.API where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.Int
 import           Data.Text                  (Text)
 import           Servant
 import           Servant.Auth.Server
+import           Servant.Multipart
 import qualified Text.Blaze.Html            as H
 import           Website.Auth.Authorisation (Access (Read, Write))
 import           Website.Content.Common
 import           Website.Content.Entry
-import           Website.Content.Index
+import qualified Website.Content.File       as Website.Data.File
 import           Website.Content.File
-import           Website.Content.User       (userDisplay, userDisplayFullPage,
-                                             userList)
+import           Website.Content.Index
+import           Website.Content.User       (userDisplay, userDisplayFullPage, userList)
 import           Website.Data.Entry
 import           Website.Data.Error
+import           Website.Data.File          (FileId)
 import           Website.Data.Permission    (checkPermission)
 import           Website.Data.User
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import qualified Website.Content.File as Website.Data.File
-import Servant.Multipart
-import Data.Int
-import Website.Data.File (FileId)
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = index

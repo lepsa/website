@@ -65,13 +65,12 @@ data Entry = Entry
 --
 
 instance FromRow Entry where
-  fromRow =
-    Entry
-      <$> field
-      <*> field
-      <*> field
-      <*> field
-      <*> field
+  fromRow = Entry
+    <$> field
+    <*> field
+    <*> field
+    <*> field
+    <*> field
 
 createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
 createEntry (EntryCreate title value) = do

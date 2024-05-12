@@ -33,29 +33,23 @@ userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
 userDisplayFullPage = basicPage <=< userDisplay
 
 userList :: (CanAppM c e m, RequiredUser c) => [User] -> m Html
-userList users =
-  basicPage $
-    mconcat
-      [ H.h2 "Users",
-        newUser,
-        H.ul $ mconcat $ userLink <$> sortUsers users
-      ]
+userList users = basicPage $ mconcat
+  [ H.h2 "Users",
+    newUser,
+    H.ul $ mconcat $ userLink <$> sortUsers users
+  ]
   where
     userLink :: User -> Html
-    userLink user =
-      H.li $ H.p $
-        mconcat
-          [ H.a
-              ! hxBoost
-              ! hxOn "::config-request" "setXsrfHeader(event)"
-              ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid))
-              $ toHtml user.email
-          ]
-    newUser :: Html
-    newUser =
-      H.a
+    userLink user = H.li $ H.p $ mconcat
+      [ H.a
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! htmlLink (Proxy @(AuthUser (CRUDCreate UserCreate))) $ "Create User"
-    sortUsers = sortBy $ \a b ->
-      compare a.email b.email
+        ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid))
+        $ toHtml user.email
+      ]
+    newUser :: Html
+    newUser = H.a
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! htmlLink (Proxy @(AuthUser (CRUDCreate UserCreate))) $ "Create User"
+    sortUsers = sortBy $ \a b -> compare a.email b.email

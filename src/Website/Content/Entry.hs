@@ -65,11 +65,10 @@ entryList entries = do
       ]
   where
     newEntry :: Html
-    newEntry =
-      H.a
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
+    newEntry = H.a
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
 
 entryLink :: TimeZone -> Entry -> Html
 entryLink tz entry = mconcat

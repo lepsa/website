@@ -5,16 +5,14 @@ module Website.Data.User where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader.Class
-import           Data.Password.Argon2             (Argon2, PasswordCheck (..),
-                                                   PasswordHash (..),
-                                                   checkPassword, hashPassword,
-                                                   mkPassword, unPasswordHash)
+import           Data.Password.Argon2             (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword,
+                                                   hashPassword, mkPassword, unPasswordHash)
 import           Data.Text                        hiding (group)
 import           Data.UUID
 import           Data.UUID.V4
 import           Database.SQLite.Simple
 import           Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.ToField ( ToField(..) )
+import           Database.SQLite.Simple.ToField   (ToField (..))
 import           GHC.Generics
 import           Web.FormUrlEncoded
 import           Website.Auth.Authorisation       (Group (Admin))
@@ -64,10 +62,9 @@ data UpdatePassword = UpdatePassword
 
 instance FromForm UpdatePassword where
   fromForm :: Form -> Either Text UpdatePassword
-  fromForm f =
-    UpdatePassword
-      <$> parseUnique "oldPassword" f
-      <*> parseUnique "newPassword" f
+  fromForm f = UpdatePassword
+    <$> parseUnique "oldPassword" f
+    <*> parseUnique "newPassword" f
 
 data UserUpdate = UserUpdate
   { password :: Maybe UpdatePassword,
@@ -91,11 +88,10 @@ data UserCreate = UserCreate
   deriving (Generic)
 
 instance FromForm UserCreate where
-  fromForm f =
-    UserCreate
-      <$> parseUnique "group" f
-      <*> parseUnique "email" f
-      <*> parseUnique "password" f
+  fromForm f = UserCreate
+    <$> parseUnique "group" f
+    <*> parseUnique "email" f
+    <*> parseUnique "password" f
 
 instance FromField (PasswordHash Argon2) where
   fromField f = PasswordHash <$> fromField @Text f
@@ -120,33 +116,28 @@ createUser (UserCreate group email password) = do
   either throwError_ pure eUser
 
 getUserHashIO :: Connection -> UserKey -> IO (Either Err (PasswordHash Argon2))
-getUserHashIO c uid =
-  ensureSingleResult <$> query c "select hash from user_login where id = ?" (Only uid)
+getUserHashIO c uid = ensureSingleResult <$> query c "select hash from user_login where id = ?" (Only uid)
 
 getUserHash :: (CanAppM c e m) => UserKey -> m (PasswordHash Argon2)
 getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither_
 
 getUserIO :: Connection -> UserKey -> IO (Either Err User)
-getUserIO c uid =
-  ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only uid)
+getUserIO c uid = ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only uid)
 
 getUser :: (CanAppM c e m) => UserKey -> m User
 getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither_
 
 getUserIdIO :: Connection -> Text -> IO (Either Err UserKey)
-getUserIdIO c email =
-  ensureSingleResult <$> query c "select id from user where email = ?" (Only email)
+getUserIdIO c email = ensureSingleResult <$> query c "select id from user where email = ?" (Only email)
 
 getUserId :: (CanAppM c e m) => Text -> m UserKey
 getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
 
 getUserLoginIO :: Connection -> UserKey -> IO (Either Err UserLogin)
-getUserLoginIO c k =
-  ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only k)
+getUserLoginIO c k = ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only k)
 
 getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
-getUserLogin k =
-  asks conn >>= liftIO . flip getUserLoginIO k >>= liftEither_
+getUserLogin k = asks conn >>= liftIO . flip getUserLoginIO k >>= liftEither_
 
 updateUser :: (CanAppM c e m) => UserKey -> UserUpdate -> m User
 updateUser key update = do

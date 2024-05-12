@@ -51,7 +51,7 @@ data FormData a = FormData
 -- | Helper function for generating forms
 generateField :: (Show a, Eq a, Enum a, Bounded a) => FieldData a -> Html
 generateField fd = case fd of
-  FieldData {} -> formField fd.fieldName fd.fieldLabel fd.fieldType fd.fieldValue
+  FieldData {}  -> formField fd.fieldName fd.fieldLabel fd.fieldType fd.fieldValue
   StaticData {} -> staticField fd.staticName fd.staticLabel fd.staticValue
   SelectData {} -> selectField fd.selectName fd.selectLabel fd.selectValue
 
@@ -63,118 +63,111 @@ class (Show b, Bounded b, Enum b, Eq b) => GenerateForm a b | a -> b where
 -- What an Entry should look like in HTML
 --
 instance GenerateForm Entry () where
-  newForm _ =
-    pure $
-      FormData
-        { title = "Create Entry",
-          createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDCreate EntryCreate)))),
-          updateUrl = Nothing,
-          fields =
-            [ FieldData
-                { fieldLabel = "Title",
-                  fieldName = "title",
-                  fieldType = "text",
-                  fieldValue = Nothing
-                },
-              FieldData
-                { fieldLabel = "Value",
-                  fieldName = "value",
-                  fieldType = "textarea",
-                  fieldValue = Nothing
-                }
-            ]
-        }
+  newForm _ = pure $ FormData
+    { title = "Create Entry",
+      createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDCreate EntryCreate)))),
+      updateUrl = Nothing,
+      fields =
+        [ FieldData
+            { fieldLabel = "Title",
+              fieldName = "title",
+              fieldType = "text",
+              fieldValue = Nothing
+            },
+          FieldData
+            { fieldLabel = "Value",
+              fieldName = "value",
+              fieldType = "textarea",
+              fieldValue = Nothing
+            }
+        ]
+    }
   updateForm entry = do
     tz <- asks timeZone
-    pure $
-      FormData
-        { title = "Update Entry",
-          createUrl = Nothing,
-          updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
-          fields =
-            [ FieldData
-                { fieldLabel = "Title",
-                  fieldName = "title",
-                  fieldType = "text",
-                  fieldValue = pure $ T.unpack entry.title
-                },
-              StaticData
-                { staticLabel = "Created",
-                  staticName = "created",
-                  staticValue = pure $ timeFormat tz entry.created
-                },
-              StaticData
-                { staticLabel = "Last Updated",
-                  staticName = "created",
-                  staticValue = pure $ maybe "Never" (timeFormat tz) entry.updated
-                },
-              FieldData
-                { fieldLabel = "Value",
-                  fieldName = "value",
-                  fieldType = "textarea",
-                  fieldValue = pure $ T.unpack entry.value
-                }
-            ]
-        }
+    pure $ FormData
+      { title = "Update Entry",
+        createUrl = Nothing,
+        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
+        fields =
+          [ FieldData
+              { fieldLabel = "Title",
+                fieldName = "title",
+                fieldType = "text",
+                fieldValue = pure $ T.unpack entry.title
+              },
+            StaticData
+              { staticLabel = "Created",
+                staticName = "created",
+                staticValue = pure $ timeFormat tz entry.created
+              },
+            StaticData
+              { staticLabel = "Last Updated",
+                staticName = "created",
+                staticValue = pure $ maybe "Never" (timeFormat tz) entry.updated
+              },
+            FieldData
+              { fieldLabel = "Value",
+                fieldName = "value",
+                fieldType = "textarea",
+                fieldValue = pure $ T.unpack entry.value
+              }
+          ]
+      }
 
 instance GenerateForm User Group where
-  newForm _ =
-    pure $
-      FormData
-        { title = "Create User",
-          createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDCreate UserCreate)))),
-          updateUrl = Nothing,
-          fields =
-            [ FieldData
-                { fieldLabel = "Email",
-                  fieldName = "email",
-                  fieldType = "text",
-                  fieldValue = Nothing
-                },
-              FieldData
-                { fieldLabel = "Password",
-                  fieldName = "password",
-                  fieldType = "password",
-                  fieldValue = Nothing
-                },
-              SelectData
-                { selectLabel = "Group",
-                  selectName = "group",
-                  selectValue = Nothing
-                }
-            ]
-        }
-  updateForm user = do
-    pure $
-      FormData
-        { title = "Update User",
-          createUrl = Nothing,
-          updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
-          fields =
-            [ StaticData
-                { staticLabel = "Email",
-                  staticName = "email",
-                  staticValue = pure $ T.unpack user.email
-                },
-              FieldData
-                { fieldLabel = "Old Password",
-                  fieldName = "oldPassword",
-                  fieldType = "password",
-                  fieldValue = Nothing
-                },
-              FieldData
-                { fieldLabel = "New Password",
-                  fieldName = "newPassword",
-                  fieldType = "password",
-                  fieldValue = Nothing
-                },
-              SelectData
-                { selectLabel = "Group",
-                  selectName = "group",
-                  selectValue = pure user.group
-                }
-            ]
-        }
+  newForm _ = pure $ FormData
+    { title = "Create User",
+      createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDCreate UserCreate)))),
+      updateUrl = Nothing,
+      fields =
+        [ FieldData
+            { fieldLabel = "Email",
+              fieldName = "email",
+              fieldType = "text",
+              fieldValue = Nothing
+            },
+          FieldData
+            { fieldLabel = "Password",
+              fieldName = "password",
+              fieldType = "password",
+              fieldValue = Nothing
+            },
+          SelectData
+            { selectLabel = "Group",
+              selectName = "group",
+              selectValue = Nothing
+            }
+        ]
+    }
+  updateForm user = pure $ FormData
+    { title = "Update User",
+      createUrl = Nothing,
+      updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
+      fields =
+        [ StaticData
+            { staticLabel = "Email",
+              staticName = "email",
+              staticValue = pure $ T.unpack user.email
+            },
+          FieldData
+            { fieldLabel = "Old Password",
+              fieldName = "oldPassword",
+              fieldType = "password",
+              fieldValue = Nothing
+            },
+          FieldData
+            { fieldLabel = "New Password",
+              fieldName = "newPassword",
+              fieldType = "password",
+              fieldValue = Nothing
+            },
+          SelectData
+            { selectLabel = "Group",
+              selectName = "group",
+              selectValue = pure user.group
+            }
+        ]
+    }
 
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
 generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a b) => Proxy a -> m Html
@@ -221,8 +214,7 @@ generateUpdateForm a = do
 
 -- User forms
 userUpdateForm :: (HasEnv c, MonadReader c m) => User -> m Html
-userUpdateForm user = do
-  generateUpdateForm user
+userUpdateForm = generateUpdateForm
 
 userCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 userCreationForm = do

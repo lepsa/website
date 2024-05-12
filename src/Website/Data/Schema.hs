@@ -7,8 +7,7 @@ import           Data.List
 import           Database.SQLite.Simple
 import           Database.SQLite.Simple.ToField
 import           Website.Data.Env
-import           Website.Data.Error             (DbErr (NotFound),
-                                                 Err (DbError), throwError_)
+import           Website.Data.Error             (DbErr (NotFound), Err (DbError), throwError_)
 import           Website.Types
 
 -- Create a table for tracking the schema version
@@ -53,7 +52,7 @@ setupDatabase = do
     execute_ c "PRAGMA foreign_keys = ON"
     [Only (fkEnabled :: Bool)] <- query_ c "PRAGMA foreign_keys"
     unless fkEnabled $ error "Foreign keys aren't supported in this version of SQLite. Please use a version with foreign key support."
-    
+
     execute_ c "PRAGMA auto_vacuum = FULL"
     [Only (vacEnabled :: Int)] <- query_ c "PRAGMA auto_vacuum"
     case vacEnabled of
@@ -72,18 +71,15 @@ runMigrations = do
     [version] -> pure version
     _         -> throwError_ $ DbError NotFound
   liftIO $ putStrLn $ "Schema: " <> show currentVersion
-  let migrationsToRun =
-        filter (\(v, _) -> v >= currentVersion) $
-          sortBy comp migrations
+  let migrationsToRun = filter (\(v, _) -> v >= currentVersion) $ sortBy comp migrations
   -- Iterate over all of the schema bumps that we have
-  liftIO $
-    traverse_
-      -- For each schema bump, run a transaction where
-      -- if anything fails, the transaction aborts and
-      -- the error propagates up, stopping the rest of
-      -- the changes and the server starting.
-      (withExclusiveTransaction c . runMigration c)
-      migrationsToRun
+  liftIO $ traverse_
+    -- For each schema bump, run a transaction where
+    -- if anything fails, the transaction aborts and
+    -- the error propagates up, stopping the rest of
+    -- the changes and the server starting.
+    (withExclusiveTransaction c . runMigration c)
+    migrationsToRun
   where
     comp (a, _) (b, _) = compare a b
 

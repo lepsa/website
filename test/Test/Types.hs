@@ -3,22 +3,22 @@
 module Test.Types where
 
 import           Control.Lens
-import qualified Data.ByteString.Lazy        as BSL
+import qualified Data.ByteString.Lazy       as BSL
 import           Data.Kind
-import           Data.Map                    (Map)
-import qualified Data.Map                    as M
-import           Data.Maybe                  (catMaybes)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as M
+import           Data.Maybe                 (catMaybes)
 import           Data.Text
 import           GHC.Exts
 import           GHC.Generics
-import           Hedgehog                    hiding (Group)
-import qualified Network.HTTP.Client         as H
+import           Hedgehog                   hiding (Group)
+import qualified Network.HTTP.Client        as H
 import           Servant
-import           Test.Db.Entry               ()
-import           Test.Db.User                ()
+import           Test.Db.Entry              ()
+import           Test.Db.User               ()
 import           Web.FormUrlEncoded
-import           Website.Auth.Authorisation  (Group)
-import           Website.Data.User           (UserCreate (UserCreate))
+import           Website.Auth.Authorisation (Group)
+import           Website.Data.User          (UserCreate (UserCreate))
 
 -- What we think that the state of the world should look like.
 -- This will often end up mirroring the database in some way, as

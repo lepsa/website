@@ -23,10 +23,9 @@ data Login = Login
   deriving (Generic)
 
 instance FromForm Login where
-  fromForm f =
-    Login
-      <$> parseUnique "login" f
-      <*> parseUnique "password" f
+  fromForm f = Login
+    <$> parseUnique "login" f
+    <*> parseUnique "password" f
 
 newtype BasicAuthCfg' = BasicAuthCfg' Connection
 

@@ -14,14 +14,11 @@ import           Text.Blaze.Html
 import           Website.Auth.Authentication
 import           Website.Content.Common
 import           Website.Content.Forms
-import           Website.Data.Entry          (EntryCreate, EntryKey,
-                                              EntryUpdate)
+import           Website.Data.Entry          (EntryCreate, EntryKey, EntryUpdate)
 import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.File           (FileId)
-import           Website.Data.User           (OptionalUser, UserCreate, UserKey,
-                                              UserLogin, UserUpdate,
-                                              getUserLogin)
+import           Website.Data.User           (OptionalUser, UserCreate, UserKey, UserLogin, UserUpdate, getUserLogin)
 import           Website.Network.API
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
@@ -30,18 +27,17 @@ import           Website.Types
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
   where
-    api a =
-      unprotected a getIndex
-        :<|> unprotected a getLogin
-        :<|> unprotected a . login
-        :<|> unprotected a . register cookieSettings jwtSettings
-        :<|> crudUser a
-        :<|> protected a getUsers
-        :<|> crudEntry a
-        :<|> unprotected a getEntries
-        :<|> crudFile a
-        :<|> unprotected a getFiles
-        :<|> serveDirectoryWebApp (currentDirectory </> "static")
+    api a = unprotected a getIndex
+       :<|> unprotected a getLogin
+       :<|> unprotected a . login
+       :<|> unprotected a . register cookieSettings jwtSettings
+       :<|> crudUser a
+       :<|> protected a getUsers
+       :<|> crudEntry a
+       :<|> unprotected a getEntries
+       :<|> crudFile a
+       :<|> unprotected a getFiles
+       :<|> serveDirectoryWebApp (currentDirectory </> "static")
 
     getLogin :: (OptionalUser c, CanAppM c e m) => m Html
     getLogin = loginForm
@@ -59,18 +55,16 @@ server cookieSettings jwtSettings currentDirectory = api
         root = linkText (Proxy @(AuthLogin :> Get '[HTML] Html))
 
     crudEntry :: Authed -> ServerT (CRUDForm EntryCreate EntryUpdate EntryKey) (AppM Env Err IO)
-    crudEntry a =
-      (protected a . postEntry)
-        :<|> protected a entryCreationForm
-        -- Unprotected, as we want the internet at large to be able to read this.
-        :<|> (unprotected a . getEntry)
-        :<|> (\ek -> protected a . putEntry ek)
-        :<|> (protected a . getEntryForUpdate)
-        :<|> (protected a . deleteEntry)
+    crudEntry a = protected a . postEntry
+             :<|> protected a entryCreationForm
+             -- Unprotected, as we want the internet at large to be able to read this.
+             :<|> unprotected a . getEntry
+             :<|> (\ek -> protected a . putEntry ek)
+             :<|> protected a . getEntryForUpdate
+             :<|> protected a . deleteEntry
 
     crudUser :: Authed -> ServerT (CRUDForm UserCreate UserUpdate UserKey) (AppM Env Err IO)
-    crudUser a =
-      hoistServer (Proxy @(CRUDForm UserCreate UserUpdate UserKey)) (protected a) $
+    crudUser a = hoistServer (Proxy @(CRUDForm UserCreate UserUpdate UserKey)) (protected a) $
         postUser
           :<|> userCreationForm
           :<|> getUser
@@ -79,11 +73,10 @@ server cookieSettings jwtSettings currentDirectory = api
           :<|> deleteUser
 
     crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
-    crudFile a =
-      protected a . postFile
-        :<|> protected a fileCreationForm
-        :<|> unprotected a . getFile
-        :<|> protected a . deleteFile
+    crudFile a = protected a . postFile
+            :<|> protected a fileCreationForm
+            :<|> unprotected a . getFile
+            :<|> protected a . deleteFile
 
     -- When using a user token do a couple of things.
     -- 1) Ensure that the user actually exists in the database.

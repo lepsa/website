@@ -7,8 +7,8 @@ import           Servant                     hiding (BasicAuth)
 import           Servant.Auth
 import           Servant.Auth.Server         (AuthResult)
 import           Servant.HTML.Blaze
-import           Text.Blaze.Html
 import qualified Text.Blaze.Html             as H
+import           Text.Blaze.Html
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Auth.Authentication
@@ -90,19 +90,16 @@ pageHeader = do
 
 -- | A common location for common footer elements
 pageFooter :: Html
-pageFooter =
-  H.footer mempty
+pageFooter = H.footer mempty
 
 -- | A common location for including resources needed by all pages. Invoked by 'basicPage'
 commonHead :: Html
-commonHead =
-  H.head $
-    mconcat
-      [ H.link ! HA.rel (stringValue "stylesheet") ! HA.href (stringValue "/main.css"),
-        H.script ! HA.src (stringValue "/main.js") $ mempty,
-        H.script ! HA.src (stringValue "/htmx.min.js") $ mempty,
-        H.title $ toHtml siteTitle
-      ]
+commonHead = H.head $ mconcat
+  [ H.link ! HA.rel (stringValue "stylesheet") ! HA.href (stringValue "/main.css"),
+    H.script ! HA.src (stringValue "/main.js") $ mempty,
+    H.script ! HA.src (stringValue "/htmx.min.js") $ mempty,
+    H.title $ toHtml siteTitle
+  ]
 
 -- | Builds the list of links on the side. Invoked by 'basicPage'
 sideNav :: (OptionalUser c, MonadReader c m) => m Html
@@ -164,36 +161,32 @@ basicPage content = do
     ]
 
 staticField :: String -> String -> Maybe String -> Html
-staticField fieldName fieldLabel value =
-  mconcat
-    [ H.div ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
-      H.div ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ maybe mempty toHtml value
-    ]
+staticField fieldName fieldLabel value = mconcat
+  [ H.div ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
+    H.div ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ maybe mempty toHtml value
+  ]
 
 -- | Helper function for building forms. Will apply styling, labels, and values.
 formField :: String -> String -> String -> Maybe String -> Html
-formField fieldName fieldLabel type_ value =
-  mconcat
-    [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
-      case type_ of
-        "textarea" -> H.textarea ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ maybe mempty toHtml value
-        _ -> H.input ! HA.class_ "formvalue" ! HA.name (toValue fieldName) ! HA.type_ (toValue type_) ! maybe mempty (HA.value . stringValue) value
-    ]
+formField fieldName fieldLabel type_ value = mconcat
+  [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
+    case type_ of
+      "textarea" -> H.textarea ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ maybe mempty toHtml value
+      _ -> H.input ! HA.class_ "formvalue" ! HA.name (toValue fieldName) ! HA.type_ (toValue type_) ! maybe mempty (HA.value . stringValue) value
+  ]
 
 selectField :: forall a. (Eq a, Enum a, Bounded a, Show a) => String -> String -> Maybe a -> Html
-selectField fieldName fieldLabel value =
-  mconcat
-    [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
-      H.select ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ mconcat $
-        mkOption <$> [minBound..maxBound]
-    ]
+selectField fieldName fieldLabel value = mconcat
+  [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
+    H.select ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ mconcat $
+      mkOption <$> [minBound..maxBound]
+  ]
   where
     mkOption :: a -> Html
-    mkOption option =
-      H.option
-        ! HA.value (stringValue val)
-        ! maybe mempty selected value
-        $ toHtml val
+    mkOption option = H.option
+      ! HA.value (stringValue val)
+      ! maybe mempty selected value
+      $ toHtml val
       where
         val = show option
         selected a = if a == option
@@ -202,11 +195,10 @@ selectField fieldName fieldLabel value =
 
 -- | Helper function for building textarea inputs
 formFieldTextArea :: String -> String -> Maybe String -> Html
-formFieldTextArea fieldName fieldLabel value =
-  mconcat
-    [ H.label ! HA.for (toValue fieldName) $ toHtml fieldLabel,
-      H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
-    ]
+formFieldTextArea fieldName fieldLabel value = mconcat
+  [ H.label ! HA.for (toValue fieldName) $ toHtml fieldLabel,
+    H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
+  ]
 
 loginForm :: (OptionalUser c, MonadReader c m) => m Html
 loginForm = basicPage $
@@ -231,32 +223,29 @@ loginForm = basicPage $
       ]
 
 editDeleteButtons :: AttributeValue -> Maybe Text -> Text -> Text -> Html
-editDeleteButtons editTarget deleteConfirmText editLink deleteLink =
-  H.div
-    ! HA.id "edit-delete-buttons"
-    $ mconcat
-      [ edit,
-        delete
-      ]
+editDeleteButtons target confirm eLink dLink = H.div
+  ! HA.id "edit-delete-buttons"
+  $ mconcat
+    [ edit,
+      delete
+    ]
   where
     edit :: Html
-    edit =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget editTarget
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxGet (H.textValue editLink)
-        $ "Edit"
+    edit = H.button
+      ! hxTrigger "click"
+      ! hxSwap "outerHTML"
+      ! hxTarget target
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! hxGet (H.textValue eLink)
+      $ "Edit"
     delete :: Html
-    delete =
-      H.button
-        ! hxTrigger "click"
-        ! hxSwap "outerHTML"
-        ! hxTarget "#edit-delete-buttons"
-        ! hxConfirm (H.textValue $ "Confirm deletion" <> fromMaybe mempty deleteConfirmText)
-        ! hxBoost
-        ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! hxDelete (H.textValue deleteLink)
-        $ "Delete"
+    delete = H.button
+      ! hxTrigger "click"
+      ! hxSwap "outerHTML"
+      ! hxTarget "#edit-delete-buttons"
+      ! hxConfirm (H.textValue $ "Confirm deletion" <> fromMaybe mempty confirm)
+      ! hxBoost
+      ! hxOn "::config-request" "setXsrfHeader(event)"
+      ! hxDelete (H.textValue dLink)
+      $ "Delete"
