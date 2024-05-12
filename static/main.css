@@ -8,51 +8,95 @@ select, textarea, input, button {
 }
 
 body {
-  background-color: #F0F0F0;
+  background-color: #F6F6F6;
+  margin: 0rem;
 }
 
 p {
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin: 0.5rem 0rem;
 }
 
 a {
-  color: blue;
+  color: #0033cc;
   text-decoration: none;
 }
 
+a:hover {
+  color: black;
+  text-decoration: underline;
+  text-decoration-thickness: 0.2rem;
+  text-decoration-skip-ink: none;
+}
+
 header {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: black solid 0.1rem;
 }
 
 #site-header {
   grid-column: 2;
+  margin: 0rem 2rem;
 }
 
 #greeter {
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100%;
+  padding: 0rem 2rem 0rem 1rem;
+  border-left: black solid 0.1rem;
+  border-bottom-left-radius: 1rem;
+}
+
+.page-div {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
   text-align: center;
 }
 
-#main-content {
-  display: flex;
-  align-items: flex-start;
-}
-
-nav {
-  display: inline-block;
-  margin: 1rem;
-}
-
 main {
   display: inline-block;
   margin: 1rem;
+}
+
+#main-content {
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+}
+
+footer {
+  border-top: black solid 0.1rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+footer p {
+  margin: 0.5rem;
+}
+
+nav {
+  text-align: center;
+  display: inline-block;
+  border-right: black solid 0.1rem;
+  border-top-right-radius: 1rem;
+  border-bottom-right-radius: 1rem;
+}
+
+.nav-separator {
+  border-top: black solid 0.1rem;
+  padding-top: 0.5rem;
+  border-top-right-radius: 1rem;
 }
 
 nav ul {
@@ -61,6 +105,10 @@ nav ul {
 
 nav ul li {
   list-style: none;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 label {

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Website.Content.Common where
 
 import           Control.Monad.Reader
@@ -18,6 +19,7 @@ import           Website.Data.Env
 import           Website.Data.User
 import           Website.Network.API.Types
 import           Website.Types
+import GitHash
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -84,13 +86,18 @@ pageHeader = do
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
-          H.h1 $ toHtml siteTitle
+          H.h2 $ toHtml siteTitle
       , loggedIn
       ]
 
 -- | A common location for common footer elements
 pageFooter :: Html
-pageFooter = H.footer mempty
+pageFooter = H.footer $ mconcat
+  [ H.p $ H.a ! HA.href "https://github.com/lepsa/website" $ "Project Repository"
+  , H.p $ H.toHtml $ "Code Version: " <> giBranch gi <> "@" <> giHash gi
+  ]
+  where
+    gi = $$tGitInfoCwd
 
 -- | A common location for including resources needed by all pages. Invoked by 'basicPage'
 commonHead :: Html
@@ -127,13 +134,11 @@ sideNav = do
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> "files" :> Get '[HTML] H.Html)) $ "Files",
           mUsers,
-          pure H.hr,
-          pure $ H.li $ H.a
+          pure $ H.li ! HA.class_ "nav-separator" $ H.a
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
-          pure H.hr,
-          pure $ H.li $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
+          pure $ H.li ! HA.class_ "nav-separator" $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
 
 -- | 'basicPage' should be used as a wrapper on any route that could be loaded directly by a
@@ -147,10 +152,10 @@ basicPage content = do
   pure $ mconcat
     [ H.docType,
       commonHead,
-      H.body
+      H.body $ H.div
+        ! HA.class_ "page-div"
         $ mconcat
           [ header,
-            H.hr,
             H.div ! HA.id (stringValue "main-content") $
               mconcat
                 [ nav,
