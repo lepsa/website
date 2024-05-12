@@ -25,15 +25,13 @@ Things I want to add over time:
 
   ![xkcd 949](https://imgs.xkcd.com/comics/file_transfer.png)
 
-### How
+## How
 
-#### Running The Server
-
-Create, link, or copy a TLS certificate and key file into the project `certificates` directory with the name `certificate.pem` and `key.pem`. These files aren't automatically reloaded if they change while the server is runnning.
+### Running The Server
 
 Do this `cabal run Website` from the project root, or `docker-compose up`
 
-Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy the `static`, `db`, and `certificates` directories to wherever you are running the server.
+Or if you are feeling fancy you can build the binary, optionally strip it, and then run that. You also need to be careful to copy the `static`, `db`, and `certificates` (if TLS is enabled) directories to wherever you are running the server.
 
 #### First Admin Setup
 
@@ -43,3 +41,14 @@ The following curl command is an example for setting up an Admin user for a loca
 
 #### Tests
 Run this `cabal run Website-test`, or `docker-compose up test --build`. It will create a new testing database and stomp all over that as it throws requests left, right, and all over the place.
+
+### TLS
+
+Support for TLS is enabled via the `tls` cabal flag.
+  - Cabal: `cabal build -f tls` or `cabal run -f tls`
+  - Docker: `docker build --build-arg flags=tls .`
+  - Docker Compose: `docker-compose build --build-arg flags=tls`
+
+#### Certificates
+
+Create, link, or copy a TLS certificate and key file into the project `certificates` directory with the name `certificate.pem` and `key.pem`. These files aren't automatically reloaded if they change while the server is runnning.

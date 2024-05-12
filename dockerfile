@@ -3,7 +3,7 @@ FROM haskell:9 as build_base
 
 WORKDIR /opt/website
 
-ARG flags
+ARG flags=-tls
 
 RUN cabal update
 COPY ./Website.cabal /opt/website/Website.cabal
@@ -20,7 +20,7 @@ FROM build_base as build
 
 WORKDIR /opt/website
 
-ARG flags
+ARG flags=-tls
 
 RUN cabal install -f "$flags" --installdir=. --install-method=copy exe:Website
 
@@ -41,6 +41,6 @@ FROM build_base as test
 
 WORKDIR /opt/website
 
-ARG flags
+ARG flags=-tls
 
 CMD cabal -f $flags run Website-test

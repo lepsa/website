@@ -4,7 +4,7 @@ services:
       context: ./
       target: web
       args:
-        FLAGS: -tls
+        flags: -tls
     ports:
       - "8080:8080"
     volumes:
@@ -15,7 +15,7 @@ services:
       context: ./
       target: test
       args:
-        FLAGS: -tls
+        flags: -tls
     volumes:
       - ./certificates:/opt/website/certificates
       - ./db:/opt/website/db
