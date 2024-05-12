@@ -29,7 +29,7 @@ type CRUDCreateForm create = Get '[HTML] Html
 
 type CRUDCreate create = CRUDCreate' (ReqBody '[FormUrlEncoded] create)
 type CRUDCreate' create = create :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
-type CRUDCreateFile create = create :> Verb 'POST 201 '[HTML] Html
+type CRUDCreateFile create = create :> Verb 'POST 201 '[HTML] (Headers '[Header "Location" Text] Html)
 
 -- Read a specific resource
 type CRUDRead key = Capture "key" key :> Get '[HTML] Html

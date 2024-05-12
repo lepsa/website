@@ -35,7 +35,7 @@ import           Network.HTTP.Types                    (Header, Method, Status,
                                                         methodPost, methodPut,
                                                         status200, status204,
                                                         status303, status401,
-                                                        status404)
+                                                        status404, status201)
 import           Test.Db.File                          ()
 import           Test.Types
 import           Text.RawString.QQ
@@ -76,7 +76,7 @@ genEmail :: (MonadGen m) => m Text
 genEmail = Gen.text textLength $ Gen.filterT (/= ':') $ Gen.filterT isAlpha genChars
 
 genPassword :: (MonadGen m) => m Text
-genPassword = Gen.text textLength $ Gen.filterT (/= ':') genChars
+genPassword = Gen.text textLength genChars
 
 genGroup :: (MonadGen m) => m Auth.Group
 genGroup = Gen.element [Auth.Admin, Auth.User]
@@ -189,7 +189,7 @@ mkKey base keys = Gen.choice
   ]
 
 genFileName :: MonadGen m => m Text
-genFileName = Gen.text (Range.linear 1 10) Gen.alphaNum
+genFileName = Gen.text (Range.linear 1 10) $ Gen.filterT (\c -> c `notElem` ['/', '\\', ';']) genChars
 
 genFileType :: MonadGen m => m Text
 genFileType = do
@@ -783,7 +783,7 @@ cCreateFile env =
             ),
       Ensure $ \old new _input output -> do
         assert $ isPrefixOf "/file/" output
-        assert $ length output > length ("/entry/" :: String)
+        assert $ length output > length ("/file/" :: String)
         length old._files + 1 === length new._files
     ]
   where
@@ -811,7 +811,7 @@ cCreateFile env =
         (formHeader : mkAuthHeader tfUpload)
         req
       res <- liftIO $ H.httpLbs req' env.manager
-      res.responseStatus === status303
+      res.responseStatus === status201
       extractKey res
 
 cCreateFileBadAuth :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
@@ -932,20 +932,6 @@ cDeleteFile env =
 -- multiple ways. Things like checking what the DB thinks the world
 -- looks like vs what the API thinks the world looks like.
 --
-
--- cTestReset :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
--- cTestReset env = Command gen execute
---   [ Update $ \_state _ _ -> initialState
---   ]
---   where
---     gen :: ApiState Symbolic -> Maybe (gen (Reset Symbolic))
---     gen _apiState = Just $ pure Reset
---     execute :: Reset Concrete -> m ()
---     execute _reset = do
---       req <- H.parseRequest (env.baseUrl <> "/reset")
---       let req' = req {H.method = methodPost}
---       res <- liftIO $ H.httpNoBody req' env.manager
---       res.responseStatus === status204
 
 cTestGetUsers :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cTestGetUsers env =

@@ -1,6 +1,5 @@
 module Website.Content.File where
 
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import qualified Data.ByteString.Lazy        as BSL
@@ -25,12 +24,19 @@ import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import Data.Foldable (traverse_)
+import Website.Data.Error
 
-uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m Html
+uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
 uploadFile formData = do
-  traverse_ (createFile <=< mkFile) $ files formData
-  pure "Uploaded"
+  let fds = files formData
+  fd <- case fds of
+    [] -> throwError_ MissingUpload
+    [fd] -> pure fd
+    _ -> throwError_ TooManyUploads
+  f <- mkFile fd >>= createFile
+  pure
+    $ addHeader (pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) f.fileId))
+    $ "Uploaded"
   where
     mkFile :: FileData Tmp -> m CreateFile
     mkFile fd = do

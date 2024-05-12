@@ -28,11 +28,18 @@ notFound = do
   h <- basicPage $ H.p "Not Found"
   pure $ err404 { errBody = H.renderHtml h }
 
+badRequest :: (OptionalUser c, MonadReader c m) => String -> m ServerError
+badRequest msg = do
+  h <- basicPage $ H.p $ H.toHtml msg
+  pure $ err400 { errBody = H.renderHtml h }
+
 errToServerError :: (OptionalUser c, MonadReader c m) => Err -> m ServerError
 errToServerError e = case e of
   DbError e'      -> dbErrToServerError e'
   Unauthenticated -> unauthenticated
   Unauthorised    -> unauthorised
+  MissingUpload   -> badRequest "Missing an upload item"
+  TooManyUploads  -> badRequest "Too many upload items"
   Other msg       -> internalServerError msg
 
 dbErrToServerError :: (OptionalUser c, MonadReader c m) => DbErr -> m ServerError

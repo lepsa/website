@@ -107,7 +107,7 @@ getFiles = do
   checkPermission "GET files" Read
   Website.Content.File.getFiles
 
-postFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m H.Html
+postFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] H.Html)
 postFile m = do
   checkPermission "POST file" Write
   Website.Data.File.uploadFile m

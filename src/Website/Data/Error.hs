@@ -8,6 +8,8 @@ data Err
   = DbError DbErr
   | Unauthenticated
   | Unauthorised
+  | MissingUpload
+  | TooManyUploads
   | Other String
   deriving (Eq, Ord, Show)
 data DbErr
