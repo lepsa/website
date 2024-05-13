@@ -48,7 +48,9 @@ common depends
                   , text
                   , time
                   , uuid
+                  , wai
                   , wai-extra
+                  , wai-middleware-prometheus
                   , warp
     if flag(tls)
         build-depends:

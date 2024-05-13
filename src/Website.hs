@@ -20,14 +20,17 @@ import           Website.Data.Schema
 import           Website.Network.API.Types
 import           Website.Network.Server
 import           Website.Types
-import Network.Wai.Middleware.Gzip
-import Network.Wai.Middleware.RequestLogger
-import System.IO
-import System.Log.Logger
-import System.Log.Handler.Syslog
-import Control.Monad.Logger
-import Control.Monad.Identity
-import Control.Monad.Reader
+import           Network.Wai.Middleware.Gzip
+import           Network.Wai.Middleware.RequestLogger
+import           System.IO
+import           System.Log.Logger
+import           System.Log.Handler.Syslog
+import           Control.Monad.Logger
+import           Control.Monad.Identity
+import           Control.Monad.Reader
+import           Network.Wai
+import           Network.Wai.Middleware.Prometheus
+import           Data.List.NonEmpty (NonEmpty ((:|)), nonEmpty)
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -92,6 +95,8 @@ startServer' onStartup api serverM dbPath port = do
     runSettings
 #endif
       warpSettings $
+      prometheus def { prometheusInstrumentApp = False } $
+      instrumentHandlerValue reqHandler $
       requestLogger $
       gzip defaultGzipSettings $
       serveWithContext api cfg $
@@ -102,6 +107,11 @@ startServer' onStartup api serverM dbPath port = do
   where
     runErr :: Err -> ReaderT Env Identity ServerError
     runErr = mapReaderT runNoLoggingT . errToServerError
+    reqHandler req =
+      let parts = filter (/= mempty) $ pathInfo req
+      in mappend "/" $ case nonEmpty parts of
+         Nothing -> mempty
+         Just (seg:|segs) -> foldl (\z p -> z <> "/" <> p) seg segs
 
 startServer :: String -> Int -> IO ()
 startServer = startServer' (pure ()) topAPI server
