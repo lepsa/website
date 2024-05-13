@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Website where
 
 import           Control.Monad
@@ -20,6 +22,12 @@ import           Website.Data.Schema
 import           Website.Network.API.Types
 import           Website.Network.Server
 import           Website.Types
+import Network.Wai.Middleware.Gzip
+import Network.Wai.Middleware.RequestLogger
+import System.IO
+import System.Log.Logger
+import System.Log.Handler.Syslog
+import Control.Monad.Logger
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -39,12 +47,14 @@ startServer'
   -> Port
   -> IO ()
 startServer' onStartup api serverM dbPath port = do
-  putStrLn "Starting server"
+  s <- openlog "Website" [PID] USER DEBUG
+  getRootLogger >>= saveGlobalLogger . setLevel DEBUG . addHandler s . removeHandler
   currentDirectory <- getCurrentDirectory
   conf <-
     Env
       <$> open dbPath
       <*> getCurrentTimeZone
+  void $ runAppM conf $ $(logInfo) "Starting server"
   -- Do all the steps to get our database up and running as
   -- we expect it to be.
   either (error . show @Err) pure <=< runAppM conf $ do
@@ -68,20 +78,27 @@ startServer' onStartup api serverM dbPath port = do
       warpSettings = setBeforeMainLoop onStartup
         $ setHost "*6"
         $ setPort port defaultSettings
+  withFile "requests.log" AppendMode $ \requestHandle -> do
+    requestLogger <- mkRequestLogger $ def
+      { outputFormat = Apache FromSocket
+      , destination = Handle requestHandle
+      }
 #if defined(TLS)
-  let tls = tlsSettings
-              (currentDirectory </> "certificates" </> "certificate.pem")
-              (currentDirectory </> "certificates" </> "key.pem")
-  runTLS tls
+    let tls = tlsSettings
+                (currentDirectory </> "certificates" </> "certificate.pem")
+                (currentDirectory </> "certificates" </> "key.pem")
+    runTLS tls
 #else
-  runSettings
+    runSettings
 #endif
-    warpSettings $
-    serveWithContext api cfg $
-      hoistServerWithContext api
-        (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
-        (runAppMToHandler errToServerError conf) $
-        serverM cookieSettings jwtSettings currentDirectory
+      warpSettings $
+      requestLogger $
+      gzip defaultGzipSettings $
+      serveWithContext api cfg $
+        hoistServerWithContext api
+          (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
+          (runAppMToHandler errToServerError conf) $
+          serverM cookieSettings jwtSettings currentDirectory
 
 startServer :: String -> Int -> IO ()
 startServer = startServer' (pure ()) topAPI server

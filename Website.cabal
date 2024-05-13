@@ -32,8 +32,10 @@ common depends
                   , directory
                   , filepath
                   , githash
+                  , hslogger
                   , http-api-data
                   , jose
+                  , monad-logger
                   , mtl
                   , password
                   , servant
@@ -46,6 +48,7 @@ common depends
                   , text
                   , time
                   , uuid
+                  , wai-extra
                   , warp
     if flag(tls)
         build-depends:

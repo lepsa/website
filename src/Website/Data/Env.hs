@@ -12,10 +12,13 @@ data Env = Env
   }
 
 class HasEnv c where
+  {-# MINIMAL (env | conn, timeZone) #-}
   env :: c -> Env
   env c = Env (conn c) (timeZone c)
   conn :: c -> Connection
+  conn = conn . env
   timeZone :: c -> TimeZone
+  timeZone = timeZone . env
 
 instance HasEnv Env where
   env = id
@@ -25,18 +28,13 @@ instance HasEnv Env where
 class HasAuth c a | c -> a where
   auth :: c -> a
 
-data EnvAuthed a = EnvAuthed
-  { _envAuthConn     :: Connection
-  , _envAuthTimeZone :: TimeZone
-  , _envAuthAuthed   :: a
-  } deriving Functor
+type EnvAuthed a = (Env, a)
 
 instance HasEnv (EnvAuthed a) where
-  conn = _envAuthConn
-  timeZone = _envAuthTimeZone
+  env = fst
 
 instance HasAuth (EnvAuthed a) a where
-  auth = _envAuthAuthed
+  auth = snd
 
 mkEnvAuthed :: a -> Env -> EnvAuthed a
-mkEnvAuthed a e = EnvAuthed (conn e) (timeZone e) a
+mkEnvAuthed a e = (e, a)

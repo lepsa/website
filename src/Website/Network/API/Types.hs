@@ -43,4 +43,4 @@ type API =
     :<|> "entries" :> Get '[HTML] Html
     :<|> "file" :> CRUDForm' FileUpload FileUpload FileId
     :<|> "files" :> Get '[HTML] Html
-    :<|> Raw
+    :<|> "static" :> Raw

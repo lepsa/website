@@ -102,9 +102,9 @@ pageFooter = H.footer $ mconcat
 -- | A common location for including resources needed by all pages. Invoked by 'basicPage'
 commonHead :: Html
 commonHead = H.head $ mconcat
-  [ H.link ! HA.rel (stringValue "stylesheet") ! HA.href (stringValue "/main.css"),
-    H.script ! HA.src (stringValue "/main.js") $ mempty,
-    H.script ! HA.src (stringValue "/htmx.min.js") $ mempty,
+  [ H.link ! HA.rel (stringValue "stylesheet") ! HA.href (stringValue "/static/main.css"),
+    H.script ! HA.src (stringValue "/static/main.js") $ mempty,
+    H.script ! HA.src (stringValue "/static/htmx.min.js") $ mempty,
     H.title $ toHtml siteTitle
   ]
 

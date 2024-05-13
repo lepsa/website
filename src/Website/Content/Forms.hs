@@ -264,6 +264,6 @@ fileCreationForm = do
       , H.img
         ! HA.id "spinner"
         ! HA.class_ "htmx-indicator"
-        ! HA.src "/90-ring.svg"
+        ! HA.src "/static/90-ring.svg"
       ]
     ]

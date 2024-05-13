@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Website.Network.API where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger       (logDebug)
 import           Data.Int
 import           Data.Text                  (Text)
 import           Servant
@@ -27,7 +29,9 @@ import           Website.Network.API.Types
 import           Website.Types
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
-getIndex = index
+getIndex = do
+  $(logDebug) "foo bar"
+  index
 
 --
 -- Entry pages

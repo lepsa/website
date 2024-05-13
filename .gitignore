@@ -19,3 +19,5 @@ dist-newstyle/
 # SSL certs
 *.csr
 *.pem
+# Logs
+*.log
