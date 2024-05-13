@@ -40,6 +40,7 @@ type API =
     :<|> "user" :> CRUDForm UserCreate UserUpdate UserKey
     :<|> "users" :> Get '[HTML] Html
     :<|> "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
+    :<|> "entry" :> Capture "title" String :> Get '[HTML] Html
     :<|> "entries" :> Get '[HTML] Html
     :<|> "file" :> CRUDForm' FileUpload FileUpload FileId
     :<|> "files" :> Get '[HTML] Html

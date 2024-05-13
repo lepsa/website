@@ -1,6 +1,5 @@
 module Website.Content.User where
 
-import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Data
 import           Data.List                   (sortBy)
@@ -16,10 +15,14 @@ import           Website.Data.User
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
+import Control.Monad.Logger
+import qualified Data.Text as T
 
-userDisplay :: (HasEnv c, MonadReader c m) => User -> m Html
-userDisplay user = pure $ H.div ! HA.id "user"
-  $ mconcat
+userDisplay :: (HasEnv c, MonadReader c m, MonadLogger m) => User -> m Html
+userDisplay user = do
+  $(logDebug) $ "userDisplay " <> T.pack (show user)
+  pure $ H.div ! HA.id "user" $
+    mconcat
     [ H.h3 $ toHtml user.email
     , H.p $ toHtml $ "Group " <> show user.group
     , editDeleteButtons
@@ -30,14 +33,18 @@ userDisplay user = pure $ H.div ! HA.id "user"
     ]
 
 userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
-userDisplayFullPage = basicPage <=< userDisplay
+userDisplayFullPage u = do
+  $(logDebug) $ "userDisplayFullPage " <> T.pack (show u)
+  basicPage =<< userDisplay u
 
 userList :: (CanAppM c e m, RequiredUser c) => [User] -> m Html
-userList users = basicPage $ mconcat
-  [ H.h2 "Users",
-    newUser,
-    H.ul $ mconcat $ userLink <$> sortUsers users
-  ]
+userList users = do
+  $(logDebug) $ "userList " <> T.pack (show users)
+  basicPage $ mconcat
+    [ H.h2 "Users",
+      newUser,
+      H.ul $ mconcat $ userLink <$> sortUsers users
+    ]
   where
     userLink :: User -> Html
     userLink user = H.li $ H.p $ mconcat

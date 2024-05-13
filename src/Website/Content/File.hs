@@ -25,9 +25,12 @@ import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
+import Control.Monad.Logger
+import qualified Data.Text as T
 
 uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
 uploadFile formData = do
+  $(logDebug) "uploadFile"
   let fds = files formData
   fd <- case fds of
     []   -> throwError_ MissingUpload
@@ -48,6 +51,7 @@ uploadFile formData = do
 
 getFile :: (OptionalUser c, CanAppM c e m) => FileId -> m (Headers '[Header "Content-Length" Int64] WithCT)
 getFile fId = do
+  $(logDebug) $ "getFile " <> T.pack (show fId)
   file <- Website.Data.File.getFile fId
   let fileLen = BSL.length file.fileData
   pure $ addHeader fileLen $ WithCT
@@ -56,6 +60,7 @@ getFile fId = do
 
 getFiles :: (CanAppM c e m, OptionalUser c) => m Html
 getFiles = do
+  $(logDebug) "getFiles"
   tz <- asks timeZone
   files <- getFileMetas
   mNewFile <- whenLoggedIn $ const newFile
@@ -98,6 +103,7 @@ getFiles = do
 
 deleteFile :: (RequiredUser c, CanAppM c e m) => FileId -> m Html
 deleteFile fId = do
+  $(logDebug) $ "deleteFile " <> T.pack (show fId)
   m <- getFileMeta fId
   Website.Data.File.deleteFile fId
   pure $ H.toHtml $ "Deleted " <> m.fileMetaName

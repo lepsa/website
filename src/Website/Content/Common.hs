@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Website.Content.Common where
 
 import           Control.Monad.Reader
@@ -20,6 +19,8 @@ import           Website.Data.User
 import           Website.Network.API.Types
 import           Website.Types
 import GitHash
+import Control.Monad.Logger
+import qualified Data.Text as T
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey
@@ -33,13 +34,15 @@ siteTitle = "Owen's Site"
 whenAdmin :: (RequiredUser c, CanAppM c e m) => (UserLogin -> H.Html) -> m (Maybe H.Html)
 whenAdmin f = do
   user <- asks auth
+  $(logDebug) $ "whenAdmin " <> T.pack (show user)
   case user.unUserLogin.group of
     Admin -> pure $ pure $ f user
     _     -> pure Nothing
 
-whenLoggedIn :: (OptionalUser c, MonadReader c m) => (UserLogin -> a) -> m (Maybe a)
+whenLoggedIn :: (OptionalUser c, MonadReader c m, MonadLogger m) => (UserLogin -> a) -> m (Maybe a)
 whenLoggedIn f = do
   mUser <- asks mAuth
+  $(logDebug) $ "whenLoggedIn " <> T.pack (show mUser)
   case mUser of
     Nothing   -> pure Nothing
     Just user -> pure $ pure $ f user
@@ -76,7 +79,7 @@ linkText ::
 linkText api = pack "/" <> toUrlPiece (safeLink topAPI api)
 
 -- | A common location for common header elements
-pageHeader :: (OptionalUser c, MonadReader c m) => m Html
+pageHeader :: (OptionalUser c, MonadReader c m, MonadLogger m) => m Html
 pageHeader = do
   loggedIn <- whenLoggedIn greetUser
   pure $ H.header $
@@ -109,7 +112,7 @@ commonHead = H.head $ mconcat
   ]
 
 -- | Builds the list of links on the side. Invoked by 'basicPage'
-sideNav :: (OptionalUser c, MonadReader c m) => m Html
+sideNav :: (OptionalUser c, MonadReader c m, MonadLogger m) => m Html
 sideNav = do
   mUsers <- whenLoggedIn $ \_ -> mconcat
     [
@@ -145,7 +148,7 @@ sideNav = do
 --  user. This could be due to a page refresh, bookmark, history, etc.
 --  'basicPage' includes all content and overall page structure that is required for styling and
 --  HTMX interactivity.
-basicPage :: (OptionalUser c, MonadReader c m) => Html -> m Html
+basicPage :: (OptionalUser c, MonadReader c m, MonadLogger m) => Html -> m Html
 basicPage content = do
   header <- pageHeader
   nav <- sideNav
@@ -205,7 +208,7 @@ formFieldTextArea fieldName fieldLabel value = mconcat
     H.textarea ! HA.name (toValue fieldName) $ maybe mempty toHtml value
   ]
 
-loginForm :: (OptionalUser c, MonadReader c m) => m Html
+loginForm :: (OptionalUser c, MonadReader c m, MonadLogger m) => m Html
 loginForm = basicPage $
   H.form
     ! HA.class_ "contentform"

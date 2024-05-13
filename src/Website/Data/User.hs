@@ -20,6 +20,8 @@ import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.Util
 import           Website.Types
+import Control.Monad.Logger
+import qualified Data.Text as T
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
@@ -104,6 +106,7 @@ instance ToField (PasswordHash Argon2) where
 
 createUser :: (CanAppM c e m) => UserCreate -> m User
 createUser (UserCreate group email password) = do
+  $(logDebug) "createUser"
   c <- asks conn
   userId <- liftIO nextRandom
   eUser <- liftIO $ withTransaction c $ do
@@ -119,28 +122,45 @@ getUserHashIO :: Connection -> UserKey -> IO (Either Err (PasswordHash Argon2))
 getUserHashIO c uid = ensureSingleResult <$> query c "select hash from user_login where id = ?" (Only uid)
 
 getUserHash :: (CanAppM c e m) => UserKey -> m (PasswordHash Argon2)
-getUserHash uid = asks conn >>= liftIO . flip getUserHashIO uid >>= liftEither_
+getUserHash uid = do
+  $(logDebug) $ "getUserHash " <> T.pack (show uid)
+  c <- asks conn
+  e <- liftIO (getUserHashIO c uid)
+  liftEither_ e
 
 getUserIO :: Connection -> UserKey -> IO (Either Err User)
 getUserIO c uid = ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only uid)
 
 getUser :: (CanAppM c e m) => UserKey -> m User
-getUser uid = asks conn >>= liftIO . flip getUserIO uid >>= liftEither_
+getUser uid = do
+  $(logDebug) $ "getUser " <> T.pack (show uid)
+  c <- asks conn
+  e <- liftIO $ getUserIO c uid
+  liftEither_ e
 
 getUserIdIO :: Connection -> Text -> IO (Either Err UserKey)
 getUserIdIO c email = ensureSingleResult <$> query c "select id from user where email = ?" (Only email)
 
 getUserId :: (CanAppM c e m) => Text -> m UserKey
-getUserId email = asks conn >>= liftIO . flip getUserIdIO email >>= liftEither_
+getUserId email = do
+  $(logDebug) $ "getUserId " <> T.pack (show email)
+  c <- asks conn
+  e <- liftIO $ getUserIdIO c email
+  liftEither_ e
 
 getUserLoginIO :: Connection -> UserKey -> IO (Either Err UserLogin)
 getUserLoginIO c k = ensureSingleResult <$> query c "select id, email, group_name from user where id = ?" (Only k)
 
 getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
-getUserLogin k = asks conn >>= liftIO . flip getUserLoginIO k >>= liftEither_
+getUserLogin k = do
+  $(logDebug) $ "getUserLogin " <> T.pack (show k)
+  c <- asks conn
+  e <- liftIO $ getUserLoginIO c k
+  liftEither_ e
 
 updateUser :: (CanAppM c e m) => UserKey -> UserUpdate -> m User
 updateUser key update = do
+  $(logDebug) $ "updateUser " <> T.pack (show key)
   c <- asks conn
   case update.group of
     Nothing -> pure ()
@@ -163,6 +183,7 @@ updateUser key update = do
 
 deleteUser :: (CanAppM c e m) => UserKey -> m ()
 deleteUser key = do
+  $(logDebug) $ "deleteUser " <> T.pack (show key)
   c <- asks conn
   liftIO $
     withTransaction c $
@@ -172,11 +193,13 @@ deleteUser key = do
 
 getUsers :: CanAppM c e m => m [User]
 getUsers = do
+  $(logDebug) "getUsers"
   c <- asks conn
   liftIO $ withTransaction c $ query_ c "select id, email, group_name from user"
 
 adminExists :: CanAppM c e m => m Bool
 adminExists = do
+  $(logDebug) "adminExists"
   c <- asks conn
   liftIO $ do
     l :: [User] <- query c "select id, email, group_name from user where group_name = ? limit 1" (Only Admin)

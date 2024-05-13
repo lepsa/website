@@ -9,6 +9,7 @@ import           Database.SQLite.Simple.ToField
 import           Website.Data.Env
 import           Website.Data.Error             (DbErr (NotFound), Err (DbError), throwError_)
 import           Website.Types
+import Control.Monad.Logger
 
 -- Create a table for tracking the schema version
 createVersion :: Query
@@ -43,6 +44,7 @@ instance ToRow Version where
 
 setupDatabase :: (CanAppM c e m) => m ()
 setupDatabase = do
+  $(logDebug) "setupDatabase"
   c <- asks conn
   -- Explicitly enable foreign keys, as SQLite doesn't turn
   -- them on by default. If the database doesn't support the
@@ -64,6 +66,7 @@ setupDatabase = do
 
 runMigrations :: (CanAppM c e m) => m ()
 runMigrations = do
+  $(logDebug) "runMigrations"
   c <- asks conn
   versions <- liftIO $ withTransaction c $ query_ c getSchemaVersion
   currentVersion <- case versions of
@@ -161,6 +164,14 @@ migrateSchemaV8 =
     "insert into permission(name, group_name, access) values ('DELETE file', 'Admin', 'Write')"
   ]
 
+migrateSchemaV9 :: [Query]
+migrateSchemaV9 =
+  [ "create table new_entry (key text primary key not null, created datetime not null, title text not null unique, value text not null, updated datetime)"
+  , "insert into new_entry select key, created, title, value, updated from entry"
+  , "drop table entry"
+  , "alter table new_entry rename to entry"
+  ]
+
 migrations :: [(Version, [Query])]
 migrations =
   [ (0, migrateSchemaV0),
@@ -171,5 +182,6 @@ migrations =
     (5, migrateSchemaV5),
     (6, migrateSchemaV6),
     (7, migrateSchemaV7),
-    (8, migrateSchemaV8)
+    (8, migrateSchemaV8),
+    (9, migrateSchemaV9)
   ]

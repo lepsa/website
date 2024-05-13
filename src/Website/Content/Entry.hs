@@ -1,7 +1,6 @@
 module Website.Content.Entry where
 
 import           CMark                       (commonmarkToHtml)
-import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Maybe                  (catMaybes)
 import           Data.Text
@@ -18,10 +17,13 @@ import           Website.Data.User           (OptionalUser)
 import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
+import Control.Monad.Logger
+import qualified Data.Text as T
 
 -- | Display an entry, with edit and delete buttons
-entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c) => Entry -> m Html
+entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c, MonadLogger m) => Entry -> m Html
 entryDisplay entry = do
+  $(logDebug) $ "entryDisplay " <> T.pack (show entry)
   tz <- asks timeZone
   editDelete <- whenLoggedIn $ \_ -> editDeleteButtons
     "#entry"
@@ -47,12 +49,15 @@ entryDisplay entry = do
       ]
 
 -- | As 'entryDisplay' with 'basicPage' wrapping
-entryDisplayFullPage :: (HasEnv c, OptionalUser c) => MonadReader c m => Entry -> m Html
-entryDisplayFullPage = basicPage <=< entryDisplay
+entryDisplayFullPage :: (HasEnv c, OptionalUser c, MonadLogger m, MonadReader c m) => Entry -> m Html
+entryDisplayFullPage e = do
+  $(logDebug) $ "entryDisplayFullPage " <> T.pack (show e)
+  entryDisplay e >>= basicPage
 
 -- | List all entries as a page
-entryList :: (OptionalUser c, HasEnv c, MonadReader c m) => [Entry] -> m Html
+entryList :: (OptionalUser c, HasEnv c, MonadReader c m, MonadLogger m) => [Entry] -> m Html
 entryList entries = do
+  $(logDebug) $ "entryList " <> T.pack (show entries)
   tz <- asks timeZone
   mNewEntry <- whenLoggedIn $ const newEntry
   basicPage $

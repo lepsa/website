@@ -9,10 +9,12 @@ import           Website.Data.Entry
 import           Website.Data.Env
 import           Website.Data.User
 import           Website.Types
+import Control.Monad.Logger
 
 -- | Initial landing page.
 index :: (OptionalUser c, CanAppM c e m) => m Html
 index = do
+  $(logDebug) "index"
   tz <- asks timeZone
   posts <- sortEntriesByDateDesc <$> getRecentEntries recentPostCount
   basicPage $

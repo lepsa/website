@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Website where
 
 import           Control.Monad
@@ -28,6 +26,8 @@ import System.IO
 import System.Log.Logger
 import System.Log.Handler.Syslog
 import Control.Monad.Logger
+import Control.Monad.Identity
+import Control.Monad.Reader
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -97,8 +97,11 @@ startServer' onStartup api serverM dbPath port = do
       serveWithContext api cfg $
         hoistServerWithContext api
           (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
-          (runAppMToHandler errToServerError conf) $
+          (runAppMToHandler runErr conf) $
           serverM cookieSettings jwtSettings currentDirectory
+  where
+    runErr :: Err -> ReaderT Env Identity ServerError
+    runErr = mapReaderT runNoLoggingT . errToServerError
 
 startServer :: String -> Int -> IO ()
 startServer = startServer' (pure ()) topAPI server

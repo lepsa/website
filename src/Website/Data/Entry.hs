@@ -17,6 +17,8 @@ import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.Util                ()
 import           Website.Types
+import Control.Monad.Logger (logDebug)
+import qualified Data.Text as T
 
 --
 -- What an Entry is, and the various derived types that
@@ -73,7 +75,8 @@ instance FromRow Entry where
     <*> field
 
 createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
-createEntry (EntryCreate title value) = do
+createEntry e@(EntryCreate title value) = do
+  $(logDebug) $ "createEntry " <> T.pack (show e)
   c <- asks conn
   uuid <- liftIO nextRandom
   entries <- liftIO $ withTransaction c $ query c "insert into entry(key, created, title, value, updated) values (?, datetime(), ?, ?, null) returning key, created, title, value, updated" (uuid, title, value)
@@ -84,6 +87,7 @@ createEntry (EntryCreate title value) = do
 
 getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
+  $(logDebug) $ "getEntry " <> T.pack (show key)
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where key = ?" (Only key)
   case entries of
@@ -91,8 +95,19 @@ getEntry key = do
     [entry] -> pure entry
     _       -> throwError $ fromErr $ DbError TooManyResults
 
+getEntryByName :: (CanAppM c e m) => String -> m Entry
+getEntryByName name = do
+  $(logDebug) $ "getEntryByName " <> T.pack (show name)
+  c <- asks conn
+  entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where title = ?" (Only name)
+  case entries of
+    []      -> throwError $ fromErr $ DbError NotFound
+    [entry] -> pure entry
+    _       -> throwError $ fromErr $ DbError TooManyResults
+
 updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
-updateEntry key (EntryUpdate title value) = do
+updateEntry key e@(EntryUpdate title value) = do
+  $(logDebug) $ "updateEntry " <> T.pack (show key) <> " " <> T.pack (show e)
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ?, updated = datetime() where key = ? returning key, created, title, value, updated" (title, value, key)
   case entries of
@@ -102,16 +117,19 @@ updateEntry key (EntryUpdate title value) = do
 
 deleteEntry :: (CanAppM c e m) => EntryKey -> m ()
 deleteEntry key = do
+  $(logDebug) $ "deleteEntry " <> T.pack (show key)
   c <- asks conn
   liftIO $ withTransaction c $ execute c "delete from entry where key = ?" (Only key)
 
 getEntries :: (CanAppM c e m) => m [Entry]
 getEntries = do
+  $(logDebug) "getEntries"
   c <- asks conn
   liftIO $ withTransaction c $ query_ c "select key, created, title, value, updated from entry"
 
 getRecentEntries :: CanAppM c e m => Int -> m [Entry]
 getRecentEntries num = do
+  $(logDebug) $ "getRecentEntries " <> T.pack (show num)
   c <- asks conn
   liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry order by created desc limit ?" (Only num)
 

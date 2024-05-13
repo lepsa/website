@@ -13,6 +13,8 @@ import           Servant
 import           Website.Data.Env
 import           Website.Data.Util
 import           Website.Types                    (CanAppM)
+import Control.Monad.Logger
+import qualified Data.Text as T
 
 newtype FileId = FileId UUID
   deriving (Eq, Show, Ord, Generic, ToField, FromField, ToHttpApiData, FromHttpApiData)
@@ -54,6 +56,7 @@ data UpdateFile = UpdateFile
 
 createFile :: CanAppM c e m => CreateFile -> m File
 createFile cFile = do
+  $(logDebug) "createFile"
   c <- asks conn
   uuid <- liftIO nextRandom
   l <- liftIO $ withTransaction c $ query c "insert into file (id, name, data, type, created, updated) values (?, ?, ?, ?, datetime(), null) returning id, name, data, type, created, updated" (uuid, cFile.createFileName, cFile.createFileData, cFile.createFileType)
@@ -61,27 +64,32 @@ createFile cFile = do
 
 getFile :: CanAppM c e m => FileId -> m File
 getFile fId = do
+  $(logDebug) $ "getFile " <> T.pack (show fId)
   c <- asks conn
   l <- liftIO $ query c "select id, name, data, type, created, updated from file where id = ?" (Only fId)
   ensureSingleResult l
 
 deleteFile :: CanAppM c e m => FileId -> m ()
 deleteFile fId = do
+  $(logDebug) $ "deleteFile " <> T.pack (show fId)
   c <- asks conn
   liftIO $ execute c "delete from file where id = ?" (Only fId)
 
 updateFile :: CanAppM c e m => UpdateFile -> m ()
 updateFile fUpdate = do
+  $(logDebug) "updateFile"
   c <- asks conn
   liftIO $ execute c "update file set name = ?, data = ?, type = ?, updated = datetime() where id = ?" (fUpdate.updateFileName, fUpdate.updateFileData, fUpdate.updateFileType, fUpdate.updateFileId)
 
 getFileMeta :: CanAppM c e m => FileId -> m FileMeta
 getFileMeta fId = do
+  $(logDebug) $ "getFileMeta " <> T.pack (show fId)
   c <- asks conn
   l <- liftIO $ query c "select id, name, created, updated from file where id = ?" (Only fId)
   ensureSingleResult l
 
 getFileMetas :: CanAppM c e m => m [FileMeta]
 getFileMetas = do
+  $(logDebug) "getFileMetas"
   c <- asks conn
   liftIO $ query_ c "select id, name, created, updated from file"

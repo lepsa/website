@@ -63,6 +63,7 @@ common extensions
                       , ScopedTypeVariables
                       , ConstraintKinds
                       , CPP
+                      , TemplateHaskell
 
 common warnings
     ghc-options: -Wall

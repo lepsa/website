@@ -23,6 +23,7 @@ import           Website.Network.API
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
+import Control.Monad.Logger
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -34,6 +35,7 @@ server cookieSettings jwtSettings currentDirectory = api
        :<|> crudUser a
        :<|> protected a getUsers
        :<|> crudEntry a
+       :<|> unprotected a . getEntryByName
        :<|> unprotected a getEntries
        :<|> crudFile a
        :<|> unprotected a getFiles
@@ -44,6 +46,7 @@ server cookieSettings jwtSettings currentDirectory = api
 
     login :: (CanAppM c e m) => Login -> m (SetLoginCookies NoContent)
     login (Login user pass) = do
+      $(logDebug) $ "login " <> T.pack (show user)
       c <- asks conn
       eUserId <- runExceptT $ checkUserPassword c (T.pack user) (T.pack pass)
       userId <- either (const $ throwError_ Unauthenticated) pure eUserId
