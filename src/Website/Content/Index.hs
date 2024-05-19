@@ -1,5 +1,6 @@
 module Website.Content.Index where
 
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Text.Blaze.Html
 import qualified Text.Blaze.Html5       as H
@@ -9,7 +10,6 @@ import           Website.Data.Entry
 import           Website.Data.Env
 import           Website.Data.User
 import           Website.Types
-import Control.Monad.Logger
 
 -- | Initial landing page.
 index :: (OptionalUser c, CanAppM c e m) => m Html

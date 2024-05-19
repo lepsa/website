@@ -1,6 +1,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Website.Content.Forms where
 
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Data
 import           Data.List
@@ -20,7 +21,6 @@ import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import Control.Monad.Logger
 
 -- | Values for a given form field
 data FieldData a

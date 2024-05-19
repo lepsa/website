@@ -1,6 +1,7 @@
 module Website.Content.File where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.ByteString.Lazy        as BSL
 import           Data.Functor
@@ -8,6 +9,7 @@ import           Data.Int
 import           Data.List
 import           Data.Maybe
 import           Data.Text
+import qualified Data.Text                   as T
 import           Data.Text.Encoding
 import           Servant
 import           Servant.Multipart
@@ -25,8 +27,6 @@ import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
 uploadFile formData = do

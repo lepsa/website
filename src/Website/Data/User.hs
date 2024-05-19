@@ -4,10 +4,12 @@
 module Website.Data.User where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Control.Monad.Reader.Class
 import           Data.Password.Argon2             (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword,
                                                    hashPassword, mkPassword, unPasswordHash)
 import           Data.Text                        hiding (group)
+import qualified Data.Text                        as T
 import           Data.UUID
 import           Data.UUID.V4
 import           Database.SQLite.Simple
@@ -20,8 +22,6 @@ import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.Util
 import           Website.Types
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.

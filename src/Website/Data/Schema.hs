@@ -1,6 +1,7 @@
 module Website.Data.Schema where
 
 import           Control.Monad
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Foldable
 import           Data.List
@@ -9,7 +10,6 @@ import           Database.SQLite.Simple.ToField
 import           Website.Data.Env
 import           Website.Data.Error             (DbErr (NotFound), Err (DbError), throwError_)
 import           Website.Types
-import Control.Monad.Logger
 
 -- Create a table for tracking the schema version
 createVersion :: Query

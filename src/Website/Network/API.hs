@@ -7,6 +7,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger       (logDebug)
 import           Data.Int
 import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 import           Servant
 import           Servant.Auth.Server
 import           Servant.Multipart
@@ -26,7 +27,6 @@ import           Website.Data.User
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import qualified Data.Text as T
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = do

@@ -1,16 +1,16 @@
 module Website.Data.Permission where
 import           Control.Monad
 import           Control.Monad.Except
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Maybe
+import qualified Data.Text                  as T
 import           Database.SQLite.Simple
 import           Website.Auth.Authorisation
 import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.User
 import           Website.Types
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 checkPermission :: (OptionalUser c, CanAppM c e m) => String -> Access -> m ()
 checkPermission name requested = do

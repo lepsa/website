@@ -23,11 +23,11 @@ instance (Functor f) => Monad (Free f) where
   (Free a) >>= f = Free $ (>>= f) <$> a
 
 data Ast a where
-  Void :: a -> Ast a
-  Literal :: t -> (t -> a) -> Ast a
-  Math :: Math a -> Ast a
-  Show_ :: (Show t) => t -> (String -> a) -> Ast a
-  Print :: String -> a -> Ast a
+  Void    ::                             a  -> Ast a
+  Literal ::             t ->      (t -> a) -> Ast a
+  Math    ::                        Math a  -> Ast a
+  Show_   :: (Show t) => t -> (String -> a) -> Ast a
+  Print   ::                   String -> a  -> Ast a
 
 instance Functor Ast where
   fmap f (Void a)      = Void (f a)
@@ -37,11 +37,11 @@ instance Functor Ast where
   fmap f (Print t a)   = Print t (f a)
 
 data Math a where
-  Add :: (Num t) => t -> t -> (t -> a) -> Math a
-  Sub :: (Num t) => t -> t -> (t -> a) -> Math a
-  Mul :: (Num t) => t -> t -> (t -> a) -> Math a
+  Add :: (Num t)        => t -> t -> (t -> a) -> Math a
+  Sub :: (Num t)        => t -> t -> (t -> a) -> Math a
+  Mul :: (Num t)        => t -> t -> (t -> a) -> Math a
   Div :: (Fractional t) => t -> t -> (t -> a) -> Math a
-  Exp :: (Integral t) => t -> t -> (t -> a) -> Math a
+  Exp :: (Integral t)   => t -> t -> (t -> a) -> Math a
 
 instance Functor Math where
   fmap f (Add x y next) = Add x y $ f . next
@@ -67,6 +67,8 @@ interpretAst f = case f of
     pure next
   Math m -> pure $ interpretMaths m
   Show_ t next -> pure . next $ show t
+
+newtype (:->) m n = (:->) (forall x. m x -> n x)
 
 freeFold :: (Monad m) => (forall x. f x -> m x) -> Free f a -> m a
 freeFold _ (Pure a)   = pure a

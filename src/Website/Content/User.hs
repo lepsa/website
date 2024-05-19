@@ -1,9 +1,11 @@
 module Website.Content.User where
 
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Data
 import           Data.List                   (sortBy)
 import           Data.Text
+import qualified Data.Text                   as T
 import           Servant
 import           Text.Blaze.Html
 import qualified Text.Blaze.Html5            as H
@@ -15,8 +17,6 @@ import           Website.Data.User
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 userDisplay :: (HasEnv c, MonadReader c m, MonadLogger m) => User -> m Html
 userDisplay user = do

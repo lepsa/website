@@ -1,8 +1,11 @@
 module Website.Content.Common where
 
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Maybe                  (catMaybes, fromMaybe)
 import           Data.Text                   (Text, pack)
+import qualified Data.Text                   as T
+import           GitHash
 import           Servant                     hiding (BasicAuth)
 import           Servant.Auth
 import           Servant.Auth.Server         (AuthResult)
@@ -18,9 +21,6 @@ import           Website.Data.Env
 import           Website.Data.User
 import           Website.Network.API.Types
 import           Website.Types
-import GitHash
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey

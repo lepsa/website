@@ -1,9 +1,11 @@
 module Website.Data.Entry where
 
 import           Control.Monad.Except
+import           Control.Monad.Logger             (logDebug)
 import           Control.Monad.Reader
 import           Data.List                        (sortBy)
 import           Data.Text
+import qualified Data.Text                        as T
 import           Data.Time
 import           Data.UUID                        (UUID)
 import           Data.UUID.V4                     (nextRandom)
@@ -17,8 +19,6 @@ import           Website.Data.Env
 import           Website.Data.Error
 import           Website.Data.Util                ()
 import           Website.Types
-import Control.Monad.Logger (logDebug)
-import qualified Data.Text as T
 
 --
 -- What an Entry is, and the various derived types that

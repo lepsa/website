@@ -1,9 +1,11 @@
 module Website.Content.Entry where
 
 import           CMark                       (commonmarkToHtml)
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.Maybe                  (catMaybes)
 import           Data.Text
+import qualified Data.Text                   as T
 import           Data.Time
 import           Servant
 import           Text.Blaze.Html
@@ -17,8 +19,6 @@ import           Website.Data.User           (OptionalUser)
 import           Website.Data.Util
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c, MonadLogger m) => Entry -> m Html

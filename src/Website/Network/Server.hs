@@ -3,6 +3,7 @@
 module Website.Network.Server where
 
 import           Control.Monad.Except
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Text                   as T
 import           Data.UUID                   ()
@@ -23,7 +24,6 @@ import           Website.Network.API
 import           Website.Network.API.CRUD
 import           Website.Network.API.Types
 import           Website.Types
-import Control.Monad.Logger
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api

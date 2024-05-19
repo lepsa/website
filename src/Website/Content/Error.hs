@@ -1,5 +1,6 @@
 module Website.Content.Error where
 
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Servant
 import qualified Text.Blaze.Html.Renderer.Utf8 as H
@@ -7,7 +8,6 @@ import qualified Text.Blaze.Html5              as H
 import           Website.Content.Common
 import           Website.Data.Error
 import           Website.Data.User
-import Control.Monad.Logger
 
 unauthenticated :: (OptionalUser c, MonadReader c m, MonadLogger m) => m ServerError
 unauthenticated = do

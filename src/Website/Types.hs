@@ -1,14 +1,14 @@
 module Website.Types where
 
 import           Control.Monad.Except
+import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Data.Text            (unpack)
+import           Data.Text.Encoding   (decodeUtf8Lenient)
 import           Servant
+import           System.Log.Logger    (Priority (..), logM)
 import           Website.Data.Env
 import           Website.Data.Error
-import Control.Monad.Logger
-import System.Log.Logger (logM, Priority (..))
-import Data.Text (unpack)
-import Data.Text.Encoding (decodeUtf8Lenient)
 
 --
 -- Application monad stack and type constraints.
@@ -31,10 +31,10 @@ runAppM c m = flip runLoggingT go $ runExceptT $ runReaderT m c
       <> ": "
       <> unpack (decodeUtf8Lenient $ fromLogStr logStr)
     priority l = case l of
-      LevelDebug -> DEBUG
-      LevelInfo -> INFO
-      LevelWarn -> WARNING
-      LevelError -> ERROR
+      LevelDebug   -> DEBUG
+      LevelInfo    -> INFO
+      LevelWarn    -> WARNING
+      LevelError   -> ERROR
       LevelOther t -> read $ unpack t
 
 

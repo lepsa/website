@@ -1,7 +1,9 @@
 module Website.Data.File where
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.ByteString.Lazy             as BSL
 import           Data.Text
+import qualified Data.Text                        as T
 import           Data.Time
 import           Data.UUID
 import           Data.UUID.V4                     (nextRandom)
@@ -13,8 +15,6 @@ import           Servant
 import           Website.Data.Env
 import           Website.Data.Util
 import           Website.Types                    (CanAppM)
-import Control.Monad.Logger
-import qualified Data.Text as T
 
 newtype FileId = FileId UUID
   deriving (Eq, Show, Ord, Generic, ToField, FromField, ToHttpApiData, FromHttpApiData)

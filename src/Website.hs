@@ -1,17 +1,28 @@
 module Website where
 
 import           Control.Monad
-import           Crypto.JOSE                 (JWK)
-import           Data.Aeson                  (eitherDecode, encode)
-import qualified Data.ByteString.Lazy.Char8  as BSL8
+import           Control.Monad.Identity
+import           Control.Monad.Logger
+import           Control.Monad.Reader
+import           Crypto.JOSE                          (JWK)
+import           Data.Aeson                           (eitherDecode, encode)
+import qualified Data.ByteString.Lazy.Char8           as BSL8
 import           Data.Kind
+import           Data.List.NonEmpty                   (NonEmpty ((:|)), nonEmpty)
 import           Data.Proxy
 import           Data.Time
-import           Database.SQLite.Simple      hiding ((:.))
+import           Database.SQLite.Simple               hiding ((:.))
+import           Network.Wai
 import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.Gzip
+import           Network.Wai.Middleware.Prometheus
+import           Network.Wai.Middleware.RequestLogger
 import           Servant.Auth.Server
 import           Servant.Server
 import           System.Directory
+import           System.IO
+import           System.Log.Handler.Syslog
+import           System.Log.Logger
 import           Website.Auth.Authentication
 import           Website.Content.Error
 import           Website.Data.Env
@@ -20,17 +31,6 @@ import           Website.Data.Schema
 import           Website.Network.API.Types
 import           Website.Network.Server
 import           Website.Types
-import           Network.Wai.Middleware.Gzip
-import           Network.Wai.Middleware.RequestLogger
-import           System.IO
-import           System.Log.Logger
-import           System.Log.Handler.Syslog
-import           Control.Monad.Logger
-import           Control.Monad.Identity
-import           Control.Monad.Reader
-import           Network.Wai
-import           Network.Wai.Middleware.Prometheus
-import           Data.List.NonEmpty (NonEmpty ((:|)), nonEmpty)
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -110,7 +110,7 @@ startServer' onStartup api serverM dbPath port = do
     reqHandler req =
       let parts = filter (/= mempty) $ pathInfo req
       in mappend "/" $ case nonEmpty parts of
-         Nothing -> mempty
+         Nothing          -> mempty
          Just (seg:|segs) -> foldl (\z p -> z <> "/" <> p) seg segs
 
 startServer :: String -> Int -> IO ()
