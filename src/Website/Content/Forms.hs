@@ -180,7 +180,7 @@ instance GenerateForm User Group where
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
 generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a b, MonadLogger m) => Proxy a -> m Html
 generateNewForm p = do
-  $(logDebug) $ "generateNewForm"
+  $(logDebug) "generateNewForm"
   fd <- newForm p
   pure $ mconcat
     [ H.h2 $ H.toHtml fd.title

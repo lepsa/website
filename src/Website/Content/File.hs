@@ -37,9 +37,9 @@ uploadFile formData = do
     [fd] -> pure fd
     _    -> throwError_ TooManyUploads
   f <- mkFile fd >>= createFile
-  pure
-    $ addHeader (pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) f.fileId))
-    $ "Uploaded"
+  pure $
+    addHeader (pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) f.fileId))
+    "Uploaded"
   where
     mkFile :: FileData Tmp -> m CreateFile
     mkFile fd = do

@@ -3,7 +3,6 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Data.Maybe
 import qualified Data.Text                  as T
 import           Database.SQLite.Simple
 import           Website.Auth.Authorisation
@@ -25,7 +24,7 @@ checkPermission name requested = do
         -- Admins inherit all user permissions.
         -- This allows us to have "default" permissions
         -- while locking regular users out of some routes.
-        fromMaybe Anon ((.group) . unUserLogin <$> userLogin) >= permission.permissionGroup &&
+        maybe Anon ((.group) . unUserLogin) userLogin >= permission.permissionGroup &&
         -- Check that the permission is at least as powerful
         -- as what has been requested. The logic on this is
         -- that if you can write to a resource, you can basically

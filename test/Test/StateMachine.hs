@@ -733,7 +733,7 @@ cTestGetUsers env = Command gen execute
 cTestGetEntries :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cTestGetEntries env = Command gen execute
   [ Ensure $ \_oldState newState _input output ->
-    let stateEntries = sort $ (\e -> (e ^. teTitle, e ^. teValue)) <$> (M.elems newState._entries)
+    let stateEntries = sort $ (\e -> (e ^. teTitle, e ^. teValue)) <$> M.elems newState._entries
         apiEntries = sort $ (\e -> (title e, value e)) <$> output
      in stateEntries === apiEntries
   ]
@@ -749,7 +749,7 @@ cTestGetEntries env = Command gen execute
 cTestGetFiles :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiState
 cTestGetFiles env = Command gen execute
   [ Ensure $ \_oldState newState _input output ->
-    let stateFiles = sort $ (\f -> (f ^. tfName, f ^. tfType, f ^. tfData)) <$> (M.elems newState._files)
+    let stateFiles = sort $ (\f -> (f ^. tfName, f ^. tfType, f ^. tfData)) <$> M.elems newState._files
         apiFiles = sort $ (\f -> (fileName f, fileType f, fileData f)) <$> output
      in stateFiles === apiFiles
   ]
