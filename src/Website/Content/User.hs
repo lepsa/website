@@ -1,26 +1,32 @@
 module Website.Content.User where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Data.Data
+import           Control.Monad.Logger        (MonadLogger, logDebug)
+import           Control.Monad.Reader        (MonadReader)
+import           Data.Data                   (Proxy (Proxy))
 import           Data.List                   (sortBy)
-import           Data.Text
-import qualified Data.Text                   as T
-import           Servant
-import           Text.Blaze.Html
+import           Data.Text                   (pack, show)
+import           Prelude                     (compare, mappend, mconcat, pure,
+                                              ($), (.), (<$>), (<>), (=<<))
+import           Servant                     (ToHttpApiData (toUrlPiece),
+                                              safeLink)
+import           Text.Blaze.Html             (Html, toHtml, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Content.Common
-import           Website.Content.Htmx
-import           Website.Data.Env
-import           Website.Data.User
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Content.Common      (AuthUser, basicPage,
+                                              editDeleteButtons, htmlLink)
+import           Website.Content.Htmx        (hxBoost, hxOn)
+import           Website.Data.Env            (HasEnv)
+import           Website.Data.User           (RequiredUser,
+                                              User (email, group, uuid),
+                                              UserCreate, UserKey)
+import           Website.Network.API.CRUD    (CRUDCreate, CRUDDelete, CRUDRead,
+                                              CRUDUpdateForm)
+import           Website.Network.API.Types   (topAPI)
+import           Website.Types               (CanAppM)
 
 userDisplay :: (HasEnv c, MonadReader c m, MonadLogger m) => User -> m Html
 userDisplay user = do
-  $(logDebug) $ "userDisplay " <> T.pack (show user)
+  $(logDebug) $ "userDisplay " <> show user
   pure $ H.div ! HA.id "user" $
     mconcat
     [ H.h3 $ toHtml user.email
@@ -34,12 +40,12 @@ userDisplay user = do
 
 userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
 userDisplayFullPage u = do
-  $(logDebug) $ "userDisplayFullPage " <> T.pack (show u)
+  $(logDebug) $ "userDisplayFullPage " <> show u
   basicPage =<< userDisplay u
 
 userList :: (CanAppM c e m, RequiredUser c) => [User] -> m Html
 userList users = do
-  $(logDebug) $ "userList " <> T.pack (show users)
+  $(logDebug) $ "userList " <> show users
   basicPage $ mconcat
     [ H.h2 "Users",
       newUser,

@@ -1,19 +1,24 @@
 module Website.Data.File where
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Logger             (logDebug)
+import           Control.Monad.Reader             (MonadIO (liftIO), asks)
 import qualified Data.ByteString.Lazy             as BSL
-import           Data.Text
-import qualified Data.Text                        as T
-import           Data.Time
-import           Data.UUID
+import           Data.Text                        (Text, show)
+import           Data.Time                        (UTCTime)
+import           Data.UUID                        (UUID)
 import           Data.UUID.V4                     (nextRandom)
-import           Database.SQLite.Simple
+import           Database.SQLite.Simple           (FromRow, Only (Only),
+                                                   execute, field, fromRow,
+                                                   query, query_,
+                                                   withTransaction)
 import           Database.SQLite.Simple.FromField (FromField)
 import           Database.SQLite.Simple.ToField   (ToField)
-import           GHC.Generics
-import           Servant
-import           Website.Data.Env
-import           Website.Data.Util
+import           GHC.Generics                     (Generic)
+import           Prelude                          (Eq, Maybe, Ord, Show, ($),
+                                                   (<$>), (<*>), (<>))
+import           Servant                          (FromHttpApiData,
+                                                   ToHttpApiData)
+import           Website.Data.Env                 (HasEnv (conn))
+import           Website.Data.Util                (ensureSingleResult)
 import           Website.Types                    (CanAppM)
 
 newtype FileId = FileId UUID
@@ -64,14 +69,14 @@ createFile cFile = do
 
 getFile :: CanAppM c e m => FileId -> m File
 getFile fId = do
-  $(logDebug) $ "getFile " <> T.pack (show fId)
+  $(logDebug) $ "getFile " <> show fId
   c <- asks conn
   l <- liftIO $ query c "select id, name, data, type, created, updated from file where id = ?" (Only fId)
   ensureSingleResult l
 
 deleteFile :: CanAppM c e m => FileId -> m ()
 deleteFile fId = do
-  $(logDebug) $ "deleteFile " <> T.pack (show fId)
+  $(logDebug) $ "deleteFile " <> show fId
   c <- asks conn
   liftIO $ execute c "delete from file where id = ?" (Only fId)
 
@@ -83,7 +88,7 @@ updateFile fUpdate = do
 
 getFileMeta :: CanAppM c e m => FileId -> m FileMeta
 getFileMeta fId = do
-  $(logDebug) $ "getFileMeta " <> T.pack (show fId)
+  $(logDebug) $ "getFileMeta " <> show fId
   c <- asks conn
   l <- liftIO $ query c "select id, name, created, updated from file where id = ?" (Only fId)
   ensureSingleResult l

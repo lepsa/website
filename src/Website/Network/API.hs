@@ -2,31 +2,47 @@
 
 module Website.Network.API where
 
-import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad              (when, (>>=))
+import           Control.Monad.IO.Class     (MonadIO (liftIO))
 import           Control.Monad.Logger       (logDebug)
-import           Data.Int
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
-import           Servant
-import           Servant.Auth.Server
-import           Servant.Multipart
+import           Data.Int                   (Int64)
+import           Data.Text                  (Text, show)
+import           Prelude                    (Maybe (Just, Nothing), String,
+                                             flip, mappend, mempty, pure, ($),
+                                             (.), (<>), (=<<))
+import           Servant                    (Header, Headers,
+                                             NoContent (NoContent),
+                                             Proxy (Proxy),
+                                             ToHttpApiData (toUrlPiece),
+                                             addHeader, safeLink)
+import           Servant.Auth.Server        (CookieSettings, JWTSettings,
+                                             acceptLogin)
+import           Servant.Multipart          (MultipartData, Tmp)
 import qualified Text.Blaze.Html            as H
 import           Website.Auth.Authorisation (Access (Read, Write))
-import           Website.Content.Common
-import           Website.Content.Entry
-import qualified Website.Content.File       as Website.Data.File
-import           Website.Content.File
-import           Website.Content.Index
-import           Website.Content.User       (userDisplay, userDisplayFullPage, userList)
-import           Website.Data.Entry
-import           Website.Data.Error
+import           Website.Content.Common     (AuthEntry, AuthUser)
+import           Website.Content.Entry      (entryDisplay, entryDisplayFullPage,
+                                             entryList)
+import           Website.Content.File       (getFiles, uploadFile)
+import           Website.Content.Index      (index)
+import           Website.Content.User       (userDisplay, userDisplayFullPage,
+                                             userList)
+import           Website.Data.Entry         (Entry (key), EntryCreate, EntryKey,
+                                             EntryUpdate, createEntry,
+                                             deleteEntry, getEntries, getEntry,
+                                             getEntryByName, updateEntry)
+import           Website.Data.Error         (Err (Other, Unauthorised),
+                                             throwError_)
 import           Website.Data.File          (FileId)
 import           Website.Data.Permission    (checkPermission)
-import           Website.Data.User
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Data.User          (OptionalUser, RequiredUser,
+                                             User (uuid), UserCreate, UserKey,
+                                             UserUpdate, adminExists,
+                                             createUser, deleteUser, getUser,
+                                             getUsers, updateUser)
+import           Website.Network.API.CRUD   (CRUDRead, WithCT)
+import           Website.Network.API.Types  (SetLoginCookies, topAPI)
+import           Website.Types              (CanAppM)
 
 getIndex :: (OptionalUser c, CanAppM c e m) => m H.Html
 getIndex = do
@@ -40,7 +56,7 @@ getIndex = do
 -- Create an Entry and get its value back as Html
 postEntry :: (RequiredUser c, CanAppM c e m) => EntryCreate -> m (Headers '[Header "Location" Text] H.Html)
 postEntry create = do
-  $(logDebug) $ "postEntry " <> T.pack (show create)
+  $(logDebug) $ "postEntry " <> show create
   checkPermission "POST entry" Write
   entry <- createEntry create
   let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key
@@ -49,7 +65,7 @@ postEntry create = do
 -- Get a given Entry
 getEntry :: (CanAppM c e m, OptionalUser c) => EntryKey -> m H.Html
 getEntry key = do
-  $(logDebug) $ "getEntry " <> T.pack (show key)
+  $(logDebug) $ "getEntry " <> show key
   checkPermission "GET entry" Read
   e <- Website.Data.Entry.getEntry key
   entryDisplayFullPage e
@@ -57,14 +73,14 @@ getEntry key = do
 -- Update a given entry and get the new value back
 putEntry :: (RequiredUser c, CanAppM c e m) => EntryKey -> EntryUpdate -> m H.Html
 putEntry key value = do
-  $(logDebug) $ "putEntry " <> T.pack (show key) <> " " <> T.pack (show value)
+  $(logDebug) $ "putEntry " <> show key <> " " <> show value
   checkPermission "PUT entry" Write
   entryDisplay =<< updateEntry key value
 
 -- Delete a given Entry, and get a confirmation response
 deleteEntry :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
 deleteEntry key = do
-  $(logDebug) $ "deleteEntry " <> T.pack (show key)
+  $(logDebug) $ "deleteEntry " <> show key
   checkPermission "DELETE entry" Write
   Website.Data.Entry.deleteEntry key
   pure $ H.toHtml @String "Deleted"
@@ -78,7 +94,7 @@ getEntries = do
 
 getEntryByName :: (OptionalUser c, CanAppM c e m) => String -> m H.Html
 getEntryByName name = do
-  $(logDebug) $ "getEntryByName " <> T.pack (show name)
+  $(logDebug) $ "getEntryByName " <> show name
   checkPermission "GET entry" Read
   e <- Website.Data.Entry.getEntryByName name
   entryDisplayFullPage e
@@ -96,19 +112,19 @@ postUser create = do
 
 getUser :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 getUser key = do
-  $(logDebug) $ "getUser " <> T.pack (show key)
+  $(logDebug) $ "getUser " <> show key
   checkPermission "GET user" Read
   userDisplayFullPage =<< Website.Data.User.getUser key
 
 putUser :: (RequiredUser c, CanAppM c e m) => UserKey -> UserUpdate -> m H.Html
 putUser key update = do
-  $(logDebug) $ "putUser " <> T.pack (show key)
+  $(logDebug) $ "putUser " <> show key
   checkPermission "PUT user" Write
   userDisplay =<< updateUser key update
 
 deleteUser :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 deleteUser key = do
-  $(logDebug) $ "deleteUser " <> T.pack (show key)
+  $(logDebug) $ "deleteUser " <> show key
   checkPermission "DELETE user" Write
   Website.Data.User.deleteUser key
   pure $ H.toHtml @String "Delete"
@@ -132,19 +148,19 @@ postFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -
 postFile m = do
   $(logDebug) "postFiles"
   checkPermission "POST file" Write
-  Website.Data.File.uploadFile m
+  uploadFile m
 
 getFile :: (OptionalUser c, CanAppM c e m) => FileId -> m (Headers '[Header "Content-Length" Int64] WithCT)
 getFile k = do
-  $(logDebug) $ "getFile " <> T.pack (show k)
+  $(logDebug) $ "getFile " <> show k
   checkPermission "GET file" Read
-  Website.Data.File.getFile k
+  getFile k
 
 deleteFile :: (RequiredUser c, CanAppM c e m) => FileId -> m H.Html
 deleteFile k = do
-  $(logDebug) $ "deleteFile " <> T.pack (show k)
+  $(logDebug) $ "deleteFile " <> show k
   checkPermission "DELETE file" Write
-  Website.Data.File.deleteFile k
+  deleteFile k
 
 register :: CanAppM c e m => CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register cookieSettings jwtSettings cUser = do

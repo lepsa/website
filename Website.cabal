@@ -66,9 +66,12 @@ common extensions
                       , ConstraintKinds
                       , CPP
                       , TemplateHaskell
+                      , NoImplicitPrelude
+    ghc-options: -Wmissing-import-lists
 
 common warnings
     ghc-options: -Wall
+                 -Werror
                  -Wunused-packages
 
 library
@@ -100,7 +103,6 @@ library
                     , Website.Data.User
                     , Website.Auth.Authentication
                     , Website.Auth.Authorisation
-                    , Free
     -- other-modules:
     -- other-extensions:
     hs-source-dirs:   src

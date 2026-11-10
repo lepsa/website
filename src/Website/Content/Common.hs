@@ -1,26 +1,44 @@
 module Website.Content.Common where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Data.Maybe                  (catMaybes, fromMaybe)
+import           Control.Monad.Logger        (MonadLogger, logDebug)
+import           Control.Monad.Reader        (MonadReader, asks)
+import           Data.Maybe                  (Maybe (Just, Nothing), catMaybes,
+                                              fromMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as T
-import           GitHash
-import           Servant                     hiding (BasicAuth)
-import           Servant.Auth
+import           GitHash                     (giBranch, giHash, tGitInfoCwd)
+import           Prelude                     (Bounded, Enum, Eq, Show, String,
+                                              maxBound, maybe, mconcat, mempty,
+                                              minBound, pure, show, ($), (.),
+                                              (<$>), (<>), (==))
+import           Servant                     (FormUrlEncoded, Get,
+                                              HasLink (MkLink), IsElem, Link,
+                                              NoContent, Proxy (Proxy), ReqBody,
+                                              StdMethod (POST),
+                                              ToHttpApiData (toUrlPiece), Verb,
+                                              safeLink, (:>))
+import           Servant.Auth                (Auth)
 import           Servant.Auth.Server         (AuthResult)
-import           Servant.HTML.Blaze
+import           Servant.HTML.Blaze          (HTML)
 import qualified Text.Blaze.Html             as H
-import           Text.Blaze.Html
+import           Text.Blaze.Html             (Attribute, AttributeValue, Html,
+                                              ToValue (toValue), stringValue,
+                                              textValue, toHtml, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Auth.Authentication
-import           Website.Auth.Authorisation
-import           Website.Content.Htmx
-import           Website.Data.Env
-import           Website.Data.User
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Auth.Authentication (Login)
+import           Website.Auth.Authorisation  (Group (Admin))
+import           Website.Content.Htmx        (hxBoost, hxConfirm, hxDelete,
+                                              hxGet, hxOn, hxSwap, hxTarget,
+                                              hxTrigger)
+import           Website.Data.Env            (HasAuth (auth))
+import           Website.Data.User           (OptionalUser, RequiredUser,
+                                              User (email, group), UserKey,
+                                              UserLogin (UserLogin, unUserLogin),
+                                              mAuth)
+import           Website.Network.API.Types   (Auths, SetLoginCookies, TopAPI,
+                                              topAPI)
+import           Website.Types               (CanAppM)
 
 type Authed = AuthResult UserKey
 type AuthLogin = Auth Auths UserKey

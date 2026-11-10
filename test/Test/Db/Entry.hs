@@ -2,9 +2,10 @@
 
 module Test.Db.Entry where
 
-import           Data.Aeson
-import           Database.SQLite.Simple
-import           Website.Data.Entry
+import           Data.Aeson             (FromJSON, ToJSON)
+import           Database.SQLite.Simple (Connection, query_)
+import           Prelude                (IO)
+import           Website.Data.Entry     (Entry, EntryKey)
 
 instance ToJSON Entry
 instance FromJSON Entry

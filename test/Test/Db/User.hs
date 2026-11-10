@@ -2,13 +2,14 @@
 
 module Test.Db.User where
 
-import           Data.Aeson
-import           Database.SQLite.Simple
+import           Data.Aeson                 (FromJSON, ToJSON)
+import           Database.SQLite.Simple     (Connection, query_)
 import           GHC.Exts                   (fromList)
-import           Web.FormUrlEncoded
-import           Web.HttpApiData
+import           Prelude                    (IO, show, (.))
+import           Web.FormUrlEncoded         (ToForm, toForm)
+import           Web.HttpApiData            (ToHttpApiData (toQueryParam))
 import           Website.Auth.Authorisation (Group)
-import           Website.Data.User
+import           Website.Data.User          (User, UserCreate (UserCreate))
 
 -- Orphan instances are here as we don't want nor need them in the main server
 instance ToJSON Group

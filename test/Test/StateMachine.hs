@@ -4,38 +4,117 @@
 
 module Test.StateMachine where
 
-import           Control.Lens
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
+import           Control.Lens                          (Each (each), Ixed (ix),
+                                                        filtered, to, view,
+                                                        (%~), (&), (.~), (<&>),
+                                                        (??), (^.), (^..), (^?))
+import           Control.Monad.Catch                   (MonadThrow)
+import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Data.Aeson                            (eitherDecode)
-import           Data.Base64.Types
-import           Data.Bool
+import           Data.Base64.Types                     (extractBase64)
+import           Data.Bool                             (Bool (False, True),
+                                                        bool, not, (&&), (||))
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.ByteString.Lazy                  as BSL
 import qualified Data.ByteString.Lazy.Char8            as BSL8
 import           Data.CaseInsensitive                  (mk)
-import           Data.Char
-import           Data.List
+import           Data.Char                             (Char, isPrint)
+import           Data.List                             (all, any, drop,
+                                                        dropWhile, filter, find,
+                                                        isPrefixOf, length,
+                                                        notElem, null, sort,
+                                                        takeWhile)
 import qualified Data.Map                              as M
-import           Data.Maybe
+import           Data.Maybe                            (Maybe (Just, Nothing),
+                                                        fromMaybe, isJust,
+                                                        maybe)
 import           Data.Text                             (Text, unpack)
 import           Data.Text.Encoding                    (encodeUtf8)
 import qualified Data.Text.Encoding                    as T
 import           Data.Text.Encoding.Base64             (encodeBase64)
-import           GHC.Records
-import           Hedgehog                              hiding (Group)
+import           GHC.Records                           (HasField)
+import           Hedgehog                              (Callback (Ensure, Require, Update),
+                                                        Command (Command),
+                                                        Concrete, MonadGen,
+                                                        MonadTest, Ord1,
+                                                        Property, Range, assert,
+                                                        concrete, evalIO,
+                                                        executeSequential,
+                                                        forAll, property,
+                                                        withTests, (/==), (===))
 import qualified Hedgehog.Gen                          as Gen
 import qualified Hedgehog.Range                        as Range
 import qualified Network.HTTP.Client                   as H
-import           Network.HTTP.Client.MultipartFormData
-import           Network.HTTP.Types
+import           Network.HTTP.Client.MultipartFormData (PartM (partContentType),
+                                                        formDataBody,
+                                                        partFileRequestBody)
+import           Network.HTTP.Types                    (Header, Method, Status,
+                                                        methodDelete, methodGet,
+                                                        methodPost, methodPut,
+                                                        status200, status201,
+                                                        status204, status303,
+                                                        status401, status404)
+import           Prelude                               (IO, Integral, MonadFail,
+                                                        Num, String, either,
+                                                        fail, flip, fmap,
+                                                        mempty, pure, snd,
+                                                        uncurry, ($), (+), (.),
+                                                        (/=), (<$>), (<*>),
+                                                        (<>), (==), (>), (>>=))
 import           Test.Db.File                          ()
-import           Test.Types
-import           Text.RawString.QQ
-import           Text.Regex.TDFA
-import           Web.FormUrlEncoded
-import           Website.Auth.Authorisation            (Group (..))
+import           Test.Types                            (ApiState (_entries, _files, _users),
+                                                        Auth (Bad, None, Normal),
+                                                        AuthKey (AuthKey),
+                                                        CreateEntry (CreateEntry),
+                                                        CreateFile (CreateFile),
+                                                        CreateUser (CreateUser),
+                                                        DeleteEntry (DeleteEntry),
+                                                        DeleteFile (DeleteFile),
+                                                        DeleteUser (DeleteUser),
+                                                        GetEntries (GetEntries),
+                                                        GetEntry (GetEntry),
+                                                        GetFile (GetFile),
+                                                        GetTestEntries (GetTestEntries),
+                                                        GetTestFiles (GetTestFiles),
+                                                        GetTestUsers (GetTestUsers),
+                                                        GetUser (GetUser),
+                                                        HasAuth, HasEmail,
+                                                        HasKey,
+                                                        HasPassword (password),
+                                                        Key (BadKey, GoodKey),
+                                                        LoginType (BadPassword, BadUser, Good),
+                                                        PasswordUpdate (PasswordUpdate), _newPassword,
+                                                        RegisterUser (RegisterUser),
+                                                        TestEntry (TestEntry),
+                                                        TestEnv (baseUrl, manager),
+                                                        TestFile (TestFile),
+                                                        TestLogin (TestLogin),
+                                                        TestUser (TestUser),
+                                                        UpdateEntry (UpdateEntry),
+                                                        UpdateUser (UpdateUser),
+                                                        _oldPassword, akUser,
+                                                        auth, ceTitle, ceValue,
+                                                        cfData, cfName, cfType,
+                                                        cuEmail, cuGroup,
+                                                        dfAuth, dfKey, email,
+                                                        entries, files,
+                                                        fromRegisterUser,
+                                                        initialState, key,
+                                                        newPassword, teTitle,
+                                                        teValue, tfData, tfName,
+                                                        tfType, tlPass, tlUser,
+                                                        tuEmail, tuGroup, tuJwt,
+                                                        tuPassword, ueTitle,
+                                                        ueValue, users, uuGroup,
+                                                        uuPassword)
+import           Text.RawString.QQ                     (r)
+import           Text.Regex.TDFA                       (AllTextMatches (getAllTextMatches),
+                                                        (=~))
+import           Web.FormUrlEncoded                    (ToForm (toForm),
+                                                        urlEncodeAsForm,
+                                                        urlEncodeForm)
+import           Website.Auth.Authorisation            (Group (User, Admin))
 import           Website.Data.Entry                    (Entry (title, value))
 import           Website.Data.File                     (File (fileData, fileName, fileType))
 import qualified Website.Data.User                     (User (..))

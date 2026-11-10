@@ -1,8 +1,9 @@
 module Test.Db where
 
-import           Data.Foldable
-import           Database.SQLite.Simple
-import           Servant
+import           Data.Foldable          (traverse_)
+import           Database.SQLite.Simple (Connection, execute_, withTransaction)
+import           Prelude                (IO, (<$))
+import           Servant                (NoContent (NoContent))
 
 resetDb :: Connection -> IO NoContent
 resetDb c = NoContent <$ withTransaction c go

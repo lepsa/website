@@ -1,7 +1,8 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Website.Data.Env where
-import           Data.Time
-import           Database.SQLite.Simple
+import           Data.Time              (TimeZone)
+import           Database.SQLite.Simple (Connection)
+import           Prelude                (fst, id, snd, (.))
 
 --
 -- Server configration values

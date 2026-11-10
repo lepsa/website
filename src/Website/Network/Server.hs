@@ -2,28 +2,55 @@
 
 module Website.Network.Server where
 
-import           Control.Monad.Except
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Except        (runExceptT, withError)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.Logger        (logDebug)
+import           Control.Monad.Reader        (asks, withReaderT)
+import           Data.Text                   (show)
 import qualified Data.Text                   as T
 import           Data.UUID                   ()
-import           Servant
-import           Servant.Auth.Server
-import           Servant.HTML.Blaze
-import           System.FilePath
-import           Text.Blaze.Html
-import           Website.Auth.Authentication
-import           Website.Content.Common
-import           Website.Content.Forms
-import           Website.Data.Entry          (EntryCreate, EntryKey, EntryUpdate)
-import           Website.Data.Env
-import           Website.Data.Error
+import           Prelude                     (IO, Maybe (Just, Nothing), const,
+                                              either, pure, ($), (.), (<>))
+import           Servant                     (Get, HasServer (ServerT),
+                                              NoContent (NoContent),
+                                              Proxy (Proxy), addHeader,
+                                              hoistServer, serveDirectoryWebApp,
+                                              (:<|>) ((:<|>)), (:>))
+import           Servant.Auth.Server         (AuthResult (Authenticated),
+                                              CookieSettings, JWTSettings,
+                                              acceptLogin)
+import           Servant.HTML.Blaze          (HTML)
+import           System.FilePath             (FilePath, (</>))
+import           Text.Blaze.Html             (Html)
+import           Website.Auth.Authentication (Login (Login), checkUserPassword)
+import           Website.Content.Common      (AuthLogin, Authed, linkText,
+                                              loginForm)
+import           Website.Content.Forms       (entryCreationForm,
+                                              fileCreationForm,
+                                              getEntryForUpdate,
+                                              getUserForUpdate,
+                                              userCreationForm)
+import           Website.Data.Entry          (EntryCreate, EntryKey,
+                                              EntryUpdate)
+import           Website.Data.Env            (Env, EnvAuthed, HasEnv (conn),
+                                              mkEnvAuthed)
+import           Website.Data.Error          (DbErr (NotFound, TooManyResults),
+                                              Err (DbError, Unauthenticated),
+                                              throwError_)
 import           Website.Data.File           (FileId)
-import           Website.Data.User           (OptionalUser, UserCreate, UserKey, UserLogin, UserUpdate, getUserLogin)
-import           Website.Network.API
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Data.User           (OptionalUser, UserCreate, UserKey,
+                                              UserLogin, UserUpdate,
+                                              getUserLogin)
+import           Website.Network.API         (deleteEntry, deleteFile,
+                                              deleteUser, getEntries, getEntry,
+                                              getEntryByName, getFile, getFiles,
+                                              getIndex, getUser, getUsers,
+                                              postEntry, postFile, postUser,
+                                              putEntry, putUser, register)
+import           Website.Network.API.CRUD    (CRUDForm, CRUDForm')
+import           Website.Network.API.Types   (FileUpload, SetLoginCookies,
+                                              TopAPI)
+import           Website.Types               (AppM, CanAppM)
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
@@ -46,7 +73,7 @@ server cookieSettings jwtSettings currentDirectory = api
 
     login :: (CanAppM c e m) => Login -> m (SetLoginCookies NoContent)
     login (Login user pass) = do
-      $(logDebug) $ "login " <> T.pack (show user)
+      $(logDebug) $ "login " <> show user
       c <- asks conn
       eUserId <- runExceptT $ checkUserPassword c (T.pack user) (T.pack pass)
       userId <- either (const $ throwError_ Unauthenticated) pure eUserId

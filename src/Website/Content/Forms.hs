@@ -1,26 +1,41 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Website.Content.Forms where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Data.Data
-import           Data.List
+import           Control.Monad.Logger        (MonadLogger, logDebug)
+import           Control.Monad.Reader        (MonadReader, asks)
+import           Data.List                   (intersperse)
+import           Data.Text                   (show)
 import qualified Data.Text                   as T
-import           Servant
-import           Text.Blaze.Html
+import           Prelude                     (Bounded, Enum, Eq,
+                                              Maybe (Nothing), Show, String,
+                                              maybe, mconcat, mempty, pure, ($),
+                                              (.), (<$>), (<>), (=<<))
+import           Servant                     (Proxy (Proxy),
+                                              ToHttpApiData (toUrlPiece),
+                                              safeLink)
+import           Text.Blaze.Html             (Html, stringValue, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Auth.Authorisation  (Access (Read, Write), Group)
-import           Website.Content.Common
-import           Website.Content.Htmx
-import           Website.Data.Entry
-import           Website.Data.Env
-import           Website.Data.Permission
-import           Website.Data.User
-import           Website.Data.Util
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Content.Common      (AuthEntry, AuthFile, AuthUser,
+                                              basicPage, formField, selectField,
+                                              staticField)
+import           Website.Content.Htmx        (hxBoost, hxIndicator, hxOn,
+                                              hxPost, hxPut, hxSwap)
+import           Website.Data.Entry          (Entry (created, key, title, updated, value),
+                                              EntryCreate, EntryKey,
+                                              EntryUpdate, getEntry)
+import           Website.Data.Env            (HasEnv (timeZone))
+import           Website.Data.Permission     (checkPermission)
+import           Website.Data.User           (RequiredUser,
+                                              User (email, group, uuid),
+                                              UserCreate, UserKey, UserUpdate,
+                                              getUser)
+import           Website.Data.Util           (timeFormat)
+import           Website.Network.API.CRUD    (CRUDCreate, CRUDCreateFile,
+                                              CRUDUpdate)
+import           Website.Network.API.Types   (FileUpload, topAPI)
+import           Website.Types               (CanAppM)
 
 -- | Values for a given form field
 data FieldData a
@@ -68,7 +83,7 @@ instance GenerateForm Entry () where
     $(logDebug) "newForm Entry"
     pure $ FormData
       { title = "Create Entry",
-        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDCreate EntryCreate)))),
+        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (Website.Network.API.CRUD.CRUDCreate EntryCreate)))),
         updateUrl = Nothing,
         fields =
           [ FieldData
@@ -86,12 +101,12 @@ instance GenerateForm Entry () where
           ]
       }
   updateForm entry = do
-    $(logDebug) $ "updateForm Entry " <> T.pack (show entry)
+    $(logDebug) $ "updateForm Entry " <> show entry
     tz <- asks timeZone
     pure $ FormData
       { title = "Update Entry",
         createUrl = Nothing,
-        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDUpdate EntryUpdate EntryKey))) entry.key),
+        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (Website.Network.API.CRUD.CRUDUpdate EntryUpdate EntryKey))) entry.key),
         fields =
           [ FieldData
               { fieldLabel = "Title",
@@ -123,7 +138,7 @@ instance GenerateForm User Group where
     $(logDebug) "newForm User"
     pure $ FormData
       { title = "Create User",
-        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDCreate UserCreate)))),
+        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (Website.Network.API.CRUD.CRUDCreate UserCreate)))),
         updateUrl = Nothing,
         fields =
           [ FieldData
@@ -146,11 +161,11 @@ instance GenerateForm User Group where
           ]
       }
   updateForm user = do
-    $(logDebug) $ "updateForm User: " <> T.pack (show user)
+    $(logDebug) $ "updateForm User: " <> show user
     pure $ FormData
       { title = "Update User",
         createUrl = Nothing,
-        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDUpdate UserUpdate UserKey))) user.uuid),
+        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (Website.Network.API.CRUD.CRUDUpdate UserUpdate UserKey))) user.uuid),
         fields =
           [ StaticData
               { staticLabel = "Email",
@@ -202,7 +217,7 @@ generateNewForm p = do
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
 generateUpdateForm :: (Show a, HasEnv c, MonadReader c m, MonadLogger m, GenerateForm a b) => a -> m Html
 generateUpdateForm a = do
-  $(logDebug) $ "generateUpdateForm: " <> T.pack (show a)
+  $(logDebug) $ "generateUpdateForm: " <> show a
   fd <- updateForm a
   pure $ mconcat
     [ H.h2 $ H.toHtml fd.title
@@ -225,7 +240,7 @@ generateUpdateForm a = do
 -- User forms
 userUpdateForm :: (HasEnv c, MonadReader c m, MonadLogger m) => User -> m Html
 userUpdateForm u = do
-  ($logDebug) $ "userUpdateForm " <> T.pack (show u)
+  ($logDebug) $ "userUpdateForm " <> show u
   generateUpdateForm u
 
 userCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
@@ -236,14 +251,14 @@ userCreationForm = do
 
 getUserForUpdate :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
 getUserForUpdate userKey = do
-  $(logDebug) $ "getUserForUpdate " <> T.pack (show userKey)
+  $(logDebug) $ "getUserForUpdate " <> show userKey
   checkPermission "GET update user" Read
   userUpdateForm =<< Website.Data.User.getUser userKey
 
 -- Entry forms
 entryUpdateForm :: (RequiredUser c, HasEnv c, MonadReader c m, MonadLogger m) => Entry -> m Html
 entryUpdateForm e = do
-  $(logDebug) $ "entryUpdateForm " <> T.pack (show e)
+  $(logDebug) $ "entryUpdateForm " <> show e
   generateUpdateForm e
 
 entryCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
@@ -254,7 +269,7 @@ entryCreationForm = do
 
 getEntryForUpdate :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
 getEntryForUpdate entry = do
-  $(logDebug) $ "getEntryForUpdate " <> T.pack (show entry)
+  $(logDebug) $ "getEntryForUpdate " <> show entry
   checkPermission "GET update entry" Read
   entryUpdateForm =<< Website.Data.Entry.getEntry entry
 
@@ -268,7 +283,7 @@ fileCreationForm = do
       -- ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
       ! HA.enctype "multipart/form-data"
-      ! hxPost (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDCreateFile FileUpload)))))
+      ! hxPost (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (Website.Network.API.CRUD.CRUDCreateFile FileUpload)))))
       ! hxIndicator "#spinner"
       $ mconcat
       [ H.p $ H.label

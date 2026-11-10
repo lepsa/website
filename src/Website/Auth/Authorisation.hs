@@ -1,10 +1,14 @@
 module Website.Auth.Authorisation where
 
-import           Control.Monad
+import           Control.Monad                    ((>=>))
 import qualified Data.Text                        as T
-import           Database.SQLite.Simple.FromField
-import           Database.SQLite.Simple.ToField
-import           GHC.Generics
+import           Database.SQLite.Simple.FromField (FromField, fromField)
+import           Database.SQLite.Simple.ToField   (ToField, toField)
+import           GHC.Generics                     (Generic)
+import           Prelude                          (Bounded, Either (Left), Enum,
+                                                   Eq, Ord, Read, Show, fail,
+                                                   maybe, pure, show, ($), (.),
+                                                   (<>))
 import           Servant                          (FromHttpApiData)
 import           Servant.API                      (parseQueryParam)
 import           Text.Read                        (readMaybe)

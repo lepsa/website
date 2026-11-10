@@ -1,6 +1,7 @@
 module Main where
 
-import           Website
+import           Prelude (IO)
+import           Website (startServer)
 
 main :: IO ()
 main = startServer "./db/db.sqlite" 8080

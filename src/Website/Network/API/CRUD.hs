@@ -1,13 +1,18 @@
 module Website.Network.API.CRUD where
 
 import qualified Data.ByteString.Lazy     as BSL
-import           Data.Data
+import           Data.Data                (Typeable)
 import           Data.Int                 (Int64)
-import           Data.Text
-import           Servant
-import           Servant.API.ContentTypes
-import           Servant.HTML.Blaze
-import           Text.Blaze.Html
+import           Data.Text                (Text)
+import           Prelude                  (Maybe (Just))
+import           Servant                  (Accept (contentType), Capture,
+                                           Delete, FormUrlEncoded, Get, Header,
+                                           Headers, MimeRender, Put, ReqBody,
+                                           StdMethod (POST), Verb, mimeRender,
+                                           (:<|>), (:>))
+import           Servant.API.ContentTypes (AllCTRender, handleAcceptH)
+import           Servant.HTML.Blaze       (HTML)
+import           Text.Blaze.Html          (Html)
 
 -- A hack to return dynamic content types. This is used with `DOWNLOAD`.
 -- `WithCT` specifies the content type, `DOWNLOAD` specifies that the

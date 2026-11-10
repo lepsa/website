@@ -1,5 +1,6 @@
 module Website.Content.Htmx where
 
+import           Prelude             (String, ($), (<>))
 import qualified Text.Blaze          as HA
 import qualified Text.Blaze.Html5    as H
 import qualified Text.Blaze.Internal as HI

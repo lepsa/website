@@ -1,13 +1,16 @@
 module Website.Content.Error where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Servant
+import           Control.Monad.Logger          (MonadLogger, logDebug)
+import           Control.Monad.Reader          (MonadReader)
+import           Prelude                       (String, pure, ($), (<>))
+import           Servant                       (ServerError (errBody), err400,
+                                                err401, err403, err404, err500)
 import qualified Text.Blaze.Html.Renderer.Utf8 as H
 import qualified Text.Blaze.Html5              as H
-import           Website.Content.Common
-import           Website.Data.Error
-import           Website.Data.User
+import           Website.Content.Common        (basicPage)
+import           Website.Data.Error            (DbErr (FailedToInsertRecord, NotFound, TooManyResults),
+                                                Err (DbError, MissingUpload, Other, TooManyUploads, Unauthenticated, Unauthorised))
+import           Website.Data.User             (OptionalUser)
 
 unauthenticated :: (OptionalUser c, MonadReader c m, MonadLogger m) => m ServerError
 unauthenticated = do

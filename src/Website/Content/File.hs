@@ -1,32 +1,47 @@
 module Website.Content.File where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.IO.Class      (MonadIO (liftIO))
+import           Control.Monad.Logger        (logDebug)
+import           Control.Monad.Reader        (asks)
 import qualified Data.ByteString.Lazy        as BSL
-import           Data.Functor
-import           Data.Int
-import           Data.List
-import           Data.Maybe
-import           Data.Text
+import           Data.Functor                ((<&>))
+import           Data.Int                    (Int64)
+import           Data.List                   (sortBy)
+import           Data.Maybe                  (catMaybes)
+import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as T
-import           Data.Text.Encoding
-import           Servant
-import           Servant.Multipart
+import           Data.Text.Encoding          (encodeUtf8)
+import           Prelude                     (compare, const, mappend, mconcat,
+                                              pure, show, ($), (.), (<$>), (<>),
+                                              (>>=))
+import           Servant                     (Header, Headers, Proxy (Proxy),
+                                              ToHttpApiData (toUrlPiece),
+                                              addHeader, safeLink)
+import           Servant.Multipart           (FileData (fdFileCType, fdFileName, fdPayload),
+                                              MultipartData (files), Tmp)
 import qualified Text.Blaze.Html             as H
 import           Text.Blaze.Html             (Html, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Content.Common
-import           Website.Content.Htmx
-import           Website.Data.Env
-import           Website.Data.Error
-import           Website.Data.File
-import           Website.Data.User
-import           Website.Data.Util
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
-import           Website.Types
+import           Website.Content.Common      (AuthFile, basicPage, htmlLink,
+                                              whenLoggedIn)
+import           Website.Content.Htmx        (hxBoost, hxConfirm, hxDelete,
+                                              hxOn, hxSwap, hxTarget, hxTrigger)
+import           Website.Data.Env            (HasEnv (timeZone))
+import           Website.Data.Error          (Err (MissingUpload, TooManyUploads),
+                                              throwError_)
+import           Website.Data.File           (CreateFile (CreateFile),
+                                              File (fileData, fileId, fileType),
+                                              FileId,
+                                              FileMeta (fileMetaCreated, fileMetaId, fileMetaName),
+                                              createFile, deleteFile, getFile,
+                                              getFileMeta, getFileMetas)
+import           Website.Data.User           (OptionalUser, RequiredUser)
+import           Website.Data.Util           (timeFormat)
+import           Website.Network.API.CRUD    (CRUDCreateForm, CRUDDelete,
+                                              CRUDRead', WithCT (WithCT))
+import           Website.Network.API.Types   (topAPI)
+import           Website.Types               (CanAppM)
 
 uploadFile :: forall c e m. (RequiredUser c, CanAppM c e m) => MultipartData Tmp -> m (Headers '[Header "Location" Text] Html)
 uploadFile formData = do

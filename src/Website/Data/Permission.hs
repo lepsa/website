@@ -1,19 +1,26 @@
 module Website.Data.Permission where
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import qualified Data.Text                  as T
-import           Database.SQLite.Simple
-import           Website.Auth.Authorisation
-import           Website.Data.Env
-import           Website.Data.Error
-import           Website.Data.User
-import           Website.Types
+import           Control.Monad              (unless)
+import           Control.Monad.Except       (MonadError (throwError))
+import           Control.Monad.IO.Class     (liftIO)
+import           Control.Monad.Logger       (logDebug)
+import           Control.Monad.Reader       (asks)
+import           Data.Text                  (show)
+import           Database.SQLite.Simple     (FromRow, Only (Only), field,
+                                             fromRow, query)
+import           Prelude                    (Eq, Ord, Read, Show, String, any,
+                                             maybe, ($), (&&), (.), (<$>),
+                                             (<*>), (<=), (<>), (>=))
+import           Website.Auth.Authorisation (Access, Group (Anon))
+import           Website.Data.Env           (HasEnv (conn))
+import           Website.Data.Error         (AsErr (fromErr),
+                                             Err (Unauthorised))
+import           Website.Data.User          (OptionalUser,
+                                             UserLogin (unUserLogin), mAuth, group)
+import           Website.Types              (CanAppM)
 
 checkPermission :: (OptionalUser c, CanAppM c e m) => String -> Access -> m ()
 checkPermission name requested = do
-  $(logDebug) $ "checkPermission " <> T.pack (show name) <> " " <> T.pack (show requested)
+  $(logDebug) $ "checkPermission " <> show name <> " " <> show requested
   -- Permissions are checked each time, rather than baking them
   -- into the JWT or initial checkup, as we want to have the
   -- most up to date information when we are doing the check
@@ -50,6 +57,6 @@ instance FromRow Permission where
 
 getPermissions :: CanAppM c e m => String -> m [Permission]
 getPermissions name = do
-  $(logDebug) $ "getPermissions " <> T.pack (show name)
+  $(logDebug) $ "getPermissions " <> show name
   c <- asks conn
   liftIO $ query c "select name, group_name, access from permission where name = ?" (Only name)

@@ -1,24 +1,33 @@
 module Website.Data.Entry where
 
-import           Control.Monad.Except
+import           Control.Monad.Except             (MonadError (throwError))
 import           Control.Monad.Logger             (logDebug)
-import           Control.Monad.Reader
+import           Control.Monad.Reader             (MonadIO (liftIO), asks)
 import           Data.List                        (sortBy)
-import           Data.Text
-import qualified Data.Text                        as T
-import           Data.Time
+import           Data.Text                        (Text, show)
+import           Data.Time                        (UTCTime)
 import           Data.UUID                        (UUID)
 import           Data.UUID.V4                     (nextRandom)
-import           Database.SQLite.Simple
-import           Database.SQLite.Simple.FromField
-import           Database.SQLite.Simple.ToField
-import           GHC.Generics
-import           Servant
-import           Web.FormUrlEncoded
-import           Website.Data.Env
-import           Website.Data.Error
+import           Database.SQLite.Simple           (FromRow, Only (Only),
+                                                   execute, field, fromRow,
+                                                   query, query_,
+                                                   withTransaction)
+import           Database.SQLite.Simple.FromField (FromField)
+import           Database.SQLite.Simple.ToField   (ToField)
+import           GHC.Generics                     (Generic)
+import           Prelude                          (Eq, Int, Maybe, Ord, Show,
+                                                   String, compare, pure, ($),
+                                                   (<$>), (<*>), (<>))
+import           Servant                          (FromHttpApiData,
+                                                   ToHttpApiData)
+import           Web.FormUrlEncoded               (FromForm, fromForm,
+                                                   parseUnique)
+import           Website.Data.Env                 (HasEnv (conn))
+import           Website.Data.Error               (AsErr (fromErr),
+                                                   DbErr (NotFound, TooManyResults),
+                                                   Err (DbError))
 import           Website.Data.Util                ()
-import           Website.Types
+import           Website.Types                    (CanAppM)
 
 --
 -- What an Entry is, and the various derived types that
@@ -76,7 +85,7 @@ instance FromRow Entry where
 
 createEntry :: (CanAppM c e m) => EntryCreate -> m Entry
 createEntry e@(EntryCreate title value) = do
-  $(logDebug) $ "createEntry " <> T.pack (show e)
+  $(logDebug) $ "createEntry " <> show e
   c <- asks conn
   uuid <- liftIO nextRandom
   entries <- liftIO $ withTransaction c $ query c "insert into entry(key, created, title, value, updated) values (?, datetime(), ?, ?, null) returning key, created, title, value, updated" (uuid, title, value)
@@ -87,7 +96,7 @@ createEntry e@(EntryCreate title value) = do
 
 getEntry :: (CanAppM c e m) => EntryKey -> m Entry
 getEntry key = do
-  $(logDebug) $ "getEntry " <> T.pack (show key)
+  $(logDebug) $ "getEntry " <> show key
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where key = ?" (Only key)
   case entries of
@@ -97,7 +106,7 @@ getEntry key = do
 
 getEntryByName :: (CanAppM c e m) => String -> m Entry
 getEntryByName name = do
-  $(logDebug) $ "getEntryByName " <> T.pack (show name)
+  $(logDebug) $ "getEntryByName " <> show name
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry where title = ?" (Only name)
   case entries of
@@ -107,7 +116,7 @@ getEntryByName name = do
 
 updateEntry :: (CanAppM c e m) => EntryKey -> EntryUpdate -> m Entry
 updateEntry key e@(EntryUpdate title value) = do
-  $(logDebug) $ "updateEntry " <> T.pack (show key) <> " " <> T.pack (show e)
+  $(logDebug) $ "updateEntry " <> show key <> " " <> show e
   c <- asks conn
   entries <- liftIO $ withTransaction c $ query c "update entry set title = ?, value = ?, updated = datetime() where key = ? returning key, created, title, value, updated" (title, value, key)
   case entries of
@@ -117,7 +126,7 @@ updateEntry key e@(EntryUpdate title value) = do
 
 deleteEntry :: (CanAppM c e m) => EntryKey -> m ()
 deleteEntry key = do
-  $(logDebug) $ "deleteEntry " <> T.pack (show key)
+  $(logDebug) $ "deleteEntry " <> show key
   c <- asks conn
   liftIO $ withTransaction c $ execute c "delete from entry where key = ?" (Only key)
 
@@ -129,7 +138,7 @@ getEntries = do
 
 getRecentEntries :: CanAppM c e m => Int -> m [Entry]
 getRecentEntries num = do
-  $(logDebug) $ "getRecentEntries " <> T.pack (show num)
+  $(logDebug) $ "getRecentEntries " <> show num
   c <- asks conn
   liftIO $ withTransaction c $ query c "select key, created, title, value, updated from entry order by created desc limit ?" (Only num)
 

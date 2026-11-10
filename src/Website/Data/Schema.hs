@@ -1,15 +1,25 @@
 module Website.Data.Schema where
 
-import           Control.Monad
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Data.Foldable
-import           Data.List
-import           Database.SQLite.Simple
-import           Database.SQLite.Simple.ToField
-import           Website.Data.Env
-import           Website.Data.Error             (DbErr (NotFound), Err (DbError), throwError_)
-import           Website.Types
+import           Control.Monad                  (unless)
+import           Control.Monad.Logger           (logDebug)
+import           Control.Monad.Reader           (liftIO, asks)
+import           Data.Foldable                  (traverse_)
+import           Data.List                      (filter, sortBy)
+import           Database.SQLite.Simple         (Connection, FromRow,
+                                                 Only (Only), Query, ToRow,
+                                                 execute, execute_, field,
+                                                 fromRow, query_, toRow,
+                                                 withExclusiveTransaction,
+                                                 withTransaction)
+import           Database.SQLite.Simple.ToField (ToField (toField))
+import           Prelude                        (Bool, Eq, IO, Int, Num, Ord,
+                                                 Read, Show, compare, error,
+                                                 pure, putStrLn, show, ($), (+),
+                                                 (.), (<$>), (<>), (>=))
+import           Website.Data.Env               (conn)
+import           Website.Data.Error             (DbErr (NotFound),
+                                                 Err (DbError), throwError_)
+import           Website.Types                  (CanAppM)
 
 -- Create a table for tracking the schema version
 createVersion :: Query

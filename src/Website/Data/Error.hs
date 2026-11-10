@@ -1,5 +1,7 @@
 module Website.Data.Error where
-import           Control.Monad.Except
+import           Control.Monad.Except (MonadError, throwError)
+import           Prelude              (Either, Eq, Maybe, Ord, Show, String,
+                                       either, id, pure, (.))
 
 --
 -- Mapping application errors to servant errors

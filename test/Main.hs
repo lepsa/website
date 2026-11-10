@@ -1,13 +1,15 @@
 module Main (main) where
 
-import           Control.Concurrent
-import           Hedgehog
+import           Control.Concurrent      (forkIO, killThread, newEmptyMVar,
+                                          putMVar, takeMVar)
+import           Hedgehog                (Group (Group), checkParallel)
 import qualified Network.HTTP.Client     as H
 import qualified Network.HTTP.Types      as H
+import           Prelude                 (Bool, IO, pure, show, ($), (<>), (==))
 import           Test.Api                (testTopAPI, testTopServer)
-import           Test.StateMachine
-import           Test.Types
-import           Website
+import           Test.StateMachine       (propApiTests)
+import           Test.Types              (TestEnv (TestEnv))
+import           Website                 (startServer')
 
 #ifdef TLS
 import           Network.Connection      (TLSSettings (..))

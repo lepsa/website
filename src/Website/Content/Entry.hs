@@ -1,29 +1,38 @@
 module Website.Content.Entry where
 
 import           CMark                       (commonmarkToHtml)
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Logger        (MonadLogger, logDebug)
+import           Control.Monad.Reader        (MonadReader, asks)
 import           Data.Maybe                  (catMaybes)
-import           Data.Text
-import qualified Data.Text                   as T
-import           Data.Time
-import           Servant
-import           Text.Blaze.Html
+import           Data.Text                   (pack, show)
+import           Data.Time                   (TimeZone)
+import           Prelude                     (mappend, mconcat, pure, ($), (.),
+                                              (<$>), (<>), (>>=), const)
+import           Servant                     (Proxy (Proxy),
+                                              ToHttpApiData (toUrlPiece),
+                                              safeLink)
+import           Text.Blaze.Html             (Html, preEscapedToHtml, toHtml,
+                                              (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Content.Common
-import           Website.Content.Htmx
-import           Website.Data.Entry
-import           Website.Data.Env
+import           Website.Content.Common      (AuthEntry, basicPage,
+                                              editDeleteButtons, htmlLink,
+                                              whenLoggedIn)
+import           Website.Content.Htmx        (hxBoost, hxOn)
+import           Website.Data.Entry          (Entry (created, key, title, updated, value),
+                                              EntryCreate, EntryKey,
+                                              sortEntriesByDateDesc)
+import           Website.Data.Env            (HasEnv (timeZone))
 import           Website.Data.User           (OptionalUser)
-import           Website.Data.Util
-import           Website.Network.API.CRUD
-import           Website.Network.API.Types
+import           Website.Data.Util           (timeFormat)
+import           Website.Network.API.CRUD    (CRUDCreate, CRUDDelete, CRUDRead,
+                                              CRUDUpdateForm)
+import           Website.Network.API.Types   (topAPI)
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c, MonadLogger m) => Entry -> m Html
 entryDisplay entry = do
-  $(logDebug) $ "entryDisplay " <> T.pack (show entry)
+  $(logDebug) $ "entryDisplay " <> show entry
   tz <- asks timeZone
   editDelete <- whenLoggedIn $ \_ -> editDeleteButtons
     "#entry"
@@ -51,13 +60,13 @@ entryDisplay entry = do
 -- | As 'entryDisplay' with 'basicPage' wrapping
 entryDisplayFullPage :: (HasEnv c, OptionalUser c, MonadLogger m, MonadReader c m) => Entry -> m Html
 entryDisplayFullPage e = do
-  $(logDebug) $ "entryDisplayFullPage " <> T.pack (show e)
+  $(logDebug) $ "entryDisplayFullPage " <> show e
   entryDisplay e >>= basicPage
 
 -- | List all entries as a page
 entryList :: (OptionalUser c, HasEnv c, MonadReader c m, MonadLogger m) => [Entry] -> m Html
 entryList entries = do
-  $(logDebug) $ "entryList " <> T.pack (show entries)
+  $(logDebug) $ "entryList " <> show entries
   tz <- asks timeZone
   mNewEntry <- whenLoggedIn $ const newEntry
   basicPage $

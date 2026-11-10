@@ -1,15 +1,17 @@
 module Website.Content.Index where
 
-import           Control.Monad.Logger
-import           Control.Monad.Reader
-import           Text.Blaze.Html
+import           Control.Monad.Logger   (logDebug)
+import           Control.Monad.Reader   (asks)
+import           Prelude                (mconcat, ($), (.), (<$>))
+import           Text.Blaze.Html        (Html)
 import qualified Text.Blaze.Html5       as H
-import           Website.Content.Common
-import           Website.Content.Entry
-import           Website.Data.Entry
-import           Website.Data.Env
-import           Website.Data.User
-import           Website.Types
+import           Website.Content.Common (basicPage)
+import           Website.Content.Entry  (entryLink)
+import           Website.Data.Entry     (getRecentEntries,
+                                         sortEntriesByDateDesc)
+import           Website.Data.Env       (HasEnv (timeZone))
+import           Website.Data.User      (OptionalUser)
+import           Website.Types          (CanAppM)
 
 -- | Initial landing page.
 index :: (OptionalUser c, CanAppM c e m) => m Html

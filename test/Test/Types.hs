@@ -1,20 +1,24 @@
 module Test.Types where
 
-import           Control.Lens
+import           Control.Lens               (Lens', _Just, makeLenses, (^.),
+                                             (^?))
 import qualified Data.ByteString.Lazy       as BSL
-import           Data.Kind
+import           Data.Kind                  (Type)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as M
 import           Data.Maybe                 (catMaybes)
-import           Data.Text
-import           GHC.Exts
-import           GHC.Generics
-import           Hedgehog                   hiding (Group)
+import           Data.Text                  (Text)
+import           GHC.Exts                   (IsList (fromList))
+import           GHC.Generics               (Generic, M1 (M1))
+import           Hedgehog                   (FunctorB, Rec (Rec), TraversableB,
+                                             Var)
 import qualified Network.HTTP.Client        as H
-import           Servant
+import           Prelude                    (Eq, Maybe (Nothing), Ord, Show,
+                                             String, ($), (.), (<$>))
+import           Servant                    (ToHttpApiData (toQueryParam))
 import           Test.Db.Entry              ()
 import           Test.Db.User               ()
-import           Web.FormUrlEncoded
+import           Web.FormUrlEncoded         (ToForm, toForm)
 import           Website.Auth.Authorisation (Group)
 import           Website.Data.User          (UserCreate (UserCreate))
 

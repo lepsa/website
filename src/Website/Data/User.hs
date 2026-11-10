@@ -3,25 +3,39 @@
 
 module Website.Data.User where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader.Class
-import           Data.Password.Argon2             (Argon2, PasswordCheck (..), PasswordHash (..), checkPassword,
-                                                   hashPassword, mkPassword, unPasswordHash)
-import           Data.Text                        hiding (group)
-import qualified Data.Text                        as T
-import           Data.UUID
-import           Data.UUID.V4
-import           Database.SQLite.Simple
-import           Database.SQLite.Simple.FromField
-import           Database.SQLite.Simple.ToField   (ToField (..))
-import           GHC.Generics
-import           Web.FormUrlEncoded
+import           Control.Monad.IO.Class           (MonadIO (liftIO))
+import           Control.Monad.Logger             (logDebug)
+import           Control.Monad.Reader.Class       (asks)
+import           Data.Password.Argon2             (Argon2,
+                                                   PasswordCheck (PasswordCheckFail, PasswordCheckSuccess),
+                                                   PasswordHash (PasswordHash),
+                                                   checkPassword, hashPassword,
+                                                   mkPassword, unPasswordHash)
+import           Data.Text                        (Text, show)
+import           Data.UUID                        (UUID)
+import           Data.UUID.V4                     (nextRandom)
+import           Database.SQLite.Simple           (Connection, FromRow,
+                                                   Only (Only), execute, field,
+                                                   fromRow, query, query_,
+                                                   withTransaction)
+import           Database.SQLite.Simple.FromField (FromField, fromField)
+import           Database.SQLite.Simple.ToField   (ToField, toField)
+import           GHC.Generics                     (Generic)
+import           Prelude                          (Bool (False, True),
+                                                   Either (Right), Eq, IO,
+                                                   Maybe (Just, Nothing), Show,
+                                                   either, pure, ($), (.), (<$),
+                                                   (<$>), (<*>), (<>))
+import           Web.FormUrlEncoded               (Form, FromForm, fromForm,
+                                                   parseMaybe, parseUnique)
 import           Website.Auth.Authorisation       (Group (Admin))
-import           Website.Data.Env
-import           Website.Data.Error
-import           Website.Data.Util
-import           Website.Types
+import           Website.Data.Env                 (Env, EnvAuthed, HasAuth,
+                                                   HasEnv (conn), auth)
+import           Website.Data.Error               (Err (Other), liftEither_,
+                                                   throwError_)
+import           Website.Data.Util                (ensureSingleInsert,
+                                                   ensureSingleResult)
+import           Website.Types                    (CanAppM)
 
 -- Known orphan instances. These are here so that we don't have to
 -- constantly wrap and unwrap (either a newtype or text) everywhere.
@@ -123,7 +137,7 @@ getUserHashIO c uid = ensureSingleResult <$> query c "select hash from user_logi
 
 getUserHash :: (CanAppM c e m) => UserKey -> m (PasswordHash Argon2)
 getUserHash uid = do
-  $(logDebug) $ "getUserHash " <> T.pack (show uid)
+  $(logDebug) $ "getUserHash " <> show uid
   c <- asks conn
   e <- liftIO (getUserHashIO c uid)
   liftEither_ e
@@ -133,7 +147,7 @@ getUserIO c uid = ensureSingleResult <$> query c "select id, email, group_name f
 
 getUser :: (CanAppM c e m) => UserKey -> m User
 getUser uid = do
-  $(logDebug) $ "getUser " <> T.pack (show uid)
+  $(logDebug) $ "getUser " <> show uid
   c <- asks conn
   e <- liftIO $ getUserIO c uid
   liftEither_ e
@@ -143,7 +157,7 @@ getUserIdIO c email = ensureSingleResult <$> query c "select id from user where 
 
 getUserId :: (CanAppM c e m) => Text -> m UserKey
 getUserId email = do
-  $(logDebug) $ "getUserId " <> T.pack (show email)
+  $(logDebug) $ "getUserId " <> show email
   c <- asks conn
   e <- liftIO $ getUserIdIO c email
   liftEither_ e
@@ -153,14 +167,14 @@ getUserLoginIO c k = ensureSingleResult <$> query c "select id, email, group_nam
 
 getUserLogin :: CanAppM c e m => UserKey -> m UserLogin
 getUserLogin k = do
-  $(logDebug) $ "getUserLogin " <> T.pack (show k)
+  $(logDebug) $ "getUserLogin " <> show k
   c <- asks conn
   e <- liftIO $ getUserLoginIO c k
   liftEither_ e
 
 updateUser :: (CanAppM c e m) => UserKey -> UserUpdate -> m User
 updateUser key update = do
-  $(logDebug) $ "updateUser " <> T.pack (show key)
+  $(logDebug) $ "updateUser " <> show key
   c <- asks conn
   case update.group of
     Nothing -> pure ()
@@ -183,7 +197,7 @@ updateUser key update = do
 
 deleteUser :: (CanAppM c e m) => UserKey -> m ()
 deleteUser key = do
-  $(logDebug) $ "deleteUser " <> T.pack (show key)
+  $(logDebug) $ "deleteUser " <> show key
   c <- asks conn
   liftIO $
     withTransaction c $

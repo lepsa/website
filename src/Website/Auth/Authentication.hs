@@ -3,18 +3,25 @@
 
 module Website.Auth.Authentication where
 
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.IO.Class
-import           Data.Bifunctor
-import           Data.Password.Argon2
-import           Data.Text
-import           Data.Text.Encoding
-import           Database.SQLite.Simple
-import           GHC.Generics
-import           Servant.Auth.Server
-import           Web.FormUrlEncoded
-import           Website.Data.User
+import           Control.Monad          (Monad ((>>=)), (<=<))
+import           Control.Monad.Except   (ExceptT, MonadError (throwError),
+                                         liftEither, runExceptT)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Bifunctor         (Bifunctor (first))
+import           Data.Password.Argon2   (PasswordCheck (PasswordCheckFail, PasswordCheckSuccess),
+                                         checkPassword, mkPassword)
+import           Data.Text              (Text)
+import           Data.Text.Encoding     (decodeUtf8')
+import           Database.SQLite.Simple (Connection)
+import           GHC.Generics           (Generic)
+import           Prelude                (String, const, either, pure, ($), (.),
+                                         (<$>), (<*>))
+import           Servant.Auth.Server    (AuthResult (Authenticated, BadPassword),
+                                         BasicAuthCfg,
+                                         BasicAuthData (BasicAuthData),
+                                         FromBasicAuthData, fromBasicAuthData)
+import           Web.FormUrlEncoded     (FromForm, fromForm, parseUnique)
+import           Website.Data.User      (UserKey, getUserHashIO, getUserIdIO)
 
 data Login = Login
   { email    :: String,

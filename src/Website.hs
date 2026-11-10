@@ -1,36 +1,79 @@
 module Website where
 
-import           Control.Monad
-import           Control.Monad.Identity
-import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad                        (void, (<=<))
+import           Control.Monad.Identity               (Identity)
+import           Control.Monad.Logger                 (NoLoggingT (runNoLoggingT),
+                                                       logInfo)
+import           Control.Monad.Reader                 (ReaderT, mapReaderT)
 import           Crypto.JOSE                          (JWK)
 import           Data.Aeson                           (eitherDecode, encode)
 import qualified Data.ByteString.Lazy.Char8           as BSL8
-import           Data.Kind
-import           Data.List.NonEmpty                   (NonEmpty ((:|)), nonEmpty)
-import           Data.Proxy
-import           Data.Time
-import           Database.SQLite.Simple               hiding ((:.))
-import           Network.Wai
-import           Network.Wai.Handler.Warp
-import           Network.Wai.Middleware.Gzip
-import           Network.Wai.Middleware.Prometheus
-import           Network.Wai.Middleware.RequestLogger
-import           Servant.Auth.Server
-import           Servant.Server
-import           System.Directory
-import           System.IO
-import           System.Log.Handler.Syslog
-import           System.Log.Logger
-import           Website.Auth.Authentication
-import           Website.Content.Error
-import           Website.Data.Env
-import           Website.Data.Error
-import           Website.Data.Schema
-import           Website.Network.API.Types
-import           Website.Network.Server
-import           Website.Types
+import           Data.Kind                            (Type)
+import           Data.List.NonEmpty                   (NonEmpty ((:|)),
+                                                       nonEmpty)
+import           Data.Maybe                           (Maybe (Just, Nothing))
+import           Data.Proxy                           (Proxy (Proxy))
+import           Data.Time                            (getCurrentTimeZone)
+import           Database.SQLite.Simple               (Only (Only), execute,
+                                                       open, query_,
+                                                       withTransaction)
+import           Network.Wai                          (Request (pathInfo))
+import           Network.Wai.Handler.Warp             (Port, defaultSettings,
+                                                       runSettings,
+                                                       setBeforeMainLoop,
+                                                       setHost, setPort)
+import           Network.Wai.Middleware.Gzip          (defaultGzipSettings,
+                                                       gzip)
+import           Network.Wai.Middleware.Prometheus    (PrometheusSettings (prometheusInstrumentApp),
+                                                       instrumentHandlerValue, def,
+                                                       prometheus)
+import           Network.Wai.Middleware.RequestLogger (Destination (Handle),
+                                                       IPAddrSource (FromSocket),
+                                                       OutputFormat (Apache),
+                                                       RequestLoggerSettings (destination, outputFormat),
+                                                       mkRequestLogger, defaultRequestLoggerSettings)
+import           Prelude                              (Bool (False, True),
+                                                       Either (Left, Right),
+                                                       Int, String, either,
+                                                       error, filter, foldl,
+                                                       mappend, mempty, pure,
+                                                       show, ($), (.), (/=),
+                                                       (<$>), (<*>), (<>),
+                                                       (>>=), (*))
+import           Servant.Auth.Server                  (CookieSettings (cookieMaxAge, cookieXsrfSetting),
+                                                       JWTSettings,
+                                                       XsrfCookieSettings (xsrfExcludeGet),
+                                                       defaultCookieSettings,
+                                                       defaultJWTSettings,
+                                                       defaultXsrfCookieSettings,
+                                                       generateKey)
+import           Servant.Server                       (Context (EmptyContext, (:.)),
+                                                       HasServer (ServerT, hoistServerWithContext),
+                                                       ServerError,
+                                                       serveWithContext)
+import           System.Directory                     (getCurrentDirectory)
+import           System.IO                            (FilePath, IO,
+                                                       IOMode (AppendMode),
+                                                       putStrLn, withFile)
+import           System.Log.Handler.Syslog            (Facility (USER),
+                                                       Option (PID), openlog)
+import           System.Log.Logger                    (Priority (DEBUG),
+                                                       addHandler,
+                                                       getRootLogger,
+                                                       removeHandler,
+                                                       saveGlobalLogger,
+                                                       setLevel)
+import           Website.Auth.Authentication          (BasicAuthCfg' (BasicAuthCfg'))
+import           Website.Content.Error                (errToServerError)
+import           Website.Data.Env                     (Env (Env), HasEnv (conn))
+import           Website.Data.Error                   (Err)
+import           Website.Data.Schema                  (createSchema, getJWK,
+                                                       insertJWK, runMigrations,
+                                                       setupDatabase)
+import           Website.Network.API.Types            (topAPI)
+import           Website.Network.Server               (server)
+import           Website.Types                        (AppM, runAppM,
+                                                       runAppMToHandler)
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -82,7 +125,7 @@ startServer' onStartup api serverM dbPath port = do
         $ setHost "*6"
         $ setPort port defaultSettings
   withFile "requests.log" AppendMode $ \requestHandle -> do
-    requestLogger <- mkRequestLogger $ def
+    requestLogger <- mkRequestLogger $ defaultRequestLoggerSettings
       { outputFormat = Apache FromSocket
       , destination = Handle requestHandle
       }

@@ -1,18 +1,23 @@
 module Website.Network.API.Types where
 
 import           Data.Text                   (Text)
-import           Servant                     (Proxy (..))
-import           Servant.API                 hiding (BasicAuth)
-import           Servant.Auth
-import           Servant.Auth.Server
-import           Servant.HTML.Blaze
-import           Servant.Multipart
-import           Text.Blaze.Html
-import           Website.Auth.Authentication
-import           Website.Data.Entry
-import           Website.Data.File
-import           Website.Data.User
-import           Website.Network.API.CRUD
+import           Prelude                     (String)
+import           Servant                     (Proxy (Proxy))
+import           Servant.API                 (Capture, FormUrlEncoded, Get,
+                                              Header, Headers, NoContent, Raw,
+                                              ReqBody, StdMethod (POST), Verb,
+                                              (:<|>), (:>))
+import           Servant.Auth                (Auth, BasicAuth, Cookie, JWT)
+import           Servant.Auth.Server         (SetCookie)
+import           Servant.HTML.Blaze          (HTML)
+import           Servant.Multipart           (MultipartData, MultipartForm, Tmp)
+import           Text.Blaze.Html             (Html)
+import           Website.Auth.Authentication (Login)
+import           Website.Data.Entry          (EntryCreate, EntryKey,
+                                              EntryUpdate)
+import           Website.Data.File           (FileId)
+import           Website.Data.User           (UserCreate, UserKey, UserUpdate)
+import           Website.Network.API.CRUD    (CRUDForm, CRUDForm')
 
 --
 -- Top level API. The type is used when writing servers, and the value is used to generate API type safe links.

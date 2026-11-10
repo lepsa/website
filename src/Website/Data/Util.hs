@@ -2,16 +2,24 @@
 
 module Website.Data.Util where
 
-import           Control.Monad
-import           Control.Monad.Except
-import           Data.Time
-import           Data.UUID
-import           Database.SQLite.Simple
-import           Database.SQLite.Simple.FromField
-import           Database.SQLite.Simple.FromRow
-import           Database.SQLite.Simple.ToField
-import           Servant.Auth.JWT
-import           Website.Data.Error
+import           Control.Monad                    (MonadFail (fail), (>=>))
+import           Control.Monad.Except             (MonadError (throwError))
+import           Data.Time                        (TimeZone, UTCTime,
+                                                   defaultTimeLocale,
+                                                   formatTime, utcToZonedTime)
+import           Data.UUID                        (UUID, fromString, toString)
+import           Database.SQLite.Simple           (FromRow, fromRow)
+import           Database.SQLite.Simple.FromField (FieldParser, FromField,
+                                                   fromField)
+import           Database.SQLite.Simple.FromRow   (fieldWith)
+import           Database.SQLite.Simple.ToField   (ToField, toField)
+import           Prelude                          (Either (Left), String,
+                                                   either, maybe, pure, ($),
+                                                   (.))
+import           Servant.Auth.JWT                 (FromJWT, ToJWT)
+import           Website.Data.Error               (AsErr (fromErr),
+                                                   DbErr (FailedToInsertRecord, NotFound, TooManyResults),
+                                                   Err (DbError, Other))
 
 -- FromField for UUIDs is an instance we need to write ourselves
 -- so that we aren't explicitly wrapping and unwrapping everywhere.
