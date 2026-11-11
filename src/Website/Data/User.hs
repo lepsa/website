@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE TypeFamilies       #-}
 
 module Website.Data.User where
 
@@ -8,9 +8,8 @@ import           Control.Monad.Logger             (logDebug)
 import           Control.Monad.Reader.Class       (asks)
 import           Data.Password.Argon2             (Argon2,
                                                    PasswordCheck (PasswordCheckFail, PasswordCheckSuccess),
-                                                   PasswordHash (PasswordHash),
-                                                   checkPassword, hashPassword,
-                                                   mkPassword, unPasswordHash)
+                                                   PasswordHash, checkPassword,
+                                                   hashPassword, mkPassword)
 import           Data.Text                        (Text, show)
 import           Data.UUID                        (UUID)
 import           Data.UUID.V4                     (nextRandom)
@@ -18,14 +17,17 @@ import           Database.SQLite.Simple           (Connection, FromRow,
                                                    Only (Only), execute, field,
                                                    fromRow, query, query_,
                                                    withTransaction)
-import           Database.SQLite.Simple.FromField (FromField, fromField)
-import           Database.SQLite.Simple.ToField   (ToField, toField)
+import           Database.SQLite.Simple.FromField (FromField)
+import           Database.SQLite.Simple.ToField   (ToField)
 import           GHC.Generics                     (Generic)
 import           Prelude                          (Bool (False, True),
                                                    Either (Right), Eq, IO,
                                                    Maybe (Just, Nothing), Show,
                                                    either, pure, ($), (.), (<$),
                                                    (<$>), (<*>), (<>))
+import           Servant                          (FromHttpApiData,
+                                                   ToHttpApiData)
+import           Servant.Auth.JWT                 (FromJWT, ToJWT)
 import           Web.FormUrlEncoded               (Form, FromForm, fromForm,
                                                    parseMaybe, parseUnique)
 import           Website.Auth.Authorisation       (Group (Admin))
@@ -37,9 +39,19 @@ import           Website.Data.Util                (ensureSingleInsert,
                                                    ensureSingleResult)
 import           Website.Types                    (CanAppM)
 
--- Known orphan instances. These are here so that we don't have to
--- constantly wrap and unwrap (either a newtype or text) everywhere.
-type UserKey = UUID
+newtype UserKey = UserKey { unUserKey :: UUID }
+  deriving newtype
+    ( Eq
+    , Show
+    , ToHttpApiData
+    , FromField
+    , ToField
+    , ToJWT
+    , FromJWT
+    , FromHttpApiData
+    )
+instance FromRow UserKey where
+  fromRow = UserKey <$> fromRow
 
 newtype UserLogin = UserLogin { unUserLogin :: User }
   deriving (Eq, Show, Generic)
@@ -108,15 +120,6 @@ instance FromForm UserCreate where
     <$> parseUnique "group" f
     <*> parseUnique "email" f
     <*> parseUnique "password" f
-
-instance FromField (PasswordHash Argon2) where
-  fromField f = PasswordHash <$> fromField @Text f
-
-instance FromRow (PasswordHash Argon2) where
-  fromRow = PasswordHash <$> field @Text
-
-instance ToField (PasswordHash Argon2) where
-  toField = toField . unPasswordHash
 
 createUser :: (CanAppM c e m) => UserCreate -> m User
 createUser (UserCreate group email password) = do

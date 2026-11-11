@@ -5,7 +5,6 @@ module Website.Network.API where
 import           Control.Monad              (when, (>>=))
 import           Control.Monad.IO.Class     (MonadIO (liftIO))
 import           Control.Monad.Logger       (logDebug)
-import           Data.Int                   (Int64)
 import           Data.Text                  (Text, show)
 import           Prelude                    (Maybe (Just, Nothing), String,
                                              flip, mappend, mempty, pure, ($),
@@ -17,13 +16,11 @@ import           Servant                    (Header, Headers,
                                              addHeader, safeLink)
 import           Servant.Auth.Server        (CookieSettings, JWTSettings,
                                              acceptLogin)
-import           Servant.Multipart          (MultipartData, Tmp)
 import qualified Text.Blaze.Html            as H
 import           Website.Auth.Authorisation (Access (Read, Write))
 import           Website.Content.Common     (AuthEntry, AuthUser)
 import           Website.Content.Entry      (entryDisplay, entryDisplayFullPage,
                                              entryList)
-import           Website.Content.File       (getFiles, uploadFile)
 import           Website.Content.Index      (index)
 import           Website.Content.User       (userDisplay, userDisplayFullPage,
                                              userList)
@@ -33,14 +30,13 @@ import           Website.Data.Entry         (Entry (key), EntryCreate, EntryKey,
                                              getEntryByName, updateEntry)
 import           Website.Data.Error         (Err (Other, Unauthorised),
                                              throwError_)
-import           Website.Data.File          (FileId)
 import           Website.Data.Permission    (checkPermission)
 import           Website.Data.User          (OptionalUser, RequiredUser,
                                              User (uuid), UserCreate, UserKey,
                                              UserUpdate, adminExists,
                                              createUser, deleteUser, getUser,
                                              getUsers, updateUser)
-import           Website.Network.API.CRUD   (CRUDRead, WithCT)
+import           Website.Network.API.CRUD   (CRUDFormRead)
 import           Website.Network.API.Types  (SetLoginCookies, topAPI)
 import           Website.Types              (CanAppM)
 
@@ -59,7 +55,7 @@ postEntry create = do
   $(logDebug) $ "postEntry " <> show create
   checkPermission "POST entry" Write
   entry <- createEntry create
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDFormRead EntryKey))) entry.key
   pure $ addHeader link mempty
 
 -- Get a given Entry
@@ -107,7 +103,7 @@ postUser create = do
   $(logDebug) "postUser"
   checkPermission "POST user" Write
   newUser <- createUser create
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) newUser.uuid
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDFormRead UserKey))) newUser.uuid
   pure $ addHeader link mempty
 
 getUser :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
@@ -138,6 +134,9 @@ getUsers = do
 --
 -- File pages
 --
+
+{-
+
 getFiles :: (OptionalUser c, CanAppM c e m) => m H.Html
 getFiles = do
   $(logDebug) "getFiles"
@@ -162,13 +161,15 @@ deleteFile k = do
   checkPermission "DELETE file" Write
   deleteFile k
 
+-}
+
 register :: CanAppM c e m => CookieSettings -> JWTSettings -> UserCreate -> m (SetLoginCookies NoContent)
 register cookieSettings jwtSettings cUser = do
   $(logDebug) "register"
   adminExists >>= flip when (throwError_ Unauthorised)
   user <- createUser cUser
   mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings user.uuid
-  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid
+  let link = mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDFormRead UserKey))) user.uuid
   case mApplyCookies of
     Nothing      -> throwError_ $ Other "Could not build login cookies"
     Just cookies -> pure $ cookies $ addHeader link NoContent

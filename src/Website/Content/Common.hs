@@ -23,7 +23,7 @@ import           Servant.HTML.Blaze          (HTML)
 import qualified Text.Blaze.Html             as H
 import           Text.Blaze.Html             (Attribute, AttributeValue, Html,
                                               ToValue (toValue), stringValue,
-                                              textValue, toHtml, (!))
+                                              textValue, toHtml, (!), ToMarkup)
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Auth.Authentication (Login)
@@ -150,10 +150,10 @@ sideNav = do
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
           ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
-          pure $ H.li $ H.a
-          ! hxBoost
-          ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! htmlLink (Proxy @(AuthLogin :> "files" :> Get '[HTML] H.Html)) $ "Files",
+          -- pure $ H.li $ H.a
+          -- ! hxBoost
+          -- ! hxOn "::config-request" "setXsrfHeader(event)"
+          -- ! htmlLink (Proxy @(AuthLogin :> "files" :> Get '[HTML] H.Html)) $ "Files",
           mUsers,
           pure $ H.li ! HA.class_ "nav-separator" $ H.a
           ! hxBoost
@@ -186,7 +186,7 @@ basicPage content = do
           ]
     ]
 
-staticField :: String -> String -> Maybe String -> Html
+staticField :: ToMarkup a => String -> String -> Maybe a -> Html
 staticField fieldName fieldLabel value = mconcat
   [ H.div ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
     H.div ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ maybe mempty toHtml value
@@ -201,7 +201,7 @@ formField fieldName fieldLabel type_ value = mconcat
       _ -> H.input ! HA.class_ "formvalue" ! HA.name (toValue fieldName) ! HA.type_ (toValue type_) ! maybe mempty (HA.value . stringValue) value
   ]
 
-selectField :: forall a. (Eq a, Enum a, Bounded a, Show a) => String -> String -> Maybe a -> Html
+selectField :: forall a. (ToMarkup a, Eq a, Enum a, Bounded a, Show a) => String -> String -> Maybe a -> Html
 selectField fieldName fieldLabel value = mconcat
   [ H.label ! HA.class_ "formlabel" ! HA.for (toValue fieldName) $ toHtml fieldLabel,
     H.select ! HA.class_ "formvalue" ! HA.name (toValue fieldName) $ mconcat $
@@ -210,11 +210,10 @@ selectField fieldName fieldLabel value = mconcat
   where
     mkOption :: a -> Html
     mkOption option = H.option
-      ! HA.value (stringValue val)
+      ! HA.value (stringValue $ show option)
       ! maybe mempty selected value
-      $ toHtml val
+      $ toHtml option
       where
-        val = show option
         selected a = if a == option
           then HA.selected "true"
           else mempty

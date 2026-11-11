@@ -15,9 +15,8 @@ import           Text.Blaze.Html             (Html)
 import           Website.Auth.Authentication (Login)
 import           Website.Data.Entry          (EntryCreate, EntryKey,
                                               EntryUpdate)
-import           Website.Data.File           (FileId)
 import           Website.Data.User           (UserCreate, UserKey, UserUpdate)
-import           Website.Network.API.CRUD    (CRUDForm, CRUDForm')
+import           Website.Network.API.CRUD    (CRUDForm)
 
 --
 -- Top level API. The type is used when writing servers, and the value is used to generate API type safe links.
@@ -47,6 +46,6 @@ type API =
     :<|> "entry" :> CRUDForm EntryCreate EntryUpdate EntryKey
     :<|> "entry" :> Capture "title" String :> Get '[HTML] Html
     :<|> "entries" :> Get '[HTML] Html
-    :<|> "file" :> CRUDForm' FileUpload FileUpload FileId
-    :<|> "files" :> Get '[HTML] Html
+    -- :<|> "file" :> CRUDForm' FileUpload FileUpload FileId
+    -- :<|> "files" :> Get '[HTML] Html
     :<|> "static" :> Raw

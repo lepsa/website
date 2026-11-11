@@ -1,5 +1,7 @@
 module Website.Content.File where
 
+{-
+
 import           Control.Monad.IO.Class      (MonadIO (liftIO))
 import           Control.Monad.Logger        (logDebug)
 import           Control.Monad.Reader        (asks)
@@ -38,7 +40,7 @@ import           Website.Data.File           (CreateFile (CreateFile),
                                               getFileMeta, getFileMetas)
 import           Website.Data.User           (OptionalUser, RequiredUser)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDCreateForm, CRUDDelete,
+import           Website.Network.API.CRUD    (CRUDFormCreateGet, CRUDDelete,
                                               CRUDRead', WithCT (WithCT))
 import           Website.Network.API.Types   (topAPI)
 import           Website.Types               (CanAppM)
@@ -122,3 +124,5 @@ deleteFile fId = do
   m <- getFileMeta fId
   Website.Data.File.deleteFile fId
   pure $ H.toHtml $ "Deleted " <> m.fileMetaName
+
+-}

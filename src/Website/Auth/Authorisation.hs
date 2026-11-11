@@ -11,6 +11,7 @@ import           Prelude                          (Bounded, Either (Left), Enum,
                                                    (<>))
 import           Servant                          (FromHttpApiData)
 import           Servant.API                      (parseQueryParam)
+import           Text.Blaze                       (ToMarkup, toMarkup)
 import           Text.Read                        (readMaybe)
 
 --
@@ -31,6 +32,9 @@ instance FromField Group where
   fromField = fromField >=> maybe (fail "Could not parse Group") pure . readMaybe
 instance ToField Group where
   toField = toField . show
+
+instance ToMarkup Group where
+    toMarkup = toMarkup . show
 
 data Access
   = None

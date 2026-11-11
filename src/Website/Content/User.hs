@@ -19,8 +19,9 @@ import           Website.Data.Env            (HasEnv)
 import           Website.Data.User           (RequiredUser,
                                               User (email, group, uuid),
                                               UserCreate, UserKey)
-import           Website.Network.API.CRUD    (CRUDCreate, CRUDDelete, CRUDRead,
-                                              CRUDUpdateForm)
+import           Website.Network.API.CRUD    (CRUDFormCreatePost,
+                                              CRUDFormDelete, CRUDFormRead,
+                                              CRUDFormUpdateGet)
 import           Website.Network.API.Types   (topAPI)
 import           Website.Types               (CanAppM)
 
@@ -34,8 +35,8 @@ userDisplay user = do
     , editDeleteButtons
         "#user"
         (pure $ ": " <> user.email)
-        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDUpdateForm UserKey))) user.uuid)
-        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDDelete UserKey))) user.uuid)
+        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDFormUpdateGet UserKey))) user.uuid)
+        (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthUser (CRUDFormDelete UserKey))) user.uuid)
     ]
 
 userDisplayFullPage :: (CanAppM c e m, RequiredUser c) => User -> m Html
@@ -57,12 +58,12 @@ userList users = do
       [ H.a
         ! hxBoost
         ! hxOn "::config-request" "setXsrfHeader(event)"
-        ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDRead UserKey))) user.uuid))
+        ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDFormRead UserKey))) user.uuid))
         $ toHtml user.email
       ]
     newUser :: Html
     newUser = H.a
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthUser (CRUDCreate UserCreate))) $ "Create User"
+      ! htmlLink (Proxy @(AuthUser (CRUDFormCreatePost UserCreate))) $ "Create User"
     sortUsers = sortBy $ \a b -> compare a.email b.email

@@ -25,8 +25,7 @@ import           Website.Data.Entry          (Entry (created, key, title, update
 import           Website.Data.Env            (HasEnv (timeZone))
 import           Website.Data.User           (OptionalUser)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDCreate, CRUDDelete, CRUDRead,
-                                              CRUDUpdateForm)
+import           Website.Network.API.CRUD    (CRUDFormRead, CRUDFormUpdateGet, CRUDFormDelete, CRUDFormCreatePost,)
 import           Website.Network.API.Types   (topAPI)
 
 -- | Display an entry, with edit and delete buttons
@@ -37,15 +36,15 @@ entryDisplay entry = do
   editDelete <- whenLoggedIn $ \_ -> editDeleteButtons
     "#entry"
     (pure $ ": " <> entry.title)
-    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDUpdateForm EntryKey))) entry.key)
-    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDDelete EntryKey))) entry.key)
+    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDFormUpdateGet EntryKey))) entry.key)
+    (mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthEntry (CRUDFormDelete EntryKey))) entry.key)
   pure
     $ H.div
       ! HA.id "entry"
     $ mconcat $ catMaybes
       [ pure $ H.h3 $ toHtml entry.title,
-        pure $ H.p $ toHtml $ "Created " <> timeFormat tz entry.created,
-        H.p . toHtml . mappend "Updated " . timeFormat tz <$> entry.updated,
+        pure $ H.p $ toHtml $ "Created: " <> timeFormat tz entry.created,
+        H.p . toHtml . mappend "Updated: " . timeFormat tz <$> entry.updated,
         -- This isn't great, but it is the easiest way to do what I want.
         -- We store the markdown in the DB for easy editing, but we display
         -- HTML when looking at the entry.
@@ -82,14 +81,14 @@ entryList entries = do
     newEntry = H.a
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthEntry (CRUDCreate EntryCreate))) $ "Create Entry"
+      ! htmlLink (Proxy @(AuthEntry (CRUDFormCreatePost EntryCreate))) $ "Create Entry"
 
 entryLink :: TimeZone -> Entry -> Html
 entryLink tz entry = mconcat
   [ H.a
     ! hxBoost
     ! hxOn "::config-request" "setXsrfHeader(event)"
-    ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDRead EntryKey))) entry.key))
+    ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDFormRead EntryKey))) entry.key))
     $ toHtml entry.title,
     toHtml $ " " <> timeFormat tz entry.created
   ]

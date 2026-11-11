@@ -25,21 +25,23 @@ import           Network.Wai.Handler.Warp             (Port, defaultSettings,
 import           Network.Wai.Middleware.Gzip          (defaultGzipSettings,
                                                        gzip)
 import           Network.Wai.Middleware.Prometheus    (PrometheusSettings (prometheusInstrumentApp),
-                                                       instrumentHandlerValue, def,
+                                                       def,
+                                                       instrumentHandlerValue,
                                                        prometheus)
 import           Network.Wai.Middleware.RequestLogger (Destination (Handle),
                                                        IPAddrSource (FromSocket),
                                                        OutputFormat (Apache),
                                                        RequestLoggerSettings (destination, outputFormat),
-                                                       mkRequestLogger, defaultRequestLoggerSettings)
+                                                       defaultRequestLoggerSettings,
+                                                       mkRequestLogger)
 import           Prelude                              (Bool (False, True),
                                                        Either (Left, Right),
                                                        Int, String, either,
                                                        error, filter, foldl,
                                                        mappend, mempty, pure,
-                                                       show, ($), (.), (/=),
-                                                       (<$>), (<*>), (<>),
-                                                       (>>=), (*))
+                                                       show, ($), (*), (.),
+                                                       (/=), (<$>), (<*>), (<>),
+                                                       (>>=))
 import           Servant.Auth.Server                  (CookieSettings (cookieMaxAge, cookieXsrfSetting),
                                                        JWTSettings,
                                                        XsrfCookieSettings (xsrfExcludeGet),

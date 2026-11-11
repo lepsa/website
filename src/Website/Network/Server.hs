@@ -26,7 +26,6 @@ import           Website.Auth.Authentication (Login (Login), checkUserPassword)
 import           Website.Content.Common      (AuthLogin, Authed, linkText,
                                               loginForm)
 import           Website.Content.Forms       (entryCreationForm,
-                                              fileCreationForm,
                                               getEntryForUpdate,
                                               getUserForUpdate,
                                               userCreationForm)
@@ -37,19 +36,16 @@ import           Website.Data.Env            (Env, EnvAuthed, HasEnv (conn),
 import           Website.Data.Error          (DbErr (NotFound, TooManyResults),
                                               Err (DbError, Unauthenticated),
                                               throwError_)
-import           Website.Data.File           (FileId)
 import           Website.Data.User           (OptionalUser, UserCreate, UserKey,
                                               UserLogin, UserUpdate,
                                               getUserLogin)
-import           Website.Network.API         (deleteEntry, deleteFile,
-                                              deleteUser, getEntries, getEntry,
-                                              getEntryByName, getFile, getFiles,
-                                              getIndex, getUser, getUsers,
-                                              postEntry, postFile, postUser,
+import           Website.Network.API         (deleteEntry, deleteUser,
+                                              getEntries, getEntry,
+                                              getEntryByName, getIndex, getUser,
+                                              getUsers, postEntry, postUser,
                                               putEntry, putUser, register)
-import           Website.Network.API.CRUD    (CRUDForm, CRUDForm')
-import           Website.Network.API.Types   (FileUpload, SetLoginCookies,
-                                              TopAPI)
+import           Website.Network.API.CRUD    (CRUDForm)
+import           Website.Network.API.Types   (SetLoginCookies, TopAPI)
 import           Website.Types               (AppM, CanAppM)
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
@@ -64,8 +60,8 @@ server cookieSettings jwtSettings currentDirectory = api
        :<|> crudEntry a
        :<|> unprotected a . getEntryByName
        :<|> unprotected a getEntries
-       :<|> crudFile a
-       :<|> unprotected a getFiles
+       -- :<|> crudFile a
+       -- :<|> unprotected a getFiles
        :<|> serveDirectoryWebApp (currentDirectory </> "static")
 
     getLogin :: (OptionalUser c, CanAppM c e m) => m Html
@@ -102,11 +98,11 @@ server cookieSettings jwtSettings currentDirectory = api
           :<|> getUserForUpdate
           :<|> deleteUser
 
-    crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
-    crudFile a = protected a . postFile
-            :<|> protected a fileCreationForm
-            :<|> unprotected a . getFile
-            :<|> protected a . deleteFile
+    -- crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
+    -- crudFile a = protected a . postFile
+    --         :<|> protected a fileCreationForm
+    --         :<|> unprotected a . getFile
+    --         :<|> protected a . deleteFile
 
     -- When using a user token do a couple of things.
     -- 1) Ensure that the user actually exists in the database.

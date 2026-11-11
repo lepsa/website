@@ -13,28 +13,27 @@ import           Prelude                     (Bounded, Enum, Eq,
 import           Servant                     (Proxy (Proxy),
                                               ToHttpApiData (toUrlPiece),
                                               safeLink)
-import           Text.Blaze.Html             (Html, stringValue, (!))
+import           Text.Blaze.Html             (Html, ToMarkup, stringValue,
+                                              toHtml, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Auth.Authorisation  (Access (Read, Write), Group)
-import           Website.Content.Common      (AuthEntry, AuthFile, AuthUser,
-                                              basicPage, formField, selectField,
+import           Website.Content.Common      (AuthEntry, AuthUser, basicPage,
+                                              formField, selectField,
                                               staticField)
-import           Website.Content.Htmx        (hxBoost, hxIndicator, hxOn,
-                                              hxPost, hxPut, hxSwap)
-import           Website.Data.Entry          (Entry (created, key, title, updated, value),
-                                              EntryCreate, EntryKey,
-                                              EntryUpdate, getEntry)
+import           Website.Content.Htmx        (hxBoost, hxOn, hxPut, hxSwap)
+import           Website.Data.Entry          (Entry (key, title), EntryCreate,
+                                              EntryKey, EntryUpdate, created,
+                                              getEntry, updated, value)
 import           Website.Data.Env            (HasEnv (timeZone))
 import           Website.Data.Permission     (checkPermission)
-import           Website.Data.User           (RequiredUser,
-                                              User (email, group, uuid),
+import           Website.Data.User           (RequiredUser, User (uuid),
                                               UserCreate, UserKey, UserUpdate,
-                                              getUser)
+                                              email, getUser, group)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDCreate, CRUDCreateFile,
-                                              CRUDUpdate)
-import           Website.Network.API.Types   (FileUpload, topAPI)
+import           Website.Network.API.CRUD    (CRUDFormCreatePost,
+                                              CRUDFormUpdatePost)
+import           Website.Network.API.Types   (topAPI)
 import           Website.Types               (CanAppM)
 
 -- | Values for a given form field
@@ -48,7 +47,7 @@ data FieldData a
   | StaticData
       { staticLabel :: String,
         staticName  :: String,
-        staticValue :: Maybe String
+        staticValue :: Maybe Html
       }
   | SelectData
       { selectLabel :: String
@@ -65,15 +64,15 @@ data FormData a = FormData
   }
 
 -- | Helper function for generating forms
-generateField :: (Show a, Eq a, Enum a, Bounded a) => FieldData a -> Html
+generateField :: (ToMarkup a, Eq a, Enum a, Bounded a, Show a) => FieldData a -> Html
 generateField fd = case fd of
   FieldData {}  -> formField fd.fieldName fd.fieldLabel fd.fieldType fd.fieldValue
   StaticData {} -> staticField fd.staticName fd.staticLabel fd.staticValue
   SelectData {} -> selectField fd.selectName fd.selectLabel fd.selectValue
 
 class (Show b, Bounded b, Enum b, Eq b) => GenerateForm a b | a -> b where
-  newForm :: (HasEnv c, MonadReader c m, MonadLogger m) => Proxy a -> m (FormData b)
-  updateForm :: (HasEnv c, MonadReader c m, MonadLogger m) => a -> m (FormData b)
+  newForm    :: (HasEnv c, MonadReader c m, MonadLogger m) => Proxy a -> m (FormData b)
+  updateForm :: (HasEnv c, MonadReader c m, MonadLogger m) =>       a -> m (FormData b)
 
 --
 -- What an Entry should look like in HTML
@@ -83,7 +82,7 @@ instance GenerateForm Entry () where
     $(logDebug) "newForm Entry"
     pure $ FormData
       { title = "Create Entry",
-        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (Website.Network.API.CRUD.CRUDCreate EntryCreate)))),
+        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDFormCreatePost EntryCreate)))),
         updateUrl = Nothing,
         fields =
           [ FieldData
@@ -106,7 +105,7 @@ instance GenerateForm Entry () where
     pure $ FormData
       { title = "Update Entry",
         createUrl = Nothing,
-        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (Website.Network.API.CRUD.CRUDUpdate EntryUpdate EntryKey))) entry.key),
+        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDFormUpdatePost EntryUpdate EntryKey))) entry.key),
         fields =
           [ FieldData
               { fieldLabel = "Title",
@@ -138,7 +137,7 @@ instance GenerateForm User Group where
     $(logDebug) "newForm User"
     pure $ FormData
       { title = "Create User",
-        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (Website.Network.API.CRUD.CRUDCreate UserCreate)))),
+        createUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDFormCreatePost UserCreate)))),
         updateUrl = Nothing,
         fields =
           [ FieldData
@@ -165,24 +164,24 @@ instance GenerateForm User Group where
     pure $ FormData
       { title = "Update User",
         createUrl = Nothing,
-        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (Website.Network.API.CRUD.CRUDUpdate UserUpdate UserKey))) user.uuid),
+        updateUrl = pure $ T.unpack $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthUser (CRUDFormUpdatePost UserUpdate UserKey))) user.uuid),
         fields =
           [ StaticData
               { staticLabel = "Email",
                 staticName = "email",
-                staticValue = pure $ T.unpack user.email
+                staticValue = pure $ toHtml user.email
               },
             FieldData
               { fieldLabel = "Old Password",
                 fieldName = "oldPassword",
                 fieldType = "password",
-                fieldValue = Nothing
+                fieldValue = Nothing @String
               },
             FieldData
               { fieldLabel = "New Password",
                 fieldName = "newPassword",
                 fieldType = "password",
-                fieldValue = Nothing
+                fieldValue = Nothing @String
               },
             SelectData
               { selectLabel = "Group",
@@ -193,18 +192,17 @@ instance GenerateForm User Group where
       }
 
 -- | Generate an empty form for a given type. This form can be used to create a new value for the type.
-generateNewForm :: (HasEnv c, MonadReader c m, GenerateForm a b, MonadLogger m) => Proxy a -> m Html
+generateNewForm :: (ToMarkup b, HasEnv c, MonadReader c m, GenerateForm a b, MonadLogger m) => Proxy a -> m Html
 generateNewForm p = do
   $(logDebug) "generateNewForm"
   fd <- newForm p
   pure $ mconcat
-    [ H.h2 $ H.toHtml fd.title
-    , H.form
+    [ H.form
       ! HA.class_ "contentform"
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
       ! maybe mempty (\url -> HA.method "POST" <> HA.action (stringValue url)) fd.createUrl
-    $ mconcat
+    $ H.h2 (H.toHtml fd.title) <> mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
         H.br,
         H.input
@@ -215,19 +213,18 @@ generateNewForm p = do
     ]
 
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
-generateUpdateForm :: (Show a, HasEnv c, MonadReader c m, MonadLogger m, GenerateForm a b) => a -> m Html
+generateUpdateForm :: (ToMarkup b, Show a, HasEnv c, MonadReader c m, MonadLogger m, GenerateForm a b) => a -> m Html
 generateUpdateForm a = do
   $(logDebug) $ "generateUpdateForm: " <> show a
   fd <- updateForm a
   pure $ mconcat
-    [ H.h2 $ H.toHtml fd.title
-    , H.form
+    [ H.form
       ! HA.class_ "contentform"
       ! hxSwap "outerHTML"
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
       ! maybe mempty (hxPut . stringValue) fd.updateUrl
-    $ mconcat
+    $ H.h2 (H.toHtml fd.title) <> mconcat
       [ mconcat $ intersperse H.br $ generateField <$> fd.fields,
         H.br,
         H.input
@@ -274,6 +271,7 @@ getEntryForUpdate entry = do
   entryUpdateForm =<< Website.Data.Entry.getEntry entry
 
 -- File form
+{-
 fileCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 fileCreationForm = do
   $(logDebug) "fileCreationForm"
@@ -301,3 +299,4 @@ fileCreationForm = do
         ! HA.src "/static/90-ring.svg"
       ]
     ]
+-}

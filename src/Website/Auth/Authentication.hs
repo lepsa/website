@@ -36,6 +36,7 @@ instance FromForm Login where
 
 newtype BasicAuthCfg' = BasicAuthCfg' Connection
 
+--  This is an orphan instance
 type instance BasicAuthCfg = BasicAuthCfg'
 
 instance FromBasicAuthData UserKey where
