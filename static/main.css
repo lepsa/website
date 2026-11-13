@@ -7,6 +7,10 @@ select, textarea, input, button {
   font: inherit;
 }
 
+textarea {
+  height: 20rem;
+}
+
 body {
   background-color: #F6F6F6;
   margin: 0rem;
@@ -24,7 +28,7 @@ a {
 a:hover {
   color: black;
   text-decoration: underline;
-  text-decoration-thickness: 0.2rem;
+  text-decoration-thickness: 0.1rem;
   text-decoration-skip-ink: none;
 }
 
@@ -65,6 +69,7 @@ h1 {
 main {
   display: inline-block;
   margin: 1rem;
+  width: 100%;
 }
 
 #main-content {
@@ -100,7 +105,7 @@ nav {
 }
 
 nav ul {
-  padding: 0px;
+  padding: 0rem;
 }
 
 nav ul li {
@@ -117,8 +122,18 @@ label {
 
 .contentform {
   display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 4px;
+  grid-template-columns: max-content 2fr;
+  gap: 0.5rem;
+  align-content: start;
+  height: 100%;
+}
+
+.entrycontent {
+  
+}
+
+.delete {
+  color: red;
 }
 
 .formlabel {
@@ -136,6 +151,10 @@ label {
 #edit-delete-buttons button {
    margin-left: 0.5rem;
    margin-right: 0.5rem;
+}
+
+#edit-delete-buttons .delete {
+  color: red;
 }
 
 .htmx-indicator{

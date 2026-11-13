@@ -13,13 +13,17 @@ import           Database.SQLite.Simple           (FromRow, Only (Only),
 import           Database.SQLite.Simple.FromField (FromField)
 import           Database.SQLite.Simple.ToField   (ToField)
 import           GHC.Generics                     (Generic)
-import           Prelude                          (Eq, Maybe, Ord, Show, ($),
-                                                   (<$>), (<*>), (<>))
+import           Prelude                          (Eq, Maybe, Ord,
+                                                   Show, ($), (<$>), (<*>),
+                                                   (<>), Num)
 import           Servant                          (FromHttpApiData,
                                                    ToHttpApiData)
 import           Website.Data.Env                 (HasEnv (conn))
 import           Website.Data.Util                (ensureSingleResult)
 import           Website.Types                    (CanAppM)
+
+sqliteBlobSize :: Num a => a
+sqliteBlobSize = 1_000_000_000
 
 newtype FileId = FileId UUID
   deriving (Eq, Show, Ord, Generic, ToField, FromField, ToHttpApiData, FromHttpApiData)

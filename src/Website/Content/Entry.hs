@@ -6,8 +6,9 @@ import           Control.Monad.Reader        (MonadReader, asks)
 import           Data.Maybe                  (catMaybes)
 import           Data.Text                   (pack, show)
 import           Data.Time                   (TimeZone)
-import           Prelude                     (mappend, mconcat, pure, ($), (.),
-                                              (<$>), (<>), (>>=), const)
+import           Prelude                     (const, foldr, mappend, maybe,
+                                              mconcat, mempty, pure, ($), (.),
+                                              (<$>), (<>), (>>=))
 import           Servant                     (Proxy (Proxy),
                                               ToHttpApiData (toUrlPiece),
                                               safeLink)
@@ -16,7 +17,7 @@ import           Text.Blaze.Html             (Html, preEscapedToHtml, toHtml,
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Content.Common      (AuthEntry, basicPage,
-                                              editDeleteButtons, htmlLink,
+                                              editDeleteButtons, hrefLink,
                                               whenLoggedIn)
 import           Website.Content.Htmx        (hxBoost, hxOn)
 import           Website.Data.Entry          (Entry (created, key, title, updated, value),
@@ -25,8 +26,10 @@ import           Website.Data.Entry          (Entry (created, key, title, update
 import           Website.Data.Env            (HasEnv (timeZone))
 import           Website.Data.User           (OptionalUser)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDFormRead, CRUDFormUpdateGet, CRUDFormDelete, CRUDFormCreatePost,)
-import           Website.Network.API.Types   (topAPI)
+import           Website.Network.API.CRUD    (CRUDFormCreatePost,
+                                              CRUDFormDelete, CRUDFormRead,
+                                              CRUDFormUpdateGet)
+import           Website.Network.API.Types   (EntryTitleGet, topAPI)
 
 -- | Display an entry, with edit and delete buttons
 entryDisplay :: (HasEnv c, MonadReader c m, OptionalUser c, MonadLogger m) => Entry -> m Html
@@ -41,7 +44,7 @@ entryDisplay entry = do
   pure
     $ H.div
       ! HA.id "entry"
-    $ mconcat $ catMaybes
+    $ foldr (\a b -> maybe b (<> b) a) mempty $
       [ pure $ H.h3 $ toHtml entry.title,
         pure $ H.p $ toHtml $ "Created: " <> timeFormat tz entry.created,
         H.p . toHtml . mappend "Updated: " . timeFormat tz <$> entry.updated,
@@ -52,7 +55,7 @@ entryDisplay entry = do
         --       Especially around JS.
         -- TODO: Maybe we can pre-render the HTML in the DB so we aren't
         --       processing it every time.
-        pure $ preEscapedToHtml $ commonmarkToHtml [] entry.value,
+        pure $ H.div ! HA.class_ ".entrycontent" $ preEscapedToHtml $ commonmarkToHtml [] entry.value,
         editDelete
       ]
 
@@ -74,14 +77,14 @@ entryList entries = do
         mNewEntry,
         pure $ H.ul $
           mconcat $
-            H.li . H.p . entryLink tz <$> sortEntriesByDateDesc entries
+            H.li . H.p . entryTitleLink tz <$> sortEntriesByDateDesc entries
       ]
   where
     newEntry :: Html
     newEntry = H.a
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthEntry (CRUDFormCreatePost EntryCreate))) $ "Create Entry"
+      ! hrefLink (Proxy @(AuthEntry (CRUDFormCreatePost EntryCreate))) $ "Create Entry"
 
 entryLink :: TimeZone -> Entry -> Html
 entryLink tz entry = mconcat
@@ -89,6 +92,16 @@ entryLink tz entry = mconcat
     ! hxBoost
     ! hxOn "::config-request" "setXsrfHeader(event)"
     ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry (CRUDFormRead EntryKey))) entry.key))
+    $ toHtml entry.title,
+    toHtml $ " " <> timeFormat tz entry.created
+  ]
+
+entryTitleLink :: TimeZone -> Entry -> Html
+entryTitleLink tz entry = mconcat
+  [ H.a
+    ! hxBoost
+    ! hxOn "::config-request" "setXsrfHeader(event)"
+    ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthEntry EntryTitleGet)) entry.title))
     $ toHtml entry.title,
     toHtml $ " " <> timeFormat tz entry.created
   ]

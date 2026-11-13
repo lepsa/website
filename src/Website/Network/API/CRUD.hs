@@ -30,13 +30,16 @@ instance MimeRender DOWNLOAD BSL.ByteString where
 instance Accept DOWNLOAD where
   contentType _ = "*/*"
 
+type LocHeaders a = Headers '[Header "Location" Text] a
+
 -- This should always be paired with CRUDFormCreate so that we can get the initial form
 -- for the CRUD creation, before posting to the CRUDCreate route, and getting the
 -- response back
 type CRUDFormCreateGet         = Get '[HTML] Html
-type CRUDFormCreatePost create = ReqBody '[FormUrlEncoded] create :> Verb 'POST 303 '[HTML] (Headers '[Header "Location" Text] Html)
-type CRUDApiCreate      create = ReqBody '[FormUrlEncoded] create :> Verb 'POST 201 '[JSON] (Headers '[Header "Location" Text] Entry)
-type CRUDCreateFile     create = create                           :> Verb 'POST 201 '[HTML] (Headers '[Header "Location" Text] Html)
+type CRUDFileCreateGet         = Get '[HTML] Html
+type CRUDFormCreatePost create = ReqBody '[FormUrlEncoded] create :> Verb 'POST 303 '[HTML] (LocHeaders Html)
+type CRUDApiCreate      create = ReqBody '[FormUrlEncoded] create :> Verb 'POST 201 '[JSON] (LocHeaders Entry)
+type CRUDFileCreatePost create = create                           :> Verb 'POST 201 '[HTML] (LocHeaders Html)
 
 -- Read a specific resource
 type CRUDFormRead key = Capture "key" key :> Get '[HTML] Html
@@ -46,13 +49,16 @@ type CRUDFileRead key = Capture "key" key :> Get '[DOWNLOAD] (Headers '[Header "
 -- This should always be paired with CRUDUpdate so that we can get the initial form
 -- for the CRUD update, before posting to the CRUDUpdate route, and getting the
 -- response back
-type CRUDFormUpdateGet         key = Capture "key" key :> "update" :> Get '[HTML] Html
+type CRUDFormUpdateGet         key = Capture "key" key :> "update"                                       :> Get '[HTML] Html
 type CRUDFormUpdatePost update key = Capture "key" key :> "update" :> (ReqBody '[FormUrlEncoded] update) :> Put '[HTML] Html
 type CRUDApiUpdate      update key = Capture "key" key :> "update" :> (ReqBody '[JSON] EntryUpdate)      :> Put '[JSON] Entry
+type CRUDFileUpdateGet         key = Capture "key" key :> "update"                                       :> Get '[HTML] Html
+type CRUDFileUpdatePost update key = Capture "key" key :> "update" :> (ReqBody '[FormUrlEncoded] update) :> Put '[HTML] Html
 
 -- Delete a specific resource
 type CRUDFormDelete key = Capture "key" key :> "delete" :> Delete '[HTML] Html
 type CRUDApiDelete  key = Capture "key" key :> "delete" :> Delete '[JSON] NoContent
+type CRUDFileDelete key = Capture "key" key :> "delete" :> Delete '[HTML] Html
 
 -- A template for creating CRUD servers for specific types.
 -- It will ensure that pages are provided so that users can perform the required actions
@@ -70,10 +76,10 @@ type CRUDApi create update key =
     :<|> CRUDApiUpdate update key
     :<|> CRUDApiDelete key
 
--- type CRUDForm' create update key =
---   CRUDCreateFile create
---     :<|> CRUDCreateForm
---     :<|> CRUDRead' key
---     -- :<|> CRUDUpdate' update key
---     -- :<|> CRUDUpdateForm key
---     :<|> CRUDDelete key
+type CRUDFile create update key =
+         CRUDFileCreatePost create
+    :<|> CRUDFileCreateGet
+    :<|> CRUDFileRead key
+    -- :<|> CRUDFileUpdatePost update key
+    -- :<|> CRUDFileUpdateGet key
+    :<|> CRUDFileDelete key

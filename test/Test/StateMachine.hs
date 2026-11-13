@@ -92,7 +92,7 @@ import           Test.Types                            (ApiState (_entries, _fil
                                                         TestLogin (TestLogin),
                                                         TestUser (TestUser),
                                                         UpdateEntry (UpdateEntry),
-                                                        UpdateUser (UpdateUser),
+                                                        UpdateUser (UpdateUser, _uuKey),
                                                         _oldPassword, akUser,
                                                         auth, ceTitle, ceValue,
                                                         cfData, cfName, cfType,
@@ -107,7 +107,7 @@ import           Test.Types                            (ApiState (_entries, _fil
                                                         tuEmail, tuGroup, tuJwt,
                                                         tuPassword, ueTitle,
                                                         ueValue, users, uuGroup,
-                                                        uuPassword)
+                                                        uuPassword, _tuPassword, _uuPassword)
 import           Text.RawString.QQ                     (r)
 import           Text.Regex.TDFA                       (AllTextMatches (getAllTextMatches),
                                                         (=~))
@@ -244,7 +244,7 @@ mkKey base keys = Gen.choice
   ]
 
 genFileName :: MonadGen m => m Text
-genFileName = Gen.text (Range.linear 1 10) $ Gen.filterT (\c -> c `notElem` ['/', '\\', ';']) genChars
+genFileName = Gen.text (Range.linear 1 10) $ Gen.filterT (\c -> c `notElem` ['/', '\\', ';', '\"']) genChars
 
 genFileType :: MonadGen m => m Text
 genFileType = do
@@ -589,6 +589,12 @@ cUpdateUser :: forall gen m. (CanStateM gen m) => TestEnv -> Command gen m ApiSt
 cUpdateUser env = Command gen execute
   [ Require userExists,
     Require userGroupAdmin,
+    Require $ \state command ->
+      maybe
+        False
+        (\u -> maybe False (\p -> p._oldPassword == u._tuPassword) command._uuPassword)
+      $ M.lookup command._uuKey state._users
+    ,
     Update $ \state input _output ->
       let update u = u
             & tuPassword .~ maybe (u ^. tuPassword) (view newPassword) (input ^. uuPassword)
@@ -600,7 +606,7 @@ cUpdateUser env = Command gen execute
       then Nothing
       else Just $ do
         (k, u) <- Gen.element $ M.toList state._users
-        UpdateUser k
+        UpdateUser k u
           <$> genPasswordUpdate u
           <*> fmap pure genGroup
           <*> mkGoodAuth state
@@ -618,7 +624,7 @@ cUpdateUserBadAuth env = Command gen execute []
       then Nothing
       else Just $ do
         (k, u) <- Gen.element $ M.toList state._users
-        UpdateUser k
+        UpdateUser k u
           <$> genPasswordUpdate u
           <*> fmap pure genGroup
           <*> mkBadAuth state

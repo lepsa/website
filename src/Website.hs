@@ -34,6 +34,8 @@ import           Network.Wai.Middleware.RequestLogger (Destination (Handle),
                                                        RequestLoggerSettings (destination, outputFormat),
                                                        defaultRequestLoggerSettings,
                                                        mkRequestLogger)
+import           Network.Wai.Parse                    (defaultParseRequestBodyOptions,
+                                                       setMaxRequestFileSize)
 import           Prelude                              (Bool (False, True),
                                                        Either (Left, Right),
                                                        Int, String, either,
@@ -49,6 +51,10 @@ import           Servant.Auth.Server                  (CookieSettings (cookieMax
                                                        defaultJWTSettings,
                                                        defaultXsrfCookieSettings,
                                                        generateKey)
+import           Servant.Multipart                    (MultipartOptions (MultipartOptions, backendOptions, generalOptions),
+                                                       Tmp,
+                                                       defaultBackendOptions,
+                                                       generalOptions)
 import           Servant.Server                       (Context (EmptyContext, (:.)),
                                                        HasServer (ServerT, hoistServerWithContext),
                                                        ServerError,
@@ -76,6 +82,7 @@ import           Website.Network.API.Types            (topAPI)
 import           Website.Network.Server               (server)
 import           Website.Types                        (AppM, runAppM,
                                                        runAppMToHandler)
+import Website.Data.File (sqliteBlobSize)
 
 #ifdef TLS
 import           Network.Wai.Handler.WarpTLS
@@ -87,7 +94,7 @@ import           System.FilePath
 -- to leave it as is.
 
 startServer'
-  :: (HasServer (api :: Type) '[BasicAuthCfg', CookieSettings, JWTSettings])
+  :: (HasServer (api :: Type) '[BasicAuthCfg', CookieSettings, JWTSettings, MultipartOptions Tmp])
   => IO ()
   -> Proxy api
   -> (CookieSettings -> JWTSettings -> FilePath -> ServerT api (AppM Env Err IO))
@@ -120,9 +127,14 @@ startServer' onStartup api serverM dbPath port = do
           }
         , cookieMaxAge = pure $ 7 * 24 * 60 * 60 -- 7 days to seconds
         }
+      multipartSettings :: MultipartOptions Tmp
+      multipartSettings = MultipartOptions {
+        generalOptions = setMaxRequestFileSize sqliteBlobSize defaultParseRequestBodyOptions,
+        backendOptions = defaultBackendOptions @Tmp Proxy
+      }
       -- Basic auth checks the user/password each time, so it already
       -- handles a user being deleted between user requests.
-      cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. EmptyContext
+      cfg = BasicAuthCfg' (conn conf) :. cookieSettings :. jwtSettings :. multipartSettings :. EmptyContext
       warpSettings = setBeforeMainLoop onStartup
         $ setHost "*6"
         $ setPort port defaultSettings
@@ -146,7 +158,7 @@ startServer' onStartup api serverM dbPath port = do
       gzip defaultGzipSettings $
       serveWithContext api cfg $
         hoistServerWithContext api
-          (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings])
+          (Proxy @'[BasicAuthCfg', CookieSettings, JWTSettings, MultipartOptions Tmp])
           (runAppMToHandler runErr conf) $
           serverM cookieSettings jwtSettings currentDirectory
   where

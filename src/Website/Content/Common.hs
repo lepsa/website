@@ -17,34 +17,33 @@ import           Servant                     (FormUrlEncoded, Get,
                                               StdMethod (POST),
                                               ToHttpApiData (toUrlPiece), Verb,
                                               safeLink, (:>))
-import           Servant.Auth                (Auth)
 import           Servant.Auth.Server         (AuthResult)
 import           Servant.HTML.Blaze          (HTML)
 import qualified Text.Blaze.Html             as H
 import           Text.Blaze.Html             (Attribute, AttributeValue, Html,
-                                              ToValue (toValue), stringValue,
-                                              textValue, toHtml, (!), ToMarkup)
+                                              ToMarkup, ToValue (toValue),
+                                              stringValue, textValue, toHtml,
+                                              (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Auth.Authentication (Login)
 import           Website.Auth.Authorisation  (Group (Admin))
 import           Website.Content.Htmx        (hxBoost, hxConfirm, hxDelete,
-                                              hxGet, hxOn, hxSwap, hxTarget,
-                                              hxTrigger)
+                                              hxGet, hxOn, hxPost, hxSwap,
+                                              hxTarget, hxTrigger)
 import           Website.Data.Env            (HasAuth (auth))
 import           Website.Data.User           (OptionalUser, RequiredUser,
                                               User (email, group), UserKey,
                                               UserLogin (UserLogin, unUserLogin),
                                               mAuth)
-import           Website.Network.API.Types   (Auths, SetLoginCookies, TopAPI,
-                                              topAPI)
+import           Website.Network.API.Types   (AppAuth, LogoutResponse,
+                                              SetLoginCookies, TopAPI, topAPI)
 import           Website.Types               (CanAppM)
 
 type Authed = AuthResult UserKey
-type AuthLogin = Auth Auths UserKey
-type AuthEntry a = AuthLogin :> "entry" :> a
-type AuthUser a = AuthLogin :> "user" :> a
-type AuthFile a = AuthLogin :> "file" :> a
+type AuthEntry a = AppAuth :> "entry" :> a
+type AuthUser a = AppAuth :> "user" :> a
+type AuthFile a = AppAuth :> "file" :> a
 
 siteTitle :: String
 siteTitle = "Owen's Site"
@@ -75,7 +74,7 @@ greetUser (UserLogin u) = H.p
   ]
 
 -- | Helper function for generating typesafe internal API links for use in HTML attributes
-htmlLink ::
+hrefLink ::
   ( IsElem endpoint TopAPI,
     HasLink endpoint,
     ToHttpApiData (MkLink endpoint Link)
@@ -84,7 +83,7 @@ htmlLink ::
   Attribute
 -- safeLink doesn't include a leading '/', so we need to stick one on here.
 -- This also lets the API root routes work, otherwise the safeLink would be ""
-htmlLink = HA.href . H.textValue . linkText
+hrefLink = HA.href . H.textValue . linkText
 
 -- | Helper function when generating typesafe internal API links.
 linkText ::
@@ -106,8 +105,8 @@ pageHeader = do
           ! HA.id "site-header"
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $
-          H.h2 $ toHtml siteTitle
+          ! hrefLink (Proxy @(AppAuth :> Get '[HTML] H.Html))
+          $ H.h2 $ toHtml siteTitle
       , loggedIn
       ]
 
@@ -132,33 +131,38 @@ commonHead = H.head $ mconcat
 -- | Builds the list of links on the side. Invoked by 'basicPage'
 sideNav :: (OptionalUser c, MonadReader c m, MonadLogger m) => m Html
 sideNav = do
-  mUsers <- whenLoggedIn $ \_ -> mconcat
-    [
-      H.li $ H.a
-      ! hxBoost
-      ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthLogin :> "users" :> Get '[HTML] H.Html)) $ "Users"
-    ]
+  mUsers <- whenLoggedIn $ \_ ->
+    H.li $ H.a
+    ! hxBoost
+    ! hxOn "::config-request" "setXsrfHeader(event)"
+    ! hrefLink (Proxy @(AppAuth :> "users" :> Get '[HTML] H.Html)) $ "Users"
+  mLogout <- whenLoggedIn $ \_ ->
+    H.li $ H.a
+    ! hxBoost
+    ! hxOn "::config-request" "setXsrfHeader(event)"
+    ! hxPost (H.textValue . linkText $ Proxy @(AppAuth :> "logout" :> LogoutResponse))
+    $ "Logout"
   pure $ H.nav $
     H.ul $
       mconcat $ catMaybes
         [ pure $ H.li $ H.a
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! htmlLink (Proxy @(AuthLogin :> Get '[HTML] H.Html)) $ "Home",
+          ! hrefLink (Proxy @(AppAuth :> Get '[HTML] H.Html)) $ "Home",
           pure $ H.li $ H.a
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! htmlLink (Proxy @(AuthLogin :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
-          -- pure $ H.li $ H.a
-          -- ! hxBoost
-          -- ! hxOn "::config-request" "setXsrfHeader(event)"
-          -- ! htmlLink (Proxy @(AuthLogin :> "files" :> Get '[HTML] H.Html)) $ "Files",
+          ! hrefLink (Proxy @(AppAuth :> "entries" :> Get '[HTML] H.Html)) $ "Entries",
+          pure $ H.li $ H.a
+          ! hxBoost
+          ! hxOn "::config-request" "setXsrfHeader(event)"
+          ! hrefLink (Proxy @(AppAuth :> "files" :> Get '[HTML] H.Html)) $ "Files",
           mUsers,
           pure $ H.li ! HA.class_ "nav-separator" $ H.a
           ! hxBoost
           ! hxOn "::config-request" "setXsrfHeader(event)"
-          ! htmlLink (Proxy @(AuthLogin :> "login" :> Get '[HTML] H.Html)) $ "Login",
+          ! hrefLink (Proxy @(AppAuth :> "login" :> Get '[HTML] H.Html)) $ "Login",
+          mLogout,
           pure $ H.li ! HA.class_ "nav-separator" $ H.a ! HA.href "https://github.com/lepsa" $ "GitHub"
         ]
 
@@ -229,7 +233,7 @@ loginForm :: (OptionalUser c, MonadReader c m, MonadLogger m) => m Html
 loginForm = basicPage $
   H.form
     ! HA.class_ "contentform"
-    ! HA.action (textValue $ linkText (Proxy @(AuthLogin :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
+    ! HA.action (textValue $ linkText (Proxy @(AppAuth :> "login" :> ReqBody '[FormUrlEncoded] Login :> Verb 'POST 303 '[HTML] (SetLoginCookies NoContent))))
     ! HA.method "POST"
     ! hxBoost
     ! hxOn "::config-request" "setXsrfHeader(event)"
@@ -266,6 +270,7 @@ editDeleteButtons target confirm eLink dLink = H.div
       $ "Edit"
     delete :: Html
     delete = H.button
+      ! HA.class_ "delete"
       ! hxTrigger "click"
       ! hxSwap "outerHTML"
       ! hxTarget "#edit-delete-buttons"

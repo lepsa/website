@@ -6,7 +6,7 @@ import           Prelude                (mconcat, ($), (.), (<$>))
 import           Text.Blaze.Html        (Html)
 import qualified Text.Blaze.Html5       as H
 import           Website.Content.Common (basicPage)
-import           Website.Content.Entry  (entryLink)
+import           Website.Content.Entry  (entryTitleLink)
 import           Website.Data.Entry     (getRecentEntries,
                                          sortEntriesByDateDesc)
 import           Website.Data.Env       (HasEnv (timeZone))
@@ -27,7 +27,7 @@ index = do
         H.p "HTMX is used to help with server interactions, mainly extending HTTP verb support in forms and allowing a small amount of client side updating for user interactions.",
         H.h2 "Recent Entries",
         H.ul $ mconcat $
-          H.li . entryLink tz <$> posts
+          H.li . entryTitleLink tz <$> posts
       ]
   where
     recentPostCount = 5

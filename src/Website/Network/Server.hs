@@ -2,146 +2,103 @@
 
 module Website.Network.Server where
 
-import           Control.Monad.Except        (runExceptT, withError)
-import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Logger        (logDebug)
-import           Control.Monad.Reader        (asks, withReaderT)
-import           Data.Text                   (show)
-import qualified Data.Text                   as T
-import           Data.UUID                   ()
-import           Prelude                     (IO, Maybe (Just, Nothing), const,
-                                              either, pure, ($), (.), (<>))
-import           Servant                     (Get, HasServer (ServerT),
-                                              NoContent (NoContent),
-                                              Proxy (Proxy), addHeader,
-                                              hoistServer, serveDirectoryWebApp,
-                                              (:<|>) ((:<|>)), (:>))
-import           Servant.Auth.Server         (AuthResult (Authenticated),
-                                              CookieSettings, JWTSettings,
-                                              acceptLogin)
-import           Servant.HTML.Blaze          (HTML)
-import           System.FilePath             (FilePath, (</>))
-import           Text.Blaze.Html             (Html)
-import           Website.Auth.Authentication (Login (Login), checkUserPassword)
-import           Website.Content.Common      (AuthLogin, Authed, linkText,
-                                              loginForm)
-import           Website.Content.Forms       (entryCreationForm,
-                                              getEntryForUpdate,
-                                              getUserForUpdate,
-                                              userCreationForm)
-import           Website.Data.Entry          (EntryCreate, EntryKey,
-                                              EntryUpdate)
-import           Website.Data.Env            (Env, EnvAuthed, HasEnv (conn),
-                                              mkEnvAuthed)
-import           Website.Data.Error          (DbErr (NotFound, TooManyResults),
-                                              Err (DbError, Unauthenticated),
-                                              throwError_)
-import           Website.Data.User           (OptionalUser, UserCreate, UserKey,
-                                              UserLogin, UserUpdate,
-                                              getUserLogin)
-import           Website.Network.API         (deleteEntry, deleteUser,
-                                              getEntries, getEntry,
-                                              getEntryByName, getIndex, getUser,
-                                              getUsers, postEntry, postUser,
-                                              putEntry, putUser, register)
-import           Website.Network.API.CRUD    (CRUDForm)
-import           Website.Network.API.Types   (SetLoginCookies, TopAPI)
-import           Website.Types               (AppM, CanAppM)
+import           Control.Monad.Except      (withError)
+import           Control.Monad.IO.Class    (MonadIO)
+import           Control.Monad.Reader      (withReaderT)
+import           Data.UUID                 ()
+import           Prelude                   (IO, Maybe (Just, Nothing), ($), (.))
+import           Servant                   (HasServer (ServerT), Proxy (Proxy),
+                                            hoistServer, serveDirectoryWebApp,
+                                            (:<|>) ((:<|>)))
+import           Servant.Auth.Server       (AuthResult (Authenticated),
+                                            CookieSettings, JWTSettings)
+import           System.FilePath           (FilePath, (</>))
+import           Website.Content.Common    (Authed)
+import           Website.Data.Entry        (EntryCreate, EntryKey, EntryUpdate)
+import           Website.Data.Env          (Env, EnvAuthed, mkEnvAuthed)
+import           Website.Data.Error        (Err (Unauthenticated), throwError_,
+                                            userLookupErrors)
+import           Website.Data.File         (FileId)
+import           Website.Data.User         (UserCreate, UserKey, UserLogin,
+                                            UserUpdate, getUserLogin)
+import qualified Website.Network.API       as API
+import           Website.Network.API.CRUD  (CRUDFile, CRUDForm)
+import           Website.Network.API.Types (FileUpload, TopAPI)
+import           Website.Types             (AppM)
 
 server :: CookieSettings -> JWTSettings -> FilePath -> ServerT TopAPI (AppM Env Err IO)
 server cookieSettings jwtSettings currentDirectory = api
   where
-    api a = unprotected a getIndex
-       :<|> unprotected a getLogin
-       :<|> unprotected a . login
-       :<|> unprotected a . register cookieSettings jwtSettings
+    api a = unprotected a API.indexGet
+       :<|> unprotected a API.loginGet
+       :<|> unprotected a . API.loginPost cookieSettings jwtSettings
+       :<|> protected a (API.logoutPost cookieSettings)
+       :<|> unprotected a . API.register cookieSettings jwtSettings
        :<|> crudUser a
-       :<|> protected a getUsers
+       :<|> protected a API.usersGet
        :<|> crudEntry a
-       :<|> unprotected a . getEntryByName
-       :<|> unprotected a getEntries
-       -- :<|> crudFile a
-       -- :<|> unprotected a getFiles
+       :<|> unprotected a . API.entryByNameGet
+       :<|> unprotected a API.entriesGet
+       :<|> crudFile a
+       :<|> unprotected a API.filesGet
        :<|> serveDirectoryWebApp (currentDirectory </> "static")
 
-    getLogin :: (OptionalUser c, CanAppM c e m) => m Html
-    getLogin = loginForm
+crudEntry :: Authed -> ServerT (CRUDForm EntryCreate EntryUpdate EntryKey) (AppM Env Err IO)
+crudEntry a =
+       protected a . API.entryCreatePost
+  :<|> protected a API.entryCreateGet
+  -- Unprotected, as q want the internet at large to be able to read this.
+  :<|> unprotected a . API.entryGet
+  :<|> (\key -> protected a . API.entryUpdatePut key)
+  :<|> protected a . API.entryUpdateGet
+  :<|> protected a . API.entryDelete
 
-    login :: (CanAppM c e m) => Login -> m (SetLoginCookies NoContent)
-    login (Login user pass) = do
-      $(logDebug) $ "login " <> show user
-      c <- asks conn
-      eUserId <- runExceptT $ checkUserPassword c (T.pack user) (T.pack pass)
-      userId <- either (const $ throwError_ Unauthenticated) pure eUserId
-      mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings userId
-      case mApplyCookies of
-        Nothing      -> throwError_ Unauthenticated
-        Just cookies -> pure $ cookies $ addHeader root NoContent
-      where
-        root = linkText (Proxy @(AuthLogin :> Get '[HTML] Html))
+crudUser :: Authed -> ServerT (CRUDForm UserCreate UserUpdate UserKey) (AppM Env Err IO)
+crudUser a = hoistServer (Proxy @(CRUDForm UserCreate UserUpdate UserKey)) (protected a) $
+       API.userCreatePost
+  :<|> API.userCreateGet
+  :<|> API.userGet
+  :<|> API.userUpdatePut
+  :<|> API.userUpdateGet
+  :<|> API.userDelete
 
-    crudEntry :: Authed -> ServerT (CRUDForm EntryCreate EntryUpdate EntryKey) (AppM Env Err IO)
-    crudEntry a = protected a . postEntry
-             :<|> protected a entryCreationForm
-             -- Unprotected, as we want the internet at large to be able to read this.
-             :<|> unprotected a . getEntry
-             :<|> (\ek -> protected a . putEntry ek)
-             :<|> protected a . getEntryForUpdate
-             :<|> protected a . deleteEntry
+crudFile :: Authed -> ServerT (CRUDFile FileUpload FileUpload FileId) (AppM Env Err IO)
+crudFile a =
+       protected a . API.createFilePost
+  :<|> protected a API.createFileGet
+  :<|> unprotected a . API.fileGet
+  -- :<|> protected a undefined
+  -- :<|> protected a undefined
+  :<|> protected a . API.fileDelete
 
-    crudUser :: Authed -> ServerT (CRUDForm UserCreate UserUpdate UserKey) (AppM Env Err IO)
-    crudUser a = hoistServer (Proxy @(CRUDForm UserCreate UserUpdate UserKey)) (protected a) $
-        postUser
-          :<|> userCreationForm
-          :<|> getUser
-          :<|> putUser
-          :<|> getUserForUpdate
-          :<|> deleteUser
+-- When using a user token do a couple of things.
+-- 1) Ensure that the user actually exists in the database.
+--    We don't want users who have had their account deleted
+--    still being able to access protected APIs.
+-- 2) Gather up all of the information what we might want to
+--    use when customising pages for the user
+protected
+  :: MonadIO m
+  => Authed
+  -> AppM (EnvAuthed UserLogin) Err m b
+  -> AppM Env Err m b
+protected a m = case a of
+  Authenticated user -> go user
+  _                  -> throwError_ Unauthenticated
+  where
+    go key = do
+      l <- withError userLookupErrors $ getUserLogin key
+      withReaderT (mkEnvAuthed l) m
 
-    -- crudFile :: Authed -> ServerT (CRUDForm' FileUpload FileUpload FileId) (AppM Env Err IO)
-    -- crudFile a = protected a . postFile
-    --         :<|> protected a fileCreationForm
-    --         :<|> unprotected a . getFile
-    --         :<|> protected a . deleteFile
-
-    -- When using a user token do a couple of things.
-    -- 1) Ensure that the user actually exists in the database.
-    --    We don't want users who have had their account deleted
-    --    still being able to access protected APIs.
-    -- 2) Gather up all of the information what we might want to
-    --    use when customising pages for the user
-    protected ::
-      (MonadIO m) =>
-      Authed ->
-      AppM (EnvAuthed UserLogin) Err m b ->
-      AppM Env Err m b
-    protected a m = case a of
-      Authenticated user -> go user
-      _                  -> throwError_ Unauthenticated
-      where
-        go key = do
-          l <- withError userLookupErrors $ getUserLogin key
-          withReaderT (mkEnvAuthed l) m
-
-    -- Similar to `withProtected` but doesn't require that the user
-    -- is authenticated. If an authenticated user ID doesn't exist
-    -- in the database however, that is an issue.
-    unprotected ::
-      (MonadIO m) =>
-      Authed ->
-      AppM (EnvAuthed (Maybe UserLogin)) Err m b ->
-      AppM Env Err m b
-    unprotected (Authenticated userKey) m = do
-      userLogin <- withError userLookupErrors $ getUserLogin userKey
-      withReaderT (mkEnvAuthed $ Just userLogin) m
-    unprotected _ m = withReaderT (mkEnvAuthed Nothing) m
-
-    -- User lookups can fail in a couple of ways,
-    -- but these are the ones we really care to catch.
-    -- A missing user at this stage means that the auth
-    -- token was valid as far as the crypto was concerned
-    -- but the ID it encoded no longer exists, so the
-    -- user shouldn't be authenticated any more.
-    userLookupErrors (DbError NotFound)       = Unauthenticated
-    userLookupErrors (DbError TooManyResults) = Unauthenticated
-    userLookupErrors e                        = e
+-- Similar to `withProtected` but doesn't require that the user
+-- is authenticated. If an authenticated user ID doesn't exist
+-- in the database however, that is an issue.
+unprotected
+  :: MonadIO m
+  => Authed
+  -> AppM (EnvAuthed (Maybe UserLogin)) Err m b
+  -> AppM Env Err m b
+unprotected (Authenticated userKey) m = do
+  userLogin <- withError userLookupErrors $ getUserLogin userKey
+  withReaderT (mkEnvAuthed $ Just userLogin) m
+unprotected _ m = withReaderT (mkEnvAuthed Nothing) m

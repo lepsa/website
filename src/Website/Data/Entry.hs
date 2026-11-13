@@ -16,8 +16,8 @@ import           Database.SQLite.Simple.FromField (FromField)
 import           Database.SQLite.Simple.ToField   (ToField)
 import           GHC.Generics                     (Generic)
 import           Prelude                          (Eq, Int, Maybe, Ord, Show,
-                                                   String, compare, pure, ($),
-                                                   (<$>), (<*>), (<>))
+                                                   compare, pure, ($), (<$>),
+                                                   (<*>), (<>))
 import           Servant                          (FromHttpApiData,
                                                    ToHttpApiData)
 import           Web.FormUrlEncoded               (FromForm, fromForm,
@@ -104,7 +104,7 @@ getEntry key = do
     [entry] -> pure entry
     _       -> throwError $ fromErr $ DbError TooManyResults
 
-getEntryByName :: (CanAppM c e m) => String -> m Entry
+getEntryByName :: (CanAppM c e m) => Text -> m Entry
 getEntryByName name = do
   $(logDebug) $ "getEntryByName " <> show name
   c <- asks conn

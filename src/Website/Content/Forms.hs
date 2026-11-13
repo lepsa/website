@@ -4,12 +4,11 @@ module Website.Content.Forms where
 import           Control.Monad.Logger        (MonadLogger, logDebug)
 import           Control.Monad.Reader        (MonadReader, asks)
 import           Data.List                   (intersperse)
-import           Data.Text                   (show)
 import qualified Data.Text                   as T
-import           Prelude                     (Bounded, Enum, Eq,
+import           Prelude                     (Bounded, Enum, Eq, Int,
                                               Maybe (Nothing), Show, String,
-                                              maybe, mconcat, mempty, pure, ($),
-                                              (.), (<$>), (<>), (=<<))
+                                              maybe, mconcat, mempty, pure,
+                                              show, ($), (.), (<$>), (<>), (/), Float)
 import           Servant                     (Proxy (Proxy),
                                               ToHttpApiData (toUrlPiece),
                                               safeLink)
@@ -17,23 +16,26 @@ import           Text.Blaze.Html             (Html, ToMarkup, stringValue,
                                               toHtml, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Auth.Authorisation  (Access (Read, Write), Group)
-import           Website.Content.Common      (AuthEntry, AuthUser, basicPage,
-                                              formField, selectField,
+import           Website.Auth.Authorisation  (Access (Write), Group)
+import           Website.Content.Common      (AuthEntry, AuthFile, AuthUser,
+                                              basicPage, formField, selectField,
                                               staticField)
-import           Website.Content.Htmx        (hxBoost, hxOn, hxPut, hxSwap)
+import           Website.Content.Htmx        (hxBoost, hxIndicator, hxOn,
+                                              hxPost, hxPut, hxSwap)
 import           Website.Data.Entry          (Entry (key, title), EntryCreate,
                                               EntryKey, EntryUpdate, created,
-                                              getEntry, updated, value)
+                                              updated, value)
 import           Website.Data.Env            (HasEnv (timeZone))
+import           Website.Data.File           (sqliteBlobSize)
 import           Website.Data.Permission     (checkPermission)
 import           Website.Data.User           (RequiredUser, User (uuid),
                                               UserCreate, UserKey, UserUpdate,
-                                              email, getUser, group)
+                                              email, group)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDFormCreatePost,
+import           Website.Network.API.CRUD    (CRUDFileCreatePost,
+                                              CRUDFormCreatePost,
                                               CRUDFormUpdatePost)
-import           Website.Network.API.Types   (topAPI)
+import           Website.Network.API.Types   (FileUpload, topAPI)
 import           Website.Types               (CanAppM)
 
 -- | Values for a given form field
@@ -100,7 +102,7 @@ instance GenerateForm Entry () where
           ]
       }
   updateForm entry = do
-    $(logDebug) $ "updateForm Entry " <> show entry
+    $(logDebug) $ "updateForm Entry " <> T.show entry
     tz <- asks timeZone
     pure $ FormData
       { title = "Update Entry",
@@ -160,7 +162,7 @@ instance GenerateForm User Group where
           ]
       }
   updateForm user = do
-    $(logDebug) $ "updateForm User: " <> show user
+    $(logDebug) $ "updateForm User: " <> T.show user
     pure $ FormData
       { title = "Update User",
         createUrl = Nothing,
@@ -215,7 +217,7 @@ generateNewForm p = do
 -- | Generate a form for editing a given value. Fields will be pre-populated with existing values.
 generateUpdateForm :: (ToMarkup b, Show a, HasEnv c, MonadReader c m, MonadLogger m, GenerateForm a b) => a -> m Html
 generateUpdateForm a = do
-  $(logDebug) $ "generateUpdateForm: " <> show a
+  $(logDebug) $ "generateUpdateForm: " <> T.show a
   fd <- updateForm a
   pure $ mconcat
     [ H.form
@@ -234,44 +236,8 @@ generateUpdateForm a = do
       ]
     ]
 
--- User forms
-userUpdateForm :: (HasEnv c, MonadReader c m, MonadLogger m) => User -> m Html
-userUpdateForm u = do
-  ($logDebug) $ "userUpdateForm " <> show u
-  generateUpdateForm u
-
-userCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
-userCreationForm = do
-  $(logDebug) "userCreationForm"
-  checkPermission "GET new user" Read
-  basicPage =<< generateNewForm (Proxy @User)
-
-getUserForUpdate :: (RequiredUser c, CanAppM c e m) => UserKey -> m H.Html
-getUserForUpdate userKey = do
-  $(logDebug) $ "getUserForUpdate " <> show userKey
-  checkPermission "GET update user" Read
-  userUpdateForm =<< Website.Data.User.getUser userKey
-
--- Entry forms
-entryUpdateForm :: (RequiredUser c, HasEnv c, MonadReader c m, MonadLogger m) => Entry -> m Html
-entryUpdateForm e = do
-  $(logDebug) $ "entryUpdateForm " <> show e
-  generateUpdateForm e
-
-entryCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
-entryCreationForm = do
-  $(logDebug) "entryCreationForm"
-  checkPermission "GET new entry" Write
-  basicPage =<< generateNewForm (Proxy @Entry)
-
-getEntryForUpdate :: (RequiredUser c, CanAppM c e m) => EntryKey -> m H.Html
-getEntryForUpdate entry = do
-  $(logDebug) $ "getEntryForUpdate " <> show entry
-  checkPermission "GET update entry" Read
-  entryUpdateForm =<< Website.Data.Entry.getEntry entry
 
 -- File form
-{-
 fileCreationForm :: (RequiredUser c, CanAppM c e m) => m Html
 fileCreationForm = do
   $(logDebug) "fileCreationForm"
@@ -281,7 +247,7 @@ fileCreationForm = do
       -- ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
       ! HA.enctype "multipart/form-data"
-      ! hxPost (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (Website.Network.API.CRUD.CRUDCreateFile FileUpload)))))
+      ! hxPost (H.textValue $ "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDFileCreatePost FileUpload)))))
       ! hxIndicator "#spinner"
       $ mconcat
       [ H.p $ H.label
@@ -290,6 +256,8 @@ fileCreationForm = do
       , H.p $ H.input
         ! HA.type_ "file"
         ! HA.name "file"
+        ! HA.required "true"
+      , H.p $ toHtml $ "Max file size: " <> maxBytes <> " bytes (" <> megabytes <> "MB)"
       , H.p $ H.button
         ! HA.type_ "submit"
         $ "Upload"
@@ -299,4 +267,6 @@ fileCreationForm = do
         ! HA.src "/static/90-ring.svg"
       ]
     ]
--}
+  where
+    maxBytes = show @Int sqliteBlobSize
+    megabytes = show @Float (sqliteBlobSize / 1024 / 1024)

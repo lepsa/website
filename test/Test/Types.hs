@@ -209,6 +209,7 @@ instance TraversableB PasswordUpdate
 
 data UpdateUser v = UpdateUser
   { _uuKey      :: Key v
+  , _uuUser     :: TestUser v
   , _uuPassword :: Maybe (PasswordUpdate v)
   , _uuGroup    :: Maybe Group
   , _uuAuth     :: Auth v

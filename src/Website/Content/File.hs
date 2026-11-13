@@ -1,7 +1,5 @@
 module Website.Content.File where
 
-{-
-
 import           Control.Monad.IO.Class      (MonadIO (liftIO))
 import           Control.Monad.Logger        (logDebug)
 import           Control.Monad.Reader        (asks)
@@ -25,7 +23,7 @@ import qualified Text.Blaze.Html             as H
 import           Text.Blaze.Html             (Html, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
-import           Website.Content.Common      (AuthFile, basicPage, htmlLink,
+import           Website.Content.Common      (AuthFile, basicPage, hrefLink,
                                               whenLoggedIn)
 import           Website.Content.Htmx        (hxBoost, hxConfirm, hxDelete,
                                               hxOn, hxSwap, hxTarget, hxTrigger)
@@ -40,8 +38,8 @@ import           Website.Data.File           (CreateFile (CreateFile),
                                               getFileMeta, getFileMetas)
 import           Website.Data.User           (OptionalUser, RequiredUser)
 import           Website.Data.Util           (timeFormat)
-import           Website.Network.API.CRUD    (CRUDFormCreateGet, CRUDDelete,
-                                              CRUDRead', WithCT (WithCT))
+import           Website.Network.API.CRUD    (CRUDFileCreateGet, CRUDFileDelete,
+                                              CRUDFileRead, WithCT (WithCT))
 import           Website.Network.API.Types   (topAPI)
 import           Website.Types               (CanAppM)
 
@@ -55,7 +53,7 @@ uploadFile formData = do
     _    -> throwError_ TooManyUploads
   f <- mkFile fd >>= createFile
   pure $
-    addHeader (pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) f.fileId))
+    addHeader (pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDFileRead FileId))) f.fileId))
     "Uploaded"
   where
     mkFile :: FileData Tmp -> m CreateFile
@@ -98,7 +96,8 @@ getFiles = do
     newFile = H.a
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthFile CRUDCreateForm)) $ "Create File"
+      ! hrefLink (Proxy @(AuthFile CRUDFileCreateGet))
+      $ "Create File"
     delFile m = H.button
       ! hxTrigger "click"
       ! hxSwap "outerHTML swap"
@@ -106,15 +105,15 @@ getFiles = do
       ! hxConfirm (H.textValue $ "Confirm deletion: " <> m.fileMetaName)
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthFile (CRUDDelete FileId))) m.fileMetaId)
+      ! hxDelete (H.textValue $ mappend "/" . toUrlPiece $ safeLink topAPI (Proxy @(AuthFile (CRUDFileDelete FileId))) m.fileMetaId)
       $ "Delete"
     fileLink tz m = mconcat
       [ H.a
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDRead' FileId))) m.fileMetaId))
+      ! HA.href (H.textValue $ pack "/" <> toUrlPiece (safeLink topAPI (Proxy @(AuthFile (CRUDFileRead FileId))) m.fileMetaId))
       ! HA.download (H.textValue m.fileMetaName)
-      $ H.toHtml m.fileMetaName,
-      H.toHtml $ " " <> timeFormat tz m.fileMetaCreated
+      $ H.toHtml m.fileMetaName
+      , H.toHtml $ " " <> timeFormat tz m.fileMetaCreated
       ]
     sortFileMeta a b = a.fileMetaName `compare` b.fileMetaName
 
@@ -123,6 +122,4 @@ deleteFile fId = do
   $(logDebug) $ "deleteFile " <> T.pack (show fId)
   m <- getFileMeta fId
   Website.Data.File.deleteFile fId
-  pure $ H.toHtml $ "Deleted " <> m.fileMetaName
-
--}
+  pure $ H.p $ H.toHtml $ "Deleted " <> m.fileMetaName

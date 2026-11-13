@@ -13,7 +13,7 @@ import           Text.Blaze.Html             (Html, toHtml, (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import           Website.Content.Common      (AuthUser, basicPage,
-                                              editDeleteButtons, htmlLink)
+                                              editDeleteButtons, hrefLink)
 import           Website.Content.Htmx        (hxBoost, hxOn)
 import           Website.Data.Env            (HasEnv)
 import           Website.Data.User           (RequiredUser,
@@ -65,5 +65,6 @@ userList users = do
     newUser = H.a
       ! hxBoost
       ! hxOn "::config-request" "setXsrfHeader(event)"
-      ! htmlLink (Proxy @(AuthUser (CRUDFormCreatePost UserCreate))) $ "Create User"
+      ! hrefLink (Proxy @(AuthUser (CRUDFormCreatePost UserCreate)))
+      $ "Create User"
     sortUsers = sortBy $ \a b -> compare a.email b.email
